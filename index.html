@@ -45,13 +45,13 @@ dialog input,dialog textarea,dialog select{width:100%}
 <main id="list"></main>
 <button class="fab p" id="fab">+</button>
 <button class="fab fabl p" id="fabE" title="Edit parts list" style="display:none">✎</button>
-<div id="bn"><button data-v="dash">📊 Dashboard</button><button data-v="garage">🚗 Garage</button><button data-v="inventory">🧴 Inventory</button></div>
+<div id="bn"><button data-v="garage">🚗 Garage</button><button data-v="dash">📊 Dashboard</button><button data-v="inventory">🧴 Inventory</button></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
 <script>
 const TYPES=[["dash","Dashboard"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
 const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair","upgrade"];
-let S={vehicles:[],records:[],inv:[],cur:null,units:"imperial"},view="dash",dk="All",bk="dash",tab="dash",ic="All",gk="All",em=false,lk="";
+let S={vehicles:[],records:[],inv:[],cur:null,units:"imperial"},view="garage",dk="All",bk="garage",tab="dash",ic="All",gk="All",em=false,lk="";
 try{const r=localStorage.getItem("garagelog");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 S.records=S.records.filter(r=>r.type!=="fuel");
 const save=()=>{try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}push()};
