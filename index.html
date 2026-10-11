@@ -36,6 +36,7 @@ dialog input,dialog textarea,dialog select{width:100%}
 .x{float:right;border:0;background:none;color:var(--mu);padding:0 4px}
 .ph{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.ph img{width:64px;height:64px;object-fit:cover;border-radius:8px}
 .sp{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--bd)}.sp:last-child{border:0}
+.sum{display:flex;gap:8px;margin-bottom:10px}.sum div{flex:1;text-align:center;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:8px 4px}.sum b{display:block;font-size:22px}.sec{display:flex;justify-content:space-between;margin:14px 2px 6px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mu)}.sec a{font-weight:400;text-transform:none;letter-spacing:0;color:var(--ac);cursor:pointer}.c h3.dt{font-size:15px}
 .q{display:flex;gap:8px;align-items:center;margin-top:8px}.q button{width:40px}
 </style>
 </head>
@@ -44,13 +45,13 @@ dialog input,dialog textarea,dialog select{width:100%}
 <main id="list"></main>
 <button class="fab p" id="fab">+</button>
 <button class="fab fabl p" id="fabE" title="Edit parts list" style="display:none">✎</button>
-<div id="bn"><button data-v="garage">🚗 Garage</button><button data-v="inventory">🧴 Inventory</button></div>
+<div id="bn"><button data-v="dash">📊 Dashboard</button><button data-v="garage">🚗 Garage</button><button data-v="inventory">🧴 Inventory</button></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
 <script>
-const TYPES=[["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
+const TYPES=[["dash","Dashboard"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
 const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair","upgrade"];
-let S={vehicles:[],records:[],inv:[],cur:null,units:"imperial"},view="garage",tab="service",ic="All",gk="All",em=false,lk="";
+let S={vehicles:[],records:[],inv:[],cur:null,units:"imperial"},view="dash",dk="All",bk="dash",tab="dash",ic="All",gk="All",em=false,lk="";
 try{const r=localStorage.getItem("garagelog");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 S.records=S.records.filter(r=>r.type!=="fuel");
 const save=()=>{try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}push()};
@@ -66,7 +67,7 @@ const dU=(id=S.cur)=>isH(id)?"hrs":S.units==="imperial"?"mi":"km";
 const soonAt=id=>isH(id)?10:500;
 const kIc=k=>(KINDS.find(x=>x[0]===k)||KINDS[KINDS.length-1])[2];
 const veh=()=>S.vehicles.find(v=>v.id===S.cur);
-const lastOdo=id=>Math.max(0,...S.records.filter(r=>r.vid===id&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
+const lastOdo=id=>Math.max(0,...S.records.filter(r=>r.vid===id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
 function rinfo(r,lo){
   if(r.done)return{st:-1,txt:"Done"};let st=0,p=[];
   if(r.date){const d=Math.round((new Date(r.date)-new Date(today()))/864e5);st=d<0?2:d<=30?1:0;p.push(d<0?`${-d}d overdue`:d===0?"due today":`in ${d}d`)}
@@ -84,16 +85,45 @@ function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
   const key=view+tab+S.cur;if(key!==lk){em=false;lk=key}
   const v=veh(),inV=view==="vehicle"&&v;
-  $("hd").innerHTML=inV?`<button id="back">←</button><b class="t">${esc(v.name)}</b><button id="ev">✎</button><button id="more">⋯</button>`:`<b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><button id="more">⋯</button>`;
+  $("hd").innerHTML=inV?`<button id="back">←</button><b class="t">${esc(v.name)}</b><button id="ev">✎</button><button id="more">⋯</button>`:`<b class="t">${view==="inventory"?"Inventory":view==="dash"?"Dashboard":"My Garage"}</b><button id="more">⋯</button>`;
   const pk=KINDS.filter(k=>S.vehicles.some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
-  const tl=inV?TYPES.filter(t=>!(isT(v.id)&&t[0]==="odometer")).map(([k,l])=>[k,k==="odometer"&&isH(v.id)?"Hours":l]):view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
-  $("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)?"on":""}" data-t="${k}">${l}</button>`).join("");
-  $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
-  $("fab").style.display="";$("fabE").style.display=inV?"":"none";$("fabE").textContent=em&&tab!=="parts"?"✓":"✎";
+  const tl=inV?TYPES.filter(t=>!(isT(v.id)&&t[0]==="odometer")).map(([k,l])=>[k,k==="odometer"&&isH(v.id)?"Hours":l]):view==="dash"?[["All","All"],...GK.concat(S.vehicles.some(x=>x.kind==="other")?[["other","Other"]]:[])]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
+  $("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:view==="dash"?dk:gk)?"on":""}" data-t="${k}">${l}</button>`).join("");
+  $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":view==="dash"?"dash":"garage")));
+  $("fab").style.display=view==="dash"||inV&&tab==="dash"?"none":"";$("fabE").style.display=inV&&tab!=="dash"?"":"none";$("fabE").textContent=em&&tab!=="parts"?"✓":"✎";
   const L=$("list");
-  if(inV)L.innerHTML=(v.cover?`<img src="${v.cover}" style="width:100%;height:150px;object-fit:cover;border-radius:12px;margin-bottom:10px">`:"")+(tab==="parts"?partsView(v):recView(v));
+  if(inV)L.innerHTML=(v.cover?`<img src="${v.cover}" style="width:100%;height:150px;object-fit:cover;border-radius:12px;margin-bottom:10px">`:"")+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
   else if(view==="inventory")L.innerHTML=invView();
+  else if(view==="dash")L.innerHTML=gdashView();
   else L.innerHTML=garageView();
+}
+const GK=[["car","Vehicles"],["offroad","Off-road"],["trailer","Trailers"],["mower","Mowers"]];
+function gdashView(){
+  const vs=S.vehicles.filter(v=>dk==="All"||v.kind===dk);
+  if(!vs.length)return'<div class="empty">'+(S.vehicles.length?"No equipment of this type yet.":"Your garage is empty. Open the Garage tab and tap + to add equipment.")+'</div>';
+  const ids=new Set(vs.map(v=>v.id)),up=[];
+  vs.forEach(v=>{const lo=lastOdo(v.id);
+    S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done).forEach(r=>up.push({v,r,i:rinfo(r,lo)}));
+    if(v.kind==="offroad"&&v.ohv){const r={desc:"OHV sticker expires",date:v.ohv,odo:"",vid:v.id};up.push({v,r,i:rinfo(r,lo)})}});
+  up.sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
+  const rec=S.records.filter(r=>ids.has(r.vid)&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,10);
+  const upH=up.length?up.map(({v,r,i})=>`<div class="c" data-open="${v.id}" style="cursor:pointer"><h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${kIc(v.kind)} ${esc(v.name)} · ${esc(i.txt)}${r.date?" · due "+r.date:""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${r.id?`<button style="margin-top:8px" data-done="${r.id}">Mark done</button>`:""}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders.</div>';
+  const rcH=rec.length?rec.map(r=>{const v=vOf(r.vid),odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(r.vid):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
+    return `<div class="c" data-open="${r.vid}" style="cursor:pointer"><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":""}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${kIc(v.kind)} ${esc(v.name)} · ${r.date||"no date"}${odo}</div></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
+  return '<div class="sec">Upcoming reminders</div>'+upH+'<div class="sec">Recent services &amp; repairs</div>'+rcH;
+}
+function dashView(v){
+  const lo=lastOdo(v.id),up=S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done).map(r=>({r,i:rinfo(r,lo)}));
+  if(v.kind==="offroad"&&v.ohv){const r={desc:"OHV sticker expires",date:v.ohv,odo:"",vid:v.id};up.push({r,i:rinfo(r,lo)})}
+  up.sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
+  const od=up.filter(x=>x.i.st===2).length,ds=up.filter(x=>x.i.st===1).length;
+  const rec=S.records.filter(r=>r.vid===v.id&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,6);
+  const mt=isT(v.id)?"":`<div><b>${lo.toLocaleString()}</b><span class="m">${dU(v.id)}</span></div>`;
+  const sum=`<div class="sum"><div><b style="color:${od?"var(--bad)":"inherit"}">${od}</b><span class="m">Overdue</span></div><div><b style="color:${ds?"var(--warn)":"inherit"}">${ds}</b><span class="m">Due soon</span></div>${mt}</div>`;
+  const upH=up.length?up.map(({r,i})=>`<div class="c"><h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${r.id?`<button style="margin-top:8px" data-done="${r.id}">Mark done</button>`:""}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders.</div>';
+  const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
+    return `<div class="c"><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":""}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
+  return '<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH;
 }
 function garageView(){
   if(!S.vehicles.length)return'<div class="empty">Your garage is empty. Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
@@ -210,23 +240,24 @@ function invForm(id){
 }
 function dataForm(){
   show(`<h3 style="margin:0">Settings &amp; data</h3><label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
-  <div class="m" style="margin-top:10px">Server sync: <span id="ss">${syncMsg}</span></div>${window.GarageNative?`<label>Server address (TrueNAS)</label><input id="srv" placeholder="http://192.168.1.50:30500" value="${esc(GarageNative.getServer())}"><button id="srvb" style="margin-top:6px;width:100%">Save &amp; sync</button>`:""}<label>Backup (copy this) or paste a backup to restore. Photos make it long.</label><textarea id="bk" rows="5">${esc(JSON.stringify(S))}</textarea>
+  <div class="m" style="margin-top:10px">Server sync: <span id="ss">${syncMsg}</span></div><label>Backup (copy this) or paste a backup to restore. Photos make it long.</label><textarea id="bk" rows="5">${esc(JSON.stringify(S))}</textarea>
   <div class="row" style="margin-top:10px"><button id="imp" style="flex:1">Restore from text</button><button class="p" id="ok" style="flex:1">Done</button></div>`);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
-  if($("srvb"))$("srvb").onclick=()=>{GarageNative.setServer($("srv").value.trim());$("ss").textContent="checking...";pull(true).then(()=>{if($("ss"))$("ss").textContent=syncMsg})};$("ok").onclick=()=>$("dlg").close();
+  $("ok").onclick=()=>$("dlg").close();
   $("imp").onclick=()=>{try{const d=JSON.parse($("bk").value);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;S=Object.assign({inv:[],units:"imperial"},d);S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
 }
-$("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more")dataForm();else if(i==="ev")vehForm(true)};
-$("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
+$("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view=bk;bk="garage";render()}else if(i==="more")dataForm();else if(i==="ev")vehForm(true)};
+$("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else if(view==="dash")dk=t;else gk=t;render()};
 $("bn").onclick=e=>{const v=e.target.dataset.v;if(v){view=v;render()}};
 $("fab").onclick=()=>view==="vehicle"?(tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
 $("fabE").onclick=()=>{if(tab==="parts")specForm();else{em=!em;render()}};
-$("list").onclick=e=>{const d=e.target.dataset;
-  if(d.open){S.cur=d.open;view="vehicle";tab="service";save();render()}
+$("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");
+  if(op&&!d.done){bk=view==="dash"?"dash":"garage";S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
   else if(d.del){if(confirm("Delete this entry?")){S.records=S.records.filter(r=>r.id!==d.del);save();render()}}
   else if(d.edit)openForm(d.edit);
   else if(d.done){S.records.find(x=>x.id===d.done).done=true;save();render()}
   else if(d.specs)specForm();
+  else if(d.go){tab=d.go;render()}
   else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${S.records.find(r=>r.id===id)[g||"ph"][+i]}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
   else if(d.idel){if(confirm("Remove this item?")){S.inv=S.inv.filter(i=>i.id!==d.idel);save();render()}}
   else if(d.iedit)invForm(d.iedit);
@@ -234,13 +265,12 @@ $("list").onclick=e=>{const d=e.target.dataset;
 const fixV=v=>{v.specs=v.specs||{};if(!v.plist){const sp=v.specs;v.plist=SPECS.filter(([k])=>sp[k]).map(([k,l])=>({l,v:sp[k]}));if(sp.other)v.plist.push({l:"Other",v:sp.other})}if(!v.pclean){v.plist=v.plist.filter(r=>r.v||!SPECS.some(x=>x[1]===r.l));v.pclean=1}v.kind=v.kind==="atv"||v.kind==="bike"?"offroad":v.kind||"car";v.meter=v.meter||"dist"};S.vehicles.forEach(fixV);
 render();
 let syncMsg="not connected yet",pt=null;
-const api=()=>{const n=window.GarageNative;if(!n)return"api/state";const u=(n.getServer()||"").trim().replace(/\/+$/,"");return u?u+"/api/state":""};
+const api=()=>"api/state";
 const push=()=>{clearTimeout(pt);pt=setTimeout(()=>{pt=null;const u=api();if(!u){syncMsg="no server address set";return}fetch(u,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(S)}).then(r=>{if(!r.ok)throw 0;syncMsg="saved to server"}).catch(()=>{syncMsg="offline (saved on this device only)"})},400)};
 const adopt=d=>{S=Object.assign({inv:[],units:"imperial"},d);S.records=S.records.filter(r=>r.type!=="fuel");S.vehicles.forEach(fixV);try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}};
 const pull=f=>{if(!f&&(pt||$("dlg").open))return Promise.resolve();const u=api();if(!u){syncMsg="no server address set";return Promise.resolve()}return fetch(u,{cache:"no-store"}).then(r=>r.json()).then(d=>{syncMsg="saved to server";if(d&&Array.isArray(d.vehicles)&&(d.vehicles.length||(d.records||[]).length||(d.inv||[]).length)){if(JSON.stringify(d)!==JSON.stringify(S)){adopt(d);if(view==="vehicle"&&!veh())view="garage";render()}}else if(S.vehicles.length)push()}).catch(()=>{syncMsg="offline (saved on this device only)"})};
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 pull();
-if(window.GarageNative&&!GarageNative.getServer()&&!S.vehicles.length)setTimeout(dataForm,300);
 </script>
 </body>
 </html>

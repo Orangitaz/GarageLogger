@@ -1,23 +1,21 @@
 const http=require("http"),fs=require("fs"),path=require("path");
-const CORS={"Access-Control-Allow-Origin":"null","Access-Control-Allow-Methods":"GET,PUT,OPTIONS","Access-Control-Allow-Headers":"Content-Type"};
 const DIR=process.env.DATA_DIR||"/data",FILE=path.join(DIR,"db.json"),PORT=+process.env.PORT||3000;
 fs.mkdirSync(DIR,{recursive:true});
 http.createServer((req,res)=>{
   const u=req.url.split("?")[0];
   if(u==="/api/state"){
-    if(req.method==="OPTIONS"){res.writeHead(204,CORS);return res.end()}
     if(req.method==="GET"){
       let d="{}";try{d=fs.readFileSync(FILE,"utf8")}catch(e){}
-      res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store",...CORS});return res.end(d);
+      res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});return res.end(d);
     }
     if(req.method==="PUT"){
       const b=[];let n=0;
-      req.on("data",c=>{n+=c.length;if(n>200e6){res.writeHead(413,CORS).end();req.destroy()}else b.push(c)});
+      req.on("data",c=>{n+=c.length;if(n>200e6){res.writeHead(413).end();req.destroy()}else b.push(c)});
       req.on("end",()=>{try{
         const t=Buffer.concat(b).toString();JSON.parse(t);
         try{fs.copyFileSync(FILE,FILE+".bak")}catch(e){}
-        fs.writeFileSync(FILE+".tmp",t);fs.renameSync(FILE+".tmp",FILE);res.writeHead(204,CORS).end();
-      }catch(e){res.writeHead(400,CORS).end()}});
+        fs.writeFileSync(FILE+".tmp",t);fs.renameSync(FILE+".tmp",FILE);res.writeHead(204).end();
+      }catch(e){res.writeHead(400).end()}});
       return;
     }
   }
