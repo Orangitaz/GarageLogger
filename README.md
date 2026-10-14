@@ -1,4 +1,25 @@
-# Garage Log - container image for TrueNAS
+# Garage Log
+
+A self-hosted maintenance log for the things in your garage: cars and trucks, UTVs, ATVs and dirt bikes, trailers, mowers and anything else with an engine. It runs as one small container on your own server (built for TrueNAS), keeps everything in one data folder, and has no cost tracking or accounts to manage.
+
+<p>
+<img src="screenshots/garage.png" width="23%" alt="My Garage">
+<img src="screenshots/dashboard.png" width="23%" alt="Equipment dashboard">
+<img src="screenshots/service-form.png" width="23%" alt="Logging a service">
+<img src="screenshots/dashboard-light.png" width="23%" alt="Light theme">
+</p>
+
+*Screenshots show sample data.*
+
+## What it does
+- **Garage and dashboards:** every piece of equipment gets a card with a status, and a dashboard with upcoming reminders and recent services and repairs.
+- **Service, repair and upgrade records** with notes, photos, receipts, quick-pick services and parts used. Parts used can come out of your inventory automatically.
+- **Reminders** by date, miles or hours, with repeats (every 6 months, 1, 2 or 3 years). Mileage reminders show an estimated date. Registration, the OHV sticker and your own dates (inspection, emissions, insurance) renew with one tap.
+- **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges.
+- **Alerts** to your phone through ntfy, Home Assistant or Gotify, and a status feed for Home Assistant dashboards.
+- **Recall check** by VIN against the US government's NHTSA database.
+- **Documents** (PDFs and photos), **printable service history**, **CSV export**, **"when did I last" search**, **archive** for sold equipment, and **Undo** for deletes.
+- Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes. Optional password.
 
 One image, one port, one data folder. No YAML needed.
 
