@@ -25,7 +25,7 @@ One image, one port, one data folder. No YAML needed.
    - **Port:** container port `3000`, host (node) port `30500`, protocol TCP
    - **Storage:** add a **Host Path** volume. Host path = your dataset (for example `/mnt/YOURPOOL/apps/garage-log-data`),
      mount path = `/data`. If you see an **Automatic Permissions** checkbox, tick it.
-   - Leave command, entrypoint and environment variables empty (the image already has them).
+   - Leave command and entrypoint empty. Environment variables are optional: `GARAGE_PASSWORD` turns on a password (see below).
 4. Click **Install** and wait for the app to show **Running**.
 5. Open `http://TRUENAS-IP:30500` in a browser. Tap the menu on your phone's browser and choose **Add to Home screen** (or **Install app**). It opens full screen with its own icon.
 
@@ -52,12 +52,28 @@ In the app go to **⋯ > Settings & data > Reminder alerts** and paste a web add
 
 Press **Send test message** to check it. The server then sends a message once a day at the time you pick, only when something has newly become due soon or overdue, and again weekly while it stays overdue. The server needs to be able to reach the address (a home server on your network works; ntfy.sh needs internet access).
 
+## Repeating reminders, registration and the OHV sticker
+- On any reminder, **Repeats** can be every 6 months, 1 year, 2 years, 3 years, or a custom number of months. Repeating reminders show **Renew** instead of Mark done. Renew marks it done and creates the next one, with the date filled in for you to adjust.
+- Equipment has a **Registration expiration** (not for mowers) and offroad equipment has an **OHV sticker expiration**. Each has its own renewal interval, set to 2 years by default. They show on the dashboard with a **Renew** button and are included in the alerts.
+- Reminders that come due by miles or hours show an estimated date, worked out from how fast your odometer or hour readings have been climbing (needs readings on at least two dates, two weeks or more apart).
+
+## Parts from inventory, search and export
+- In a service, repair or upgrade, **Take from inventory** subtracts what you used from your inventory. Editing or deleting the entry puts the difference back.
+- **Last done** on the dashboard searches descriptions, parts and notes and shows when and at what reading it was last done.
+- **Export records (CSV)** is under **⋯ > Settings & data** (all equipment) and in each equipment's **More** menu (that one only).
+
+## Recalls (optional, needs internet on the server)
+Put the VIN on a car or truck and Garage Log asks the US government's NHTSA recall database about it once a week. It looks up the year, make and model from the VIN and lists the recalls NHTSA has for that model year, so the list can include recalls already fixed on your vehicle. Confirm with your VIN at nhtsa.gov/recalls, then tap **Mark handled** on any that are done. New recalls also go to your reminder alert address if you set one. **More > Check for recalls (VIN)** checks right away.
+
+## Password (optional)
+Set an environment variable `GARAGE_PASSWORD` on the app (TrueNAS: Edit > Environment Variables). The browser then asks for a password (any user name) before showing the app, your data or photos. Without it the app is open to anyone who can reach the port. The password is sent in a form that is only protected when you use the app through HTTPS (a reverse proxy) or a VPN, so it keeps casual visitors out on a home network but is not a substitute for those.
+
 ## Updating
 Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > garage-log > **Edit**, re-save
 (or use the app's update/redeploy action) so it pulls the newest `latest` image. Your data stays in the dataset.
 
 ## Notes
-- No login. Keep it on your home network or behind a VPN or reverse proxy.
+- No login unless you set `GARAGE_PASSWORD`. Keep it on your home network or behind a VPN or reverse proxy.
 - Change `30500` to any free port; the container always listens on 3000.
 - No GitHub? Build on any PC with Docker: `docker build -t YOURUSER/garage-log .` then
   `docker push YOURUSER/garage-log` (Docker Hub), and use `YOURUSER/garage-log` as the image name.

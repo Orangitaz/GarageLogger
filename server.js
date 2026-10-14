@@ -1,5 +1,7 @@
 const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto");
 const DIR=process.env.DATA_DIR||"/data",FILE=path.join(DIR,"db.json"),PHOTOS=path.join(DIR,"photos"),BACKUPS=path.join(DIR,"backups"),ALERT_STATE=path.join(DIR,"alert-state.json"),PORT=+process.env.PORT||3000;
+const RECALLS=path.join(DIR,"recalls.json"),VPIC=process.env.VPIC_URL||"https://vpic.nhtsa.dot.gov",RAPI=process.env.RECALL_URL||"https://api.nhtsa.gov";
+const PASS=process.env.GARAGE_PASSWORD||"",sha=x=>crypto.createHash("sha256").update(String(x)).digest(),PASSH=PASS?sha(PASS):null;
 fs.mkdirSync(PHOTOS,{recursive:true});
 const ST={"/manifest.webmanifest":"application/manifest+json","/sw.js":"text/javascript","/icon.svg":"image/svg+xml","/icon-192.png":"image/png","/icon-512.png":"image/png","/apple-touch-icon.png":"image/png"};
 const EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"},MIME={jpg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif"};
@@ -70,6 +72,7 @@ function dueItems(S,tz){
     };
     for(const r of R.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done)){const i=info(r);if(i.st>=1)out.push({id:r.id,name:v.name,what:r.desc||"Reminder",st:i.st,txt:i.txt})}
     if(v.kind==="offroad"&&v.ohv){const i=info({date:v.ohv,odo:""});if(i.st>=1)out.push({id:"ohv:"+v.id,name:v.name,what:"OHV sticker expires",st:i.st,txt:i.txt})}
+    if(v.kind!=="mower"&&v.reg){const i=info({date:v.reg,odo:""});if(i.st>=1)out.push({id:"reg:"+v.id,name:v.name,what:"Registration expires",st:i.st,txt:i.txt})}
   }
   return out.sort((a,b)=>b.st-a.st);
 }
@@ -106,6 +109,44 @@ async function runAlerts(){
 }
 setTimeout(runAlerts,20000);setInterval(runAlerts,15*60e3);
 
+// ---------- recalls (NHTSA, by VIN) ----------
+const VINRE=/^[A-HJ-NPR-Z0-9]{17}$/i,clip=(x,n)=>String(x??"").slice(0,n);
+const readRc=()=>{try{return JSON.parse(fs.readFileSync(RECALLS,"utf8"))}catch(e){return{}}};
+async function jget(url){const r=await fetch(url,{signal:AbortSignal.timeout(15000),headers:{Accept:"application/json"}});if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
+// Decode the VIN to year/make/model, then list the recall campaigns NHTSA has for that model year.
+async function lookupRecalls(vin){
+  const d=await jget(VPIC+"/api/vehicles/DecodeVinValues/"+encodeURIComponent(vin)+"?format=json"),x=(d.Results||[])[0]||{};
+  const make=clip(x.Make,60).trim(),model=clip(x.Model,80).trim(),year=clip(x.ModelYear,4).trim();
+  if(!make||!model||!/^\d{4}$/.test(year)){const e=new Error("decode");e.code="decode";throw e}
+  const r=await jget(RAPI+"/recalls/recallsByVehicle?"+new URLSearchParams({make,model,modelYear:year}));
+  const items=(r.results||[]).slice(0,30).map(i=>({id:clip(i.NHTSACampaignNumber,20),comp:clip(i.Component,120),sum:clip(i.Summary,700),rem:clip(i.Remedy,500),date:clip(i.ReportReceivedDate,20),park:!!i.parkIt})).filter(i=>i.id);
+  return{vin,at:Date.now(),make,model,year,items};
+}
+let rcRunning=false;
+async function runRecalls(){
+  if(rcRunning)return;rcRunning=true;
+  try{
+    const S=read(),rc=readRc(),out={},a=S.alert,alertOn=a&&/^https?:\/\//.test(a.url||"");let changed=false;
+    for(const v of S.vehicles||[]){
+      const vin=String(v.vin||"").trim().toUpperCase();if(!VINRE.test(vin))continue;
+      let e=rc[v.id];
+      if(!e||e.vin!==vin||Date.now()-e.at>7*DAY){
+        try{const n=await lookupRecalls(vin);n.notified=e&&e.vin===vin?e.notified||[]:[];e=n;changed=true}
+        catch(err){console.error("recall check failed:",err.message);if(!e||e.vin!==vin)continue}
+      }
+      const ok=v.rcOk||[],fresh=(e.items||[]).filter(i=>!ok.includes(i.id)&&!(e.notified||[]).includes(i.id));
+      if(fresh.length&&alertOn){
+        try{await sendAlert(a,"Garage Log: "+fresh.length+" recall"+(fresh.length===1?"":"s")+" for "+v.name,fresh.map(i=>`${i.comp||"Recall"} (${i.id})`).join("\n")+"\nCheck your VIN at nhtsa.gov/recalls",true);e.notified=[...(e.notified||[]),...fresh.map(i=>i.id)];changed=true}
+        catch(err){console.error("recall alert failed:",err.message)}
+      }
+      out[v.id]=e;
+    }
+    if(changed||Object.keys(out).length!==Object.keys(rc).length)fs.writeFileSync(RECALLS,JSON.stringify(out));
+  }catch(e){console.error("recall run failed:",e.message)}
+  finally{rcRunning=false}
+}
+setTimeout(runRecalls,60000);setInterval(runRecalls,6*3600e3);
+
 // ---------- http ----------
 const body=(req,limit,cb)=>{
   const b=[];let n=0,dead=false;
@@ -113,8 +154,19 @@ const body=(req,limit,cb)=>{
   req.on("end",()=>{if(!dead)cb(Buffer.concat(b))});
   req.on("error",()=>{});
 };
+function authed(req){
+  if(!PASS)return true;
+  const m=/^Basic (.+)$/i.exec(req.headers.authorization||"");if(!m)return false;
+  const t=Buffer.from(m[1],"base64").toString(),i=t.indexOf(":");
+  return i>=0&&crypto.timingSafeEqual(sha(t.slice(i+1)),PASSH);
+}
 http.createServer((req,res)=>{
   const u=req.url.split("?")[0];
+  // Optional password (GARAGE_PASSWORD). The icons, manifest and health check stay open so installing the app still works.
+  if(PASS&&!ST[u]&&u!=="/healthz"&&!authed(req)){
+    req.resume();
+    return setTimeout(()=>{res.writeHead(401,{"WWW-Authenticate":'Basic realm="Garage Log", charset="UTF-8"',"Content-Type":"text/plain"});res.end("Password required")},400);
+  }
   if(u==="/api/state"){
     if(req.method==="GET"){
       let d="{}";try{d=fs.readFileSync(FILE,"utf8")}catch(e){}
@@ -146,6 +198,18 @@ http.createServer((req,res)=>{
     try{const b=fs.readFileSync(path.join(PHOTOS,n));res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"Cache-Control":"public, max-age=31536000, immutable"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
+  if(u==="/api/recalls"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(readRc()))}
+  if(u==="/api/recalls/check"&&req.method==="POST")return body(req,10e3,async buf=>{
+    let j;try{j=JSON.parse(buf.toString())}catch(e){res.writeHead(400,JSON_H);return res.end('{"error":"bad"}')}
+    const vin=String(j.vin||"").trim().toUpperCase(),vid=clip(j.vid,40);
+    if(!vid||!VINRE.test(vin)){res.writeHead(400,JSON_H);return res.end('{"error":"vin"}')}
+    try{
+      const e=await lookupRecalls(vin),rc=readRc();
+      e.notified=rc[vid]&&rc[vid].vin===vin?rc[vid].notified||[]:[];rc[vid]=e;
+      fs.writeFileSync(RECALLS,JSON.stringify(rc));
+      res.writeHead(200,JSON_H);res.end(JSON.stringify(e));
+    }catch(err){res.writeHead(502,JSON_H);res.end(JSON.stringify({error:err.code==="decode"?"decode":"net"}))}
+  });
   if(u==="/api/alert/test"&&req.method==="POST")return body(req,10e3,async buf=>{
     try{
       const a=JSON.parse(buf.toString());
