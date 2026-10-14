@@ -1,6 +1,7 @@
 const http=require("http"),fs=require("fs"),path=require("path");
 const DIR=process.env.DATA_DIR||"/data",FILE=path.join(DIR,"db.json"),PORT=+process.env.PORT||3000;
 fs.mkdirSync(DIR,{recursive:true});
+const ST={"/manifest.webmanifest":"application/manifest+json","/sw.js":"text/javascript","/icon.svg":"image/svg+xml","/icon-192.png":"image/png","/icon-512.png":"image/png","/apple-touch-icon.png":"image/png"};
 http.createServer((req,res)=>{
   const u=req.url.split("?")[0];
   if(u==="/api/state"){
@@ -18,6 +19,10 @@ http.createServer((req,res)=>{
       }catch(e){res.writeHead(400).end()}});
       return;
     }
+  }
+  if(ST[u]){
+    try{const b=fs.readFileSync(path.join(__dirname,"public",u));res.writeHead(200,{"Content-Type":ST[u],"Cache-Control":u==="/sw.js"?"no-cache":"public, max-age=86400"});return res.end(b)}
+    catch(e){res.writeHead(404).end();return}
   }
   if(u==="/healthz"){res.writeHead(200,{"Content-Type":"text/plain"});return res.end("ok")}
   if(u==="/"||u==="/index.html"){

@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#06080c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Garage Log">
 <title>Garage Log</title>
 <style>
 :root{--bg:#eef1f7;--card:rgba(255,255,255,.82);--pop:#fff;--field:#f1f4f9;--hbg:rgba(238,241,247,.8);--tx:#121821;--mu:#667386;--ac:#00a56a;--ac2:#0a8fd6;--on:#fff;--bd:rgba(18,30,50,.1);--bad:#d6284b;--warn:#c2740a;--sh:0 12px 28px -16px rgba(30,50,90,.3);--g1:rgba(0,165,106,.14);--g2:rgba(10,143,214,.12);color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
@@ -27,6 +33,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ac);box-
 .tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 0 12px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tabs:empty{padding:0}
+.tabs.wrap{flex-wrap:wrap;overflow:visible;gap:8px}
+.tabs.wrap button{flex:1 1 auto}
 .tabs button{white-space:nowrap;background:var(--card);color:var(--mu);padding:8px 15px;border-radius:99px;font-size:14px;flex:none}
 .tabs button.on{background:linear-gradient(135deg,var(--ac),var(--ac2));color:var(--on);border-color:transparent;box-shadow:0 8px 20px -8px var(--ac)}
 main{padding:16px;max-width:640px;margin:auto}
@@ -83,6 +91,9 @@ dialog input,dialog textarea,dialog select{width:100%;margin-top:6px}
 .q{display:flex;gap:14px;align-items:center;margin-top:12px}
 .q button{width:46px;height:46px;border-radius:50%;padding:0;font-size:22px;background:var(--field)}
 .q b{font-size:30px;font-weight:800;min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
+.mrow{display:block;width:100%;text-align:left;margin-top:8px;padding:14px 16px;font-size:16px}
+.c h3 .tag~.tag{margin-left:0}
+details summary{cursor:pointer;padding:4px 0}
 .fresh .c{animation:rise .4s cubic-bezier(.2,.8,.3,1) both}
 .fresh .c:nth-child(2){animation-delay:.05s}.fresh .c:nth-child(3){animation-delay:.1s}.fresh .c:nth-child(4){animation-delay:.15s}.fresh .c:nth-child(5){animation-delay:.2s}.fresh .c:nth-child(n+6){animation-delay:.25s}
 @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
@@ -106,22 +117,28 @@ try{const r=localStorage.getItem("garagelog");if(r)S=Object.assign(S,JSON.parse(
 S.records=S.records.filter(r=>r.type!=="fuel");
 const save=()=>{try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}push()};
 const $=id=>document.getElementById(id);
+let ours=false;
+const theme=()=>{try{return localStorage.getItem("garagelog-theme")||"auto"}catch(e){return"auto"}};
+const applyTheme=()=>{const t=theme(),r=document.documentElement;if(t==="auto"){if(ours){r.removeAttribute("data-theme");ours=false}}else{r.setAttribute("data-theme",t);ours=true}
+  const dk=t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme:dark)").matches),m=document.querySelector('meta[name="theme-color"]');if(m)m.content=dk?"#06080c":"#eef1f7"};
+const setTheme=t=>{try{localStorage.setItem("garagelog-theme",t)}catch(e){}applyTheme()};
+applyTheme();
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const uid=()=>Math.random().toString(36).slice(2,10);
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const addM=(s,n)=>{const d=new Date(s+"T00:00:00"),day=d.getDate();d.setMonth(d.getMonth()+n);if(d.getDate()!==day)d.setDate(0);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const KINDS=[["car","Car / Truck","🚗"],["offroad","Off-road","🏞️","Off-road (UTV / ATV / dirt bike)"],["trailer","Trailer","🚚"],["mower","Lawn mower","🌿"],["other","Other","🔧"]];
 const KC={car:"#4da3ff",offroad:"#ff7a3d",trailer:"#b07cff",mower:"#2bf0a0",other:"#9aa7b8"},SC=["var(--ac)","var(--warn)","var(--bad)"];
 const vOf=id=>S.vehicles.find(v=>v.id===id);
 const isH=id=>(vOf(id)||{}).meter==="hrs",isT=id=>(vOf(id)||{}).meter==="time";
 const dU=(id=S.cur)=>isH(id)?"hrs":S.units==="imperial"?"mi":"km";
-const soonAt=id=>isH(id)?10:500;
+const soonAt=id=>+(vOf(id)||{}).soonDist||(isH(id)?10:500),soonD=id=>+(vOf(id)||{}).soonDays||30;
 const kIc=k=>(KINDS.find(x=>x[0]===k)||KINDS[KINDS.length-1])[2];
 const veh=()=>S.vehicles.find(v=>v.id===S.cur);
 const lastOdo=id=>Math.max(0,...S.records.filter(r=>r.vid===id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
 function rinfo(r,lo){
   if(r.done)return{st:-1,txt:"Done"};let st=0,p=[];
-  if(r.date){const d=Math.round((new Date(r.date)-new Date(today()))/864e5);st=d<0?2:d<=30?1:0;p.push(d<0?`${-d}d overdue`:d===0?"due today":`in ${d}d`)}
+  if(r.date){const d=Math.round((new Date(r.date)-new Date(today()))/864e5);st=d<0?2:d<=soonD(r.vid)?1:0;p.push(d<0?`${-d}d overdue`:d===0?"due today":`in ${d}d`)}
   if(r.odo!==""&&r.odo!=null){const d=r.odo-lo;st=Math.max(st,d<=0?2:d<=soonAt(r.vid)?1:0);p.push(d<=0?`${-d} ${dU(r.vid)} over`:`in ${d} ${dU(r.vid)}`)}
   return{st,txt:p.join(" / ")};
 }
@@ -132,14 +149,21 @@ function vstat(v){
 }
 const tag=st=>st==2?'<span class="tag bad">Overdue</span>':st==1?'<span class="tag warn">Due soon</span>':'<span class="tag ok">OK</span>';
 
+const MAIN=["dash","service","repair","parts","reminder"];
+const vTabs=v=>TYPES.filter(t=>!(isT(v.id)&&t[0]==="odometer")).map(([k,l])=>[k,k==="odometer"&&isH(v.id)?"Hours":l]);
+function moreMenu(){
+  const v=veh(),L=vTabs(v).filter(t=>!MAIN.includes(t[0]));
+  show(`<h3 style="margin:0">More</h3>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}};
+}
 function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
   const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key}
   const v=veh(),inV=view==="vehicle"&&v;
   $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><button id="ev">✎</button><button id="more">⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":S.vehicles.length+" in the garage"}</span></div><button id="more">⋯</button>`;
   const pk=KINDS.filter(k=>S.vehicles.some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
-  const tl=inV?TYPES.filter(t=>!(isT(v.id)&&t[0]==="odometer")).map(([k,l])=>[k,k==="odometer"&&isH(v.id)?"Hours":l]):view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
-  $("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)?"on":""}" data-t="${k}">${l}</button>`).join("");
+  const vt=inV?vTabs(v):[],tl=inV?[...vt.filter(t=>MAIN.includes(t[0])),["more",(vt.find(t=>t[0]===tab&&!MAIN.includes(t[0]))||[0,"More"])[1]+" ▾"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
+  $("tabs").className="tabs"+(inV?" wrap":"");$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)||(k==="more"&&inV&&!MAIN.includes(tab))?"on":""}" data-t="${k}">${l}</button>`).join("");
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
   $("fab").style.display=inV&&tab==="dash"?"none":"";$("fabE").style.display=inV&&tab!=="dash"?"":"none";$("fabE").textContent=em&&tab!=="parts"?"✓":"✎";
   const L=$("list");L.className=ch?"fresh":"";
@@ -188,17 +212,18 @@ function partsView(v){
 function invView(){
   let a=S.inv.filter(i=>ic==="All"||i.cat===ic).sort((x,y)=>x.cat.localeCompare(y.cat)||x.name.localeCompare(y.name));
   if(!a.length)return'<div class="empty"><div class="ei">🛢️</div>No items yet.<br>Tap + to add oil, grease, filters or parts on hand.</div>';
-  return a.map(i=>`<div class="c"><button class="x" data-idel="${i.id}">✕</button><h3 data-iedit="${i.id}">${esc(i.name)}<span class="tag">${i.cat}</span></h3>${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
+  return a.map(i=>`<div class="c"><button class="x" data-idel="${i.id}">✕</button><h3 data-iedit="${i.id}">${esc(i.name)}${i.qty<=0?'<span class="tag bad">Out</span>':i.qty<=(i.low!==""&&i.low!=null?+i.low:1)?'<span class="tag warn">Low</span>':""}<span class="tag">${i.cat}</span></h3>${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
 }
 function shrink(f,mx=800,q=.65){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,mx/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",q))};i.src=r.result};r.readAsDataURL(f)})}
 const btns='<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="ok" style="flex:1">Save</button></div>';
 function show(h){$("dbody").onclick=null;$("dbody").innerHTML=h;$("dlg").showModal();if($("cancel"))$("cancel").onclick=()=>$("dlg").close()}
-function openForm(id){
-  const e=id?S.records.find(r=>r.id===id):{type:tab,date:today(),odo:"",desc:"",notes:"",parts:"",ph:[]};
+function logFrom(r){openForm(null,{type:"service",date:today(),desc:(r.desc||"").replace(/^Next:\s*/,""),banner:"Reminder marked done. Log the service now, or cancel to skip."})}
+function openForm(id,pre){
+  const e=id?S.records.find(r=>r.id===id):Object.assign({type:tab,date:today(),odo:"",desc:"",notes:"",parts:"",ph:[]},pre||{});
   const t=e.type,rem=t==="reminder",hp=PH.includes(t),sr=["service","repair","upgrade"].includes(t);const nopts=isT(S.cur)?[[1,"1 month"],[3,"3 months"],[6,"6 months"],[12,"1 year"]]:(isH(S.cur)?[10,25,50,100,150,200,250]:[1000,3000,5000,7500,10000,15000]).map(n=>[n,n.toLocaleString()+" "+dU()]);
   const cs=+e.next>0&&!nopts.some(([n])=>n===+e.next);
   let ph=(e.ph||[]).slice(),rc=(e.rc||[]).slice();
-  show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":TYPES.find(x=>x[0]===t)[1].toLowerCase()}</h3>
+  show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":TYPES.find(x=>x[0]===t)[1].toLowerCase()}</h3>${e.banner?`<div class="m" style="margin-top:6px;color:var(--ac)">${esc(e.banner)}</div>`:""}
   <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
   ${isT(S.cur)?"":`<label>${rem?"Due at "+dU()+" (optional)":(isH(S.cur)?"Hours":"Odometer ("+(S.units==="imperial"?"mi":"km")+")")}</label><input type="number" inputmode="numeric" id="f_odo" value="${e.odo}" placeholder="${lastOdo(S.cur)||""}">`}
   ${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
@@ -257,33 +282,43 @@ function addPart(){
 }
 function vehForm(edit){
   const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
-  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><input type="file" id="cf" accept="image/*"><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><div id="v_or"><label>OHV sticker expiration</label><input type="date" id="v_oh" value="${v.ohv||""}"></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}">${edit?'<button id="dv" style="margin-top:12px;width:100%">Delete this equipment</button>':""}${btns}`);
+  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><input type="file" id="cf" accept="image/*"><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><div id="v_or"><label>OHV sticker expiration</label><input type="date" id="v_oh" value="${v.ohv||""}"></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="dv" style="margin-top:12px;width:100%">Delete this equipment</button>':""}${btns}`);
   let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${cover}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
   $("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await shrink(f,700,.7);$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
   const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none"};tp();
-  $("v_k").onchange=()=>{tp();if(!edit)$("v_t").value={mower:"hrs",trailer:"time"}[$("v_k").value]||"dist"};
+  const sp=()=>{const t=$("v_t").value;$("v_sm").style.display=t==="time"?"none":"";$("v_sm").placeholder=t==="hrs"?"10 hrs":"500 "+(S.units==="imperial"?"mi":"km")};sp();$("v_t").addEventListener("change",sp);
+  $("v_k").onchange=()=>{tp();if(!edit)$("v_t").value={mower:"hrs",trailer:"time"}[$("v_k").value]||"dist";sp()};
   $("ok").onclick=()=>{const n=$("v_n").value.trim()||$("v_m").value.trim();if(!n)return;
-    const f={name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,kind:$("v_k").value,meter:$("v_t").value,cover};
+    const f={name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,kind:$("v_k").value,meter:$("v_t").value,cover,soonDays:+$("v_sd").value||0,soonDist:+$("v_sm").value||0};
     if(edit)Object.assign(v,f);else{const nv=Object.assign({id:uid(),specs:{}},f);fixV(nv);S.vehicles.push(nv)}
     save();$("dlg").close();render()};
   if(edit)$("dv").onclick=()=>{if(!confirm("Delete "+v.name+" and all its records?"))return;S.records=S.records.filter(r=>r.vid!==v.id);S.vehicles=S.vehicles.filter(x=>x.id!==v.id);S.cur=null;view="garage";save();$("dlg").close();render()};
 }
 function invForm(id){
   const e=id?S.inv.find(i=>i.id===id):{name:"",cat:ic==="All"?"Oil":ic,qty:1,unit:"",notes:""};
-  show(`<h3 style="margin:0">${id?"Edit":"Add"} item</h3><label>Name</label><input id="i_n" value="${esc(e.name)}" placeholder="e.g. Mobil 1 5W-30"><label>Category</label><select id="i_c">${CATS.map(c=>`<option ${c===e.cat?"selected":""}>${c}</option>`).join("")}</select><label>Quantity on hand</label><input type="number" step="any" id="i_q" value="${e.qty}"><label>Unit</label><input id="i_u" value="${esc(e.unit)}" placeholder="qt, tube, each"><label>Notes / part number</label><textarea id="i_notes" rows="2">${esc(e.notes)}</textarea>${btns}`);
-  $("ok").onclick=()=>{const n=$("i_n").value.trim();if(!n)return;const o={id:e.id||uid(),name:n,cat:$("i_c").value,qty:+$("i_q").value||0,unit:$("i_u").value.trim(),notes:$("i_notes").value.trim()};
+  show(`<h3 style="margin:0">${id?"Edit":"Add"} item</h3><label>Name</label><input id="i_n" value="${esc(e.name)}" placeholder="e.g. Mobil 1 5W-30"><label>Category</label><select id="i_c">${CATS.map(c=>`<option ${c===e.cat?"selected":""}>${c}</option>`).join("")}</select><label>Quantity on hand</label><input type="number" step="any" id="i_q" value="${e.qty}"><label>Unit</label><input id="i_u" value="${esc(e.unit)}" placeholder="qt, tube, each"><label>Warn me at or below (optional)</label><input type="number" step="any" id="i_l" value="${e.low??""}" placeholder="1"><label>Notes / part number</label><textarea id="i_notes" rows="2">${esc(e.notes)}</textarea>${btns}`);
+  $("ok").onclick=()=>{const n=$("i_n").value.trim();if(!n)return;const o={id:e.id||uid(),name:n,cat:$("i_c").value,qty:+$("i_q").value||0,unit:$("i_u").value.trim(),notes:$("i_notes").value.trim(),low:$("i_l").value===""?"":+$("i_l").value};
     if(id)S.inv[S.inv.findIndex(i=>i.id===id)]=o;else S.inv.push(o);save();$("dlg").close();render()};
 }
+const restore=t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;S=Object.assign({inv:[],units:"imperial"},d);S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
 function dataForm(){
-  show(`<h3 style="margin:0">Settings &amp; data</h3><label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
-  <div class="m" style="margin-top:10px">Server sync: <span id="ss">${syncMsg}</span></div><label>Backup (copy this) or paste a backup to restore. Photos make it long.</label><textarea id="bk" rows="5">${esc(JSON.stringify(S))}</textarea>
-  <div class="row" style="margin-top:10px"><button id="imp" style="flex:1">Restore from text</button><button class="p" id="ok" style="flex:1">Done</button></div>`);
+  show(`<h3 style="margin:0">Settings &amp; data</h3>
+  <label>Appearance</label><select id="th"><option value="auto">Match my device</option><option value="dark">Dark</option><option value="light">Light</option></select>
+  <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
+  <div class="m" style="margin-top:12px">Server sync: <span id="ss">${syncMsg}</span></div>
+  <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden>
+  <details style="margin-top:12px"><summary class="m">Copy or paste backup text</summary><textarea id="bk" rows="5" style="margin-top:8px">${esc(JSON.stringify(S))}</textarea><button id="imp" style="margin-top:8px;width:100%">Restore from text</button></details>
+  <div class="row" style="margin-top:14px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
+  $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
   $("ok").onclick=()=>$("dlg").close();
-  $("imp").onclick=()=>{try{const d=JSON.parse($("bk").value);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;S=Object.assign({inv:[],units:"imperial"},d);S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
+  $("dlb").onclick=()=>{const b=new Blob([JSON.stringify(S)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="garage-log-"+today()+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
+  $("rfb").onclick=()=>$("rf").click();
+  $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
+  $("imp").onclick=()=>restore($("bk").value);
 }
 $("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more")dataForm();else if(i==="ev")vehForm(true)};
-$("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
+$("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(t==="more")return moreMenu();if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
 $("bn").onclick=e=>{const v=e.target.dataset.v;if(v){view=v;render()}};
 $("fab").onclick=()=>view==="vehicle"?(tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
 $("fabE").onclick=()=>{if(tab==="parts")specForm();else{em=!em;render()}};
@@ -291,7 +326,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   if(op){S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
   else if(d.del){if(confirm("Delete this entry?")){S.records=S.records.filter(r=>r.id!==d.del);save();render()}}
   else if(d.edit)openForm(d.edit);
-  else if(d.done){S.records.find(x=>x.id===d.done).done=true;save();render()}
+  else if(d.done){const r=S.records.find(x=>x.id===d.done);r.done=true;save();render();logFrom(r)}
   else if(d.specs)specForm();
   else if(d.go){tab=d.go;render()}
   else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${S.records.find(r=>r.id===id)[g||"ph"][+i]}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
@@ -307,6 +342,7 @@ const adopt=d=>{S=Object.assign({inv:[],units:"imperial"},d);S.records=S.records
 const pull=f=>{if(!f&&(pt||$("dlg").open))return Promise.resolve();const u=api();if(!u){syncMsg="no server address set";return Promise.resolve()}return fetch(u,{cache:"no-store"}).then(r=>r.json()).then(d=>{syncMsg="saved to server";if(d&&Array.isArray(d.vehicles)&&(d.vehicles.length||(d.records||[]).length||(d.inv||[]).length)){if(JSON.stringify(d)!==JSON.stringify(S)){adopt(d);if(view==="vehicle"&&!veh())view="garage";render()}}else if(S.vehicles.length)push()}).catch(()=>{syncMsg="offline (saved on this device only)"})};
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 pull();
+try{if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
 </script>
 </body>
 </html>

@@ -27,7 +27,7 @@ One image, one port, one data folder. No YAML needed.
      mount path = `/data`. If you see an **Automatic Permissions** checkbox, tick it.
    - Leave command, entrypoint and environment variables empty (the image already has them).
 4. Click **Install** and wait for the app to show **Running**.
-5. Open `http://TRUENAS-IP:30500` in a browser. Tap the menu on your phone's browser and choose **Add to Home screen**.
+5. Open `http://TRUENAS-IP:30500` in a browser. Tap the menu on your phone's browser and choose **Add to Home screen** (or **Install app**). It opens full screen with its own icon.
 
 If the app stops right away, open its **Logs**. A "permission denied" on `/data` means the dataset isn't writable by
 user 568: on the dataset's **Permissions** screen set the owner to `apps` (568) and save.
