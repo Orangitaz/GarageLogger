@@ -4,14 +4,14 @@ One image, one port, one data folder. No YAML needed.
 
 ## Part 1: Build the image (once, about 3 minutes, free)
 
-1. Sign in at github.com and create a new repository named `garage-log` (private or public).
+1. Sign in at github.com and use your repository (`Orangitaz/GarageLogger`, private or public).
 2. Upload everything in this folder to it. Keep the `.github` folder (drag the whole folder in).
 3. Open the repo's **Actions** tab. The "Build and publish image" run starts by itself. If it doesn't,
    choose it on the left and click **Run workflow**. Wait for the green check.
 4. Make the image public so TrueNAS can pull it without a login:
-   your GitHub profile > **Packages** > `garage-log` > **Package settings** > **Change visibility** > Public.
+   your GitHub profile > **Packages** > `garagelogger` > **Package settings** > **Change visibility** > Public.
    (The image holds only the app, never your data, so public is fine.)
-5. Your image name is `ghcr.io/YOUR-GITHUB-USERNAME/garage-log` (all lowercase), tag `latest`.
+5. Your image name is `ghcr.io/orangitaz/garagelogger` (all lowercase), tag `latest`.
 
 ## Part 2: Install on TrueNAS (Community Edition)
 
@@ -19,7 +19,7 @@ One image, one port, one data folder. No YAML needed.
 2. **Apps > Discover Apps > Custom App.**
 3. Fill in the form (labels can differ slightly between TrueNAS versions):
    - **Application name:** `garage-log`
-   - **Image repository:** `ghcr.io/YOUR-GITHUB-USERNAME/garage-log`
+   - **Image repository:** `ghcr.io/orangitaz/garagelogger`
    - **Image tag:** `latest`
    - **Run as user/group (if shown):** user `568`, group `568`
    - **Port:** container port `3000`, host (node) port `30500`, protocol TCP
