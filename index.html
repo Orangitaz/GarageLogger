@@ -19,7 +19,7 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:170px;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(60vmax 42vmax at 95% -8%,var(--g2),transparent 62%),radial-gradient(52vmax 40vmax at -12% 8%,var(--g1),transparent 62%),var(--bg)}
-header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--hbg);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);z-index:5;padding:14px 16px 0;border-bottom:1px solid var(--bd)}
+header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--hbg);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);z-index:5;padding:14px 16px 12px;border-bottom:1px solid var(--bd)}
 .row{display:flex;gap:8px;align-items:center}
 .tw{flex:1;min-width:0}
 .t{display:block;font-size:27px;font-weight:800;letter-spacing:-.025em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(100deg,var(--tx) 40%,var(--ac));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
@@ -30,7 +30,7 @@ button:active{transform:scale(.95)}
 button.p{background:linear-gradient(135deg,var(--ac),var(--ac2));color:var(--on);border-color:transparent;box-shadow:0 8px 22px -8px var(--ac)}
 #hd button{width:42px;height:42px;padding:0;border-radius:50%;font-size:18px;background:var(--card);flex:none}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 25%,transparent)}
-.tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 0 12px;scrollbar-width:none}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 6px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tabs:empty{padding:0}
 .tabs.wrap{flex-wrap:wrap;overflow:visible;gap:8px}
@@ -84,7 +84,7 @@ dialog input,dialog textarea,dialog select{width:100%;margin-top:6px}
 .x{float:right;border:0!important;background:none!important;color:var(--mu);padding:0 6px!important}
 .ph{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.ph img{width:70px;height:70px;object-fit:cover;border-radius:12px;border:1px solid var(--bd);cursor:pointer}
 .sp{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px dashed var(--bd)}.sp:last-child{border:0}
-.sec{display:flex;justify-content:space-between;align-items:center;margin:20px 2px 10px;font-size:12px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mu)}
+.sec{display:flex;justify-content:flex-start;align-items:center;margin:20px 2px 10px;font-size:12px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mu)}
 .sec::before{content:"";flex:none;width:18px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--ac),var(--ac2));margin-right:10px}
 .sec:first-child{margin-top:4px}
 .sec{gap:0}.sec a{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ac);cursor:pointer}
@@ -97,6 +97,11 @@ details summary{cursor:pointer;padding:4px 0}
 .qa{display:block;width:100%;margin:0 0 6px;padding:13px 16px;border-radius:16px;font-size:15px;background:color-mix(in srgb,var(--ac) 10%,var(--field));border:1px solid color-mix(in srgb,var(--ac) 30%,var(--bd));color:var(--ac)}
 .qps{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.qps button{padding:7px 13px;border-radius:99px;font-size:13.5px}
 .row select,.row input{flex:1;min-width:0}
+.mv{position:absolute;top:12px;left:12px;z-index:3;display:flex;gap:6px}
+.mv button{width:40px;height:40px;padding:0;border-radius:50%;background:rgba(0,0,0,.62);color:#fff;border-color:rgba(255,255,255,.25);font-size:18px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(166px + env(safe-area-inset-bottom,0px));width:min(92vw,380px);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 18px;background:var(--pop);border:1px solid var(--bd);border-radius:18px;box-shadow:0 18px 40px -14px rgba(0,0,0,.6);z-index:8}
+#toast[hidden]{display:none}
+#toast button{color:var(--ac);flex:none}
 #pv{position:fixed;inset:0;z-index:50;overflow:auto;background:#fff;color:#111;padding:calc(20px + env(safe-area-inset-top,0px)) 18px calc(28px + env(safe-area-inset-bottom,0px));font-size:14px}
 #pv .bar{display:flex;gap:8px;margin-bottom:18px}
 #pv button{color:#111;background:#f2f4f7;border:1px solid #d5dae2;padding:10px 16px;box-shadow:none}
@@ -116,11 +121,13 @@ details summary{cursor:pointer;padding:4px 0}
 </style>
 </head>
 <body>
-<header><div class="row" id="hd"></div><div class="tabs" id="tabs"></div></header>
+<header><div class="row" id="hd"></div></header>
+<div class="tabs" id="tabs"></div>
 <main id="list"></main>
 <button class="fab p" id="fab">+</button>
 <button class="fab fabl p" id="fabE" title="Edit parts list" style="display:none">✎</button>
 <div id="bn"><button data-v="garage"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>Garage</button><button data-v="inventory"><svg viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>Inventory</button></div>
+<div id="toast" hidden></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
 <div id="pv" hidden></div>
 <script>
@@ -158,7 +165,8 @@ const repTxt=n=>n%12===0?(n===12?"year":n/12+" years"):n+" months";
 const nextDate=(d,n)=>{let x=addM(d||today(),n),i=0;while(x<=today()&&i++<60)x=addM(x,n);return x};
 const vDates=v=>[v.kind==="offroad"&&v.ohv&&{k:"ohv",l:"OHV sticker expires",date:v.ohv,rep:v.ohvRep??24},v.kind!=="mower"&&v.reg&&{k:"reg",l:"Registration expires",date:v.reg,rep:v.regRep??24}].filter(Boolean).concat((v.dts||[]).filter(x=>x.date).map(x=>({k:"dt:"+x.id,l:x.l||"Other date",date:x.date,rep:x.rep??24})));
 const act=()=>S.vehicles.filter(v=>!v.arch);
-const pseudo=v=>vDates(v).map(x=>({desc:x.l,date:x.date,odo:"",vid:v.id,pk:x.k,rep:x.rep}));
+const pseudo=v=>{const g=new Map();for(const x of vDates(v))g.set(x.date,[...(g.get(x.date)||[]),x]);
+  return [...g.values()].map(a=>a.length===1?{desc:a[0].l,date:a[0].date,odo:"",vid:v.id,pk:a[0].k,rep:a[0].rep}:{desc:a.map(x=>x.l.replace(/ expires$/,"")).join(" + ")+" expire",date:a[0].date,odo:"",vid:v.id,pk:a.map(x=>x.k).join(","),rep:a.every(x=>x.rep===a[0].rep)?a[0].rep:0})};
 const partsOf=r=>(r.parts?[r.parts]:[]).concat(r.pl||[]).concat((r.iu||[]).map(x=>x.n+" ×"+x.q+(x.u?" "+x.u:"")));
 const rbtn=r=>r.pk?`<button style="margin-top:8px" data-renew="${r.pk}">Renew</button>`:r.id?(r.rep>0?`<button style="margin-top:8px" data-renew="${r.id}">Renew</button>`:`<button style="margin-top:8px" data-done="${r.id}">Mark done</button>`):"";
 // Rough date a distance/hours reminder will come due, from how fast the readings have been climbing.
@@ -204,6 +212,18 @@ function printView(v){
   $("pv").hidden=false;$("pv").scrollTop=0;
   $("pv_p").onclick=()=>{try{window.print()}catch(e){}};$("pv_x").onclick=()=>{$("pv").hidden=true};
 }
+let tt=null;
+function toast(msg,undo){const t=$("toast");t.innerHTML=`<span>${esc(msg)}</span><button id="tu">Undo</button>`;t.hidden=false;clearTimeout(tt);const hide=()=>{t.hidden=true};tt=setTimeout(hide,8000);$("tu").onclick=()=>{clearTimeout(tt);hide();undo()}}
+function addChooser(){
+  const v=veh(),L=[["service","Service"],["repair","Repair"],["upgrade","Upgrade"],["reminder","Reminder"],["note","Note"]];
+  show(`<h3 style="margin:0">Add to ${esc(v.name)}</h3>`+L.map(([k,l])=>`<button class="mrow" data-add="${k}">${l}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.add;if(k){$("dlg").close();openForm(null,{type:k})}};
+}
+function mvVeh(spec){
+  const[id,n]=spec.split(":"),vis=act().filter(v=>gk==="All"||v.kind===gk),i=vis.findIndex(v=>v.id===id),j=i+ +n;
+  if(i<0||j<0||j>=vis.length)return;
+  const a=S.vehicles.indexOf(vis[i]),b=S.vehicles.indexOf(vis[j]);[S.vehicles[a],S.vehicles[b]]=[S.vehicles[b],S.vehicles[a]];save();render();
+}
 function adjInv(a,b){
   const m=new Map();(a||[]).forEach(x=>m.set(x.id,(m.get(x.id)||0)-x.q));(b||[]).forEach(x=>m.set(x.id,(m.get(x.id)||0)+x.q));
   for(const[id,d]of m){const it=S.inv.find(i=>i.id===id);if(it&&d)it.qty=Math.max(0,+(it.qty-d).toFixed(2))}
@@ -217,11 +237,12 @@ function csvExport(vid){
   saveBlob("garage-log-"+(vid?nm(vid).replace(/[^\w-]+/g,"-")+"-":"")+"records-"+today()+".csv",new Blob(["﻿"+[H.join(","),...rows].join("\r\n")],{type:"text/csv"}));
 }
 function renewDlg(key){
-  const v=veh();let title,cur,rep,go;
-  if(key==="ohv"||key==="reg"||key.startsWith("dt:")){const x=vDates(v).find(z=>z.k===key);if(!x)return;title=x.l.replace(" expires","");cur=x.date;rep=x.rep;go=d=>{if(key.startsWith("dt:")){const z=(v.dts||[]).find(y=>"dt:"+y.id===key);if(z)z.date=d}else v[key]=d}}
-  else{const r=S.records.find(z=>z.id===key);if(!r)return;title=r.desc||"Reminder";cur=r.date;rep=r.rep;go=d=>{r.done=true;S.records.push(Object.assign(clone(r),{id:uid(),date:d,odo:"",done:false,nrid:""}))}}
-  show(`<h3 style="margin:0">Renew</h3><div class="m" style="margin-top:6px">${esc(title)}${rep>0?" · repeats every "+repTxt(rep):""}</div><label>New expiration / due date</label><input type="date" id="rn_d" value="${nextDate(cur,rep||12)}"><div class="m" style="margin-top:6px">Change the date if the new sticker or tag shows a different one.</div>${btns}`);
-  $("ok").onclick=()=>{const d=$("rn_d").value;if(!d)return alert("Pick the new date.");go(d);save();$("dlg").close();render()};
+  const v=veh(),L=[],ks=key.split(","),vd=k=>k==="ohv"||k==="reg"||k.startsWith("dt:");
+  if(ks.every(vd)){for(const k of ks){const x=vDates(v).find(z=>z.k===k);if(x)L.push({t:x.l.replace(" expires",""),cur:x.date,rep:x.rep,go:d=>{if(k.startsWith("dt:")){const z=(v.dts||[]).find(y=>"dt:"+y.id===k);if(z)z.date=d}else v[k]=d}})}}
+  else{const r=S.records.find(z=>z.id===key);if(r)L.push({t:r.desc||"Reminder",cur:r.date,rep:r.rep,go:d=>{r.done=true;S.records.push(Object.assign(clone(r),{id:uid(),date:d,odo:"",done:false,nrid:""}))}})}
+  if(!L.length)return;
+  show(`<h3 style="margin:0">Renew</h3>`+L.map((x,i)=>`${L.length===1?`<div class="m" style="margin-top:6px">${esc(x.t)}${x.rep>0?" \u00b7 repeats every "+repTxt(x.rep):""}</div>`:""}<label>${L.length>1?esc(x.t)+" \u2014 new date":"New expiration / due date"}</label><input type="date" class="rnd" id="rn_d${i||""}" value="${nextDate(x.cur,x.rep||12)}">`).join("")+`<div class="m" style="margin-top:6px">Change a date if the new sticker or tag shows a different one.</div>${btns}`);
+  $("ok").onclick=()=>{const ds=[...document.querySelectorAll(".rnd")].map(i=>i.value);if(ds.some(d=>!d))return alert("Pick the new date.");L.forEach((x,i)=>x.go(ds[i]));save();$("dlg").close();render()};
 }
 function searchForm(v){
   show(`<h3 style="margin:0">When did I last…</h3><input id="sq" placeholder="oil, brake pads, belt…" autocomplete="off" style="margin-top:10px"><div id="sres" class="m" style="margin-top:12px">Searches descriptions, parts and notes for ${esc(v.name)}.</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>`);
@@ -279,7 +300,7 @@ function docsForm(v){
 }
 function moreMenu(){
   const v=veh(),L=vTabs(v).filter(t=>!MAIN.includes(t[0]));
-  show(`<h3 style="margin:0">More</h3>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<button class="mrow" data-pv="1">Print service history</button><button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button><button class="mrow" data-csv="1">Export records (CSV)</button>'+(/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  show(`<h3 style="margin:0">More</h3><label>Records</label>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<label>Tools</label><button class="mrow" data-pv="1">Print service history</button><button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button><button class="mrow" data-csv="1">Export records (CSV)</button>'+(/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
   $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}else if(e.target.dataset.rcnow){recallNow(v)}};
 }
 function render(){
@@ -291,7 +312,7 @@ function render(){
   const vt=inV?vTabs(v):[],tl=inV?[...vt.filter(t=>MAIN.includes(t[0])),["more",(vt.find(t=>t[0]===tab&&!MAIN.includes(t[0]))||[0,"More"])[1]+" ▾"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
   $("tabs").className="tabs"+(inV?" wrap":"");$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)||(k==="more"&&inV&&!MAIN.includes(tab))?"on":""}" data-t="${k}">${l}</button>`).join("");
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
-  $("fab").style.display=inV&&tab==="dash"?"none":"";$("fabE").style.display=inV&&tab!=="dash"?"":"none";$("fabE").textContent=em&&tab!=="parts"?"✓":"✎";
+  $("fab").style.display="";$("fabE").style.display=(inV&&tab!=="dash")||(view==="garage"&&act().length>1)?"":"none";$("fabE").textContent=em&&!(inV&&tab==="parts")?"✓":"✎";
   const L=$("list");L.className=ch?"fresh":"";
   if(inV)L.innerHTML=`<div class="hero${v.cover?"":" nc"}" style="--k:${KC[v.kind]||KC.other}">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}</div>`+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
   else if(view==="inventory")L.innerHTML=invView();
@@ -309,12 +330,11 @@ function dashView(v){
 }
 function garageView(){
   if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
-  return act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[v.model,isT(v.id)?"":lastOdo(v.id).toLocaleString()+" "+dU(v.id)].filter(Boolean).join(" · ");
-    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${esc(mt)}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
+  return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[v.model,isT(v.id)?"":lastOdo(v.id).toLocaleString()+" "+dU(v.id)].filter(Boolean).join(" · ");
+    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${esc(mt)}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
 }
 function recView(v){
-  const lo=lastOdo(v.id),n=S.records.filter(r=>r.vid===v.id&&["service","repair","upgrade"].includes(r.type)).length;
-  let out=`<div class="m" style="margin-bottom:10px">${isT(v.id)?"":lo.toLocaleString()+" "+dU(v.id)+" · "}${n} service/repair records</div>`;
+  let out=isT(v.id)?"":`<div class="m" style="margin-bottom:10px">${lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>`;
   const rows=S.records.filter(r=>r.vid===v.id&&r.type===tab).sort((a,b)=>tab==="reminder"?(a.date||"9").localeCompare(b.date||"9"):(b.date||"").localeCompare(a.date||"")||b.odo-a.odo);
   if(!rows.length)out+='<div class="empty"><div class="ei">🔧</div>Nothing here yet.<br>Tap + to add.</div>';
   return out+(em?'<div class="m" style="margin-bottom:8px;color:var(--ac)">Edit mode: use Edit or Delete on an entry, then tap ✓ when done.</div>':"")+rows.map(card).join("");
@@ -330,7 +350,7 @@ function card(r){
 }
 function partsView(v){
   const top=[["License plate",["car","trailer"].includes(v.kind)?v.plate:""],["OHV sticker expires",v.kind==="offroad"?v.ohv:""],["Registration expires",v.kind!=="mower"?v.reg:""],...(v.dts||[]).map(x=>[x.l||"Other date",x.date]),["VIN / serial #",v.vin]].filter(x=>x[1]).map(([l,x])=>`<div class="sp"><span class="m">${l}</span><span>${esc(x)}</span></div>`).join("");
-  return `<div class="c">${top}${(v.plist||[]).map(r=>`<div class="sp"><span class="m">${esc(r.l)}</span><span style="white-space:pre-wrap;text-align:right">${esc(r.v||"—")}</span></div>`).join("")||'<div class="m">No parts yet. Tap + to add one as you go.</div>'}</div>`;
+  return (top?`<div class="sec" style="margin-top:4px">Info</div><div class="c">${top}</div>`:"")+`<div class="sec"${top?"":' style="margin-top:4px"'}>Parts</div><div class="c">${(v.plist||[]).map(r=>`<div class="sp"><span class="m">${esc(r.l)}</span><span style="white-space:pre-wrap;text-align:right">${esc(r.v||"—")}</span></div>`).join("")||'<div class="m">No parts yet. Tap + to add one as you go.</div>'}</div>`;
 }
 function invView(){
   let a=S.inv.filter(i=>ic==="All"||i.cat===ic).sort((x,y)=>x.cat.localeCompare(y.cat)||x.name.localeCompare(y.name));
@@ -343,20 +363,22 @@ const btns='<div class="row" style="margin-top:14px"><button id="cancel" style="
 function show(h){$("dbody").onclick=null;$("dbody").innerHTML=h;$("dlg").showModal();if($("cancel"))$("cancel").onclick=()=>$("dlg").close()}
 function logFrom(r){openForm(null,{type:"service",date:today(),desc:(r.desc||"").replace(/^Next:\s*/,""),banner:"Reminder marked done. Log the service now, or cancel to skip."})}
 function openForm(id,pre){
-  const e=id?S.records.find(r=>r.id===id):Object.assign({type:tab,date:tab==="reminder"?"":today(),odo:"",desc:"",notes:"",parts:"",ph:[]},pre||{});
+  const e=id?S.records.find(r=>r.id===id):Object.assign({type:(pre&&pre.type)||tab,date:((pre&&pre.type)||tab)==="reminder"?"":today(),odo:"",desc:"",notes:"",parts:"",ph:[]},pre||{});
   const t=e.type,rem=t==="reminder",hp=PH.includes(t),sr=["service","repair","upgrade"].includes(t);const nopts=isT(S.cur)?[[1,"1 month"],[3,"3 months"],[6,"6 months"],[12,"1 year"]]:(isH(S.cur)?[10,25,50,100,150,200,250]:[1000,3000,5000,7500,10000,15000]).map(n=>[n,n.toLocaleString()+" "+dU()]);
   const cs=+e.next>0&&!nopts.some(([n])=>n===+e.next),repC=+e.rep>0&&!REP.some(([n])=>n===+e.rep);
   const pr=t==="service"&&!id&&vOf(S.cur)?PR(vOf(S.cur).kind):[];
   let ph=(e.ph||[]).slice(),rc=(e.rc||[]).slice();
   show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":(({repair:"repair",upgrade:"upgrade",reminder:"reminder",note:"note"})[t]||TYPES.find(x=>x[0]===t)[1].toLowerCase())}</h3>${e.banner?`<div class="m" style="margin-top:6px;color:var(--ac)">${esc(e.banner)}</div>`:""}
-  <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${rem?`<label>Repeats</label><select id="f_rep">${REP.map(([n,l])=>`<option value="${n}" ${+e.rep===n||(!e.rep&&n===0)?"selected":""}>${l}</option>`).join("")}<option value="c" ${repC?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_repc" value="${repC?e.rep:""}" placeholder="Months" style="margin-top:6px;display:${repC?"":"none"}">`:""}${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
+  <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${rem?`<label>Repeats</label><select id="f_rep">${REP.map(([n,l])=>`<option value="${n}" ${+e.rep===n||(!e.rep&&n===0)?"selected":""}>${l}</option>`).join("")}<option value="c" ${repC?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_repc" value="${repC?e.rep:""}" placeholder="Months" style="margin-top:6px;display:${repC?"":"none"}">`:""}
   ${isT(S.cur)?"":`<label>${rem?"Due at "+dU()+" (optional)":(isH(S.cur)?"Hours":"Odometer ("+(S.units==="imperial"?"mi":"km")+")")}</label><input type="number" inputmode="numeric" id="f_odo" value="${e.odo}" placeholder="${lastOdo(S.cur)||""}">`}
   ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
   ${sr?'<label style="display:flex;align-items:center;gap:8px">Parts used <button class="p" id="addpt" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="pls"></div>'+(S.inv.length?'<label>Take from inventory</label><select id="ivs"></select><div id="ius"></div>':""):""}
+  ${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
     <label>Notes</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
-  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><input type="file" id="pf" accept="image/*" multiple>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><input type="file" id="rf" accept="image/*" multiple>':""}${btns}`);
+  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${btns}`);
   const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${p}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
   grp("ph","pf",ph,800,.65);grp("rc","rf",rc,1600,.7);
+  if($("pfb"))$("pfb").onclick=()=>$("pf").click();if($("rcb"))$("rcb").onclick=()=>$("rf").click();
   let pl=sr?[...(e.parts?[e.parts]:[]),...(e.pl||[])]:[];if(sr&&!pl.length)pl=[""];
   const dpl=()=>{if($("pls"))$("pls").innerHTML=pl.map((x,i)=>`<div class="row" style="margin-top:6px"><input class="pt" value="${esc(x)}" placeholder="Part"><button data-pd="${i}">✕</button></div>`).join("")};
   const syncP=()=>{if($("pls"))pl=[...$("pls").querySelectorAll(".pt")].map(i=>i.value)};dpl();
@@ -386,6 +408,8 @@ function openForm(id,pre){
     if(t==="odometer"&&o.odo==="")return alert(isH(S.cur)?"Enter an hours reading.":"Enter an odometer reading.");
     if(rem&&!o.date&&o.odo==="")return alert("Set a due date or due odometer.");
     if(rem&&o.rep>0&&!o.date)return alert("A repeating reminder needs a due date.");
+    if(!id&&!rem&&o.odo!==""&&!isT(S.cur)){const lo=lastOdo(S.cur),ld=S.records.filter(r=>r.vid===S.cur&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null&&r.date).map(r=>r.date).sort().pop()||"";
+      if(+o.odo<lo&&(!o.date||o.date>=ld)&&!confirm("That's lower than the last reading ("+lo.toLocaleString()+" "+dU()+"). Save anyway?"))return}
     if($("f_next")){const sv=$("f_next").value,n=sv==="c"?+($("f_nextc").value||0):+sv;o.next=n;
       const old=e.nrid?S.records.find(r=>r.id===e.nrid):null;
       if(n>0){const tm=isT(S.cur);
@@ -432,9 +456,9 @@ function addPart(){
 }
 function vehForm(edit){
   const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
-  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><input type="file" id="cf" accept="image/*"><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><div id="v_dts"></div><button type="button" id="v_adt" style="margin-top:10px;width:100%">+ Add another date (inspection, emissions…)</button><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="av" style="margin-top:12px;width:100%">Archive this equipment</button><button id="dv" style="margin-top:8px;width:100%">Delete this equipment</button>':""}${btns}`);
+  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><button type="button" id="cfb" style="width:100%;margin-top:8px">Choose photo…</button><input type="file" id="cf" accept="image/*" hidden><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><div id="v_dts"></div><button type="button" id="v_adt" style="margin-top:10px;width:100%">+ Add another date (inspection, emissions…)</button><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="av" style="margin-top:12px;width:100%">Archive this equipment</button><button id="dv" style="margin-top:8px;width:100%">Delete this equipment</button>':""}${btns}`);
   let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${cover}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
-  $("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
+  $("cfb").onclick=()=>$("cf").click();$("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
   const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none";$("v_rg").style.display=k==="mower"?"none":""};tp();
   let dts=(v.dts||[]).map(x=>({...x}));
   const syD2=()=>{dts=[...$("v_dts").querySelectorAll(".dtr0")].map(r=>({id:r.dataset.id,l:r.querySelector(".dtl").value.trim(),date:r.querySelector(".dtd").value,rep:+r.querySelector(".dtr").value||24}))};
@@ -470,7 +494,7 @@ function dataForm(){
   <div class="m" id="al_m" style="margin-top:6px">The server sends a message when something becomes due soon or overdue, then weekly while it stays overdue. Use "JSON webhook" for Home Assistant or Gotify. Leave the address empty to turn alerts off.</div>
   <div class="m" style="margin-top:12px">Server sync: <span id="ss">${syncMsg}</span></div>
   <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
-  <details style="margin-top:12px"><summary class="m">Copy or paste backup text (no photos)</summary><textarea id="bk" rows="5" style="margin-top:8px">${esc(JSON.stringify(S))}</textarea><button id="imp" style="margin-top:8px;width:100%">Restore from text</button></details>
+  
   <div class="row" style="margin-top:14px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
@@ -483,18 +507,18 @@ function dataForm(){
   $("dlb").onclick=async()=>{const b=$("dlb");b.textContent="Preparing…";const c=await inlined();b.textContent="Download backup";const bl=new Blob([JSON.stringify(c)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download="garage-log-"+today()+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
   $("rfb").onclick=()=>$("rf").click();
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
-  $("imp").onclick=()=>restore($("bk").value);
   $("csvb").onclick=()=>csvExport();
   $("dbody").onclick=e=>{const d=e.target.dataset;if(d.unarch){const v=vOf(d.unarch);if(v){delete v.arch;save();$("dlg").close();render();dataForm()}}else if(d.aprint){const v=vOf(d.aprint);$("dlg").close();if(v)printView(v)}};
 }
 $("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more")dataForm();else if(i==="ev")vehForm(true)};
 $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(t==="more")return moreMenu();if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
 $("bn").onclick=e=>{const v=e.target.dataset.v;if(v){view=v;render()}};
-$("fab").onclick=()=>view==="vehicle"?(tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
-$("fabE").onclick=()=>{if(tab==="parts")specForm();else{em=!em;render()}};
+$("fab").onclick=()=>view==="vehicle"?(tab==="dash"?addChooser():tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
+$("fabE").onclick=()=>{if(view==="vehicle"&&tab==="parts")specForm();else{em=!em;render()}};
 $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");
-  if(op){S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
-  else if(d.del){const r0=S.records.find(r=>r.id===d.del);if(confirm("Delete this entry?"+((r0&&(r0.iu||[]).length)?" Parts taken from inventory will be put back.":""))){if(r0)adjInv(r0.iu,[]);S.records=S.records.filter(r=>r.id!==d.del);save();render()}}
+  if(d.mv)mvVeh(d.mv);
+  else if(op){S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
+  else if(d.del){const k=S.records.findIndex(r=>r.id===d.del);if(k>=0){const r0=S.records[k];adjInv(r0.iu,[]);S.records.splice(k,1);save();render();toast("Entry deleted",()=>{S.records.splice(Math.min(k,S.records.length),0,r0);adjInv([],r0.iu);save();render()})}}
   else if(d.edit)openForm(d.edit);
   else if(d.done){const r=S.records.find(x=>x.id===d.done);r.done=true;save();render();logFrom(r)}
   else if(d.renew)renewDlg(d.renew);
@@ -504,7 +528,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.specs)specForm();
   else if(d.go){tab=d.go;render()}
   else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${S.records.find(r=>r.id===id)[g||"ph"][+i]}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
-  else if(d.idel){if(confirm("Remove this item?")){S.inv=S.inv.filter(i=>i.id!==d.idel);save();render()}}
+  else if(d.idel){const k=S.inv.findIndex(i=>i.id===d.idel);if(k>=0){const it=S.inv[k];S.inv.splice(k,1);save();render();toast("Item removed",()=>{S.inv.splice(Math.min(k,S.inv.length),0,it);save();render()})}}
   else if(d.iedit)invForm(d.iedit);
   else if(d.q){const[id,n]=d.q.split(":"),it=S.inv.find(i=>i.id===id);it.qty=Math.max(0,+(it.qty+ +n).toFixed(2));save();render()}};
 const fixV=v=>{v.specs=v.specs||{};if(!v.plist){const sp=v.specs;v.plist=SPECS.filter(([k])=>sp[k]).map(([k,l])=>({l,v:sp[k]}));if(sp.other)v.plist.push({l:"Other",v:sp.other})}if(!v.pclean){v.plist=v.plist.filter(r=>r.v||!SPECS.some(x=>x[1]===r.l));v.pclean=1}v.kind=v.kind==="atv"||v.kind==="bike"?"offroad":v.kind||"car";v.meter=v.meter||"dist"};S.vehicles.forEach(fixV);

@@ -73,9 +73,13 @@ function dueItems(S,tz){
       return{st,txt:p.join(" / ")};
     };
     for(const r of R.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done)){const i=info(r);if(i.st>=1)out.push({id:r.id,vid:v.id,name:v.name,what:r.desc||"Reminder",st:i.st,txt:i.txt})}
-    if(v.kind==="offroad"&&v.ohv){const i=info({date:v.ohv,odo:""});if(i.st>=1)out.push({id:"ohv:"+v.id,vid:v.id,name:v.name,what:"OHV sticker expires",st:i.st,txt:i.txt})}
-    if(v.kind!=="mower"&&v.reg){const i=info({date:v.reg,odo:""});if(i.st>=1)out.push({id:"reg:"+v.id,vid:v.id,name:v.name,what:"Registration expires",st:i.st,txt:i.txt})}
-    for(const x of v.dts||[]){if(!x.date)continue;const i=info({date:x.date,odo:""});if(i.st>=1)out.push({id:"dt:"+x.id,vid:v.id,name:v.name,what:x.l||"Other date",st:i.st,txt:i.txt})}
+    // Dates that fall on the same day (registration with inspection/emissions, say) are reported as one item.
+    const ds=[];
+    if(v.kind==="offroad"&&v.ohv)ds.push({k:"ohv:"+v.id,w:"OHV sticker expires",date:v.ohv});
+    if(v.kind!=="mower"&&v.reg)ds.push({k:"reg:"+v.id,w:"Registration expires",date:v.reg});
+    for(const x of v.dts||[])if(x.date)ds.push({k:"dt:"+x.id,w:x.l||"Other date",date:x.date});
+    const g=new Map();for(const x of ds)g.set(x.date,[...(g.get(x.date)||[]),x]);
+    for(const[date,a]of g){const i=info({date,odo:""});if(i.st>=1)out.push({id:a.map(x=>x.k).join("+"),vid:v.id,name:v.name,what:a.length===1?a[0].w:a.map(x=>x.w.replace(/ expires$/,"")).join(" + ")+" expire",st:i.st,txt:i.txt})}
   }
   return out.sort((a,b)=>b.st-a.st);
 }

@@ -61,10 +61,12 @@ Press **Send test message** to check it. The server then sends a message once a 
 ## Parts from inventory, search and export
 - In a service, repair or upgrade, **Take from inventory** subtracts what you used from your inventory. Editing or deleting the entry puts the difference back.
 - **Last done** on the dashboard searches descriptions, parts and notes and shows when and at what reading it was last done.
+- Deleting an entry or an inventory item shows **Undo** for a few seconds. Logging a reading lower than the last one asks you to confirm.
+- On the garage screen the pencil lets you reorder your equipment with arrows. The **+** on an equipment's dashboard asks what to add.
 - **Export records (CSV)** is under **⋯ > Settings & data** (all equipment) and in each equipment's **More** menu (that one only).
 
 ## Extra dates, documents and archive
-- Under an equipment's registration date, **+ Add another date** adds your own named dates (inspection, emissions, insurance). They stay hidden until you add one, repeat like registration, show on the dashboard with Renew, and go out in the alerts.
+- Under an equipment's registration date, **+ Add another date** adds your own named dates (inspection, emissions, insurance). They stay hidden until you add one, repeat like registration, show on the dashboard with Renew, and go out in the alerts. Dates that fall on the same day (Oregon registration with inspection and emissions, say) show as one reminder, and Renew then asks for each new date.
 - **More > Documents** attaches PDFs and photos (manuals, title copies, insurance cards) to a piece of equipment. The files live in the `docs/` folder of your data folder, so a dataset snapshot covers them. The backup file from Settings only lists them; it does not contain the files themselves.
 - **Archive this equipment** (in the equipment's edit screen) takes it out of the garage, the alerts and the recall checks but keeps its history. Archived equipment is listed under **⋯ > Settings & data > Archived equipment**, where you can print its history or restore it.
 
