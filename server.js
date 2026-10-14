@@ -2,9 +2,10 @@ const http=require("http"),fs=require("fs"),path=require("path"),crypto=require(
 const DIR=process.env.DATA_DIR||"/data",FILE=path.join(DIR,"db.json"),PHOTOS=path.join(DIR,"photos"),BACKUPS=path.join(DIR,"backups"),ALERT_STATE=path.join(DIR,"alert-state.json"),PORT=+process.env.PORT||3000;
 const RECALLS=path.join(DIR,"recalls.json"),VPIC=process.env.VPIC_URL||"https://vpic.nhtsa.dot.gov",RAPI=process.env.RECALL_URL||"https://api.nhtsa.gov";
 const PASS=process.env.GARAGE_PASSWORD||"",sha=x=>crypto.createHash("sha256").update(String(x)).digest(),PASSH=PASS?sha(PASS):null;
-fs.mkdirSync(PHOTOS,{recursive:true});
+const DOCS=path.join(DIR,"docs");
+fs.mkdirSync(PHOTOS,{recursive:true});fs.mkdirSync(DOCS,{recursive:true});
 const ST={"/manifest.webmanifest":"application/manifest+json","/sw.js":"text/javascript","/icon.svg":"image/svg+xml","/icon-192.png":"image/png","/icon-512.png":"image/png","/apple-touch-icon.png":"image/png"};
-const EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"},MIME={jpg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif"};
+const EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"},DEXT=Object.assign({"application/pdf":"pdf"},{"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"}),MIME={jpg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif"};
 const JSON_H={"Content-Type":"application/json","Cache-Control":"no-store"};
 
 // ---------- data file ----------
@@ -30,11 +31,12 @@ function write(d){
 }
 
 // ---------- photos are stored as files, not inside db.json ----------
-function savePhoto(buf,ext){
-  const name=crypto.createHash("sha1").update(buf).digest("hex").slice(0,16)+"."+ext,f=path.join(PHOTOS,name);
+function saveFile(dir,buf,ext){
+  const name=crypto.createHash("sha1").update(buf).digest("hex").slice(0,16)+"."+ext,f=path.join(dir,name);
   if(!fs.existsSync(f))fs.writeFileSync(f,buf);
   return name;
 }
+const savePhoto=(buf,ext)=>saveFile(PHOTOS,buf,ext);
 function dataUrlToFile(u){
   if(typeof u!=="string"||!u.startsWith("data:image/"))return u;
   const i=u.indexOf(";base64,"),ext=i<0?null:EXT[u.slice(5,i)];
@@ -61,7 +63,7 @@ const DAY=864e5;
 function dueItems(S,tz){
   const out=[],today=ymd(tz),units=S.units==="metric"?"km":"mi",R=S.records||[];
   const days=s=>Math.round((new Date(s+"T00:00:00Z")-new Date(today+"T00:00:00Z"))/DAY);
-  for(const v of S.vehicles||[]){
+  for(const v of (S.vehicles||[]).filter(v=>!v.arch)){
     const hrs=v.meter==="hrs",unit=hrs?"hrs":units,sd=+v.soonDays||30,sm=+v.soonDist||(hrs?10:500);
     const lo=Math.max(0,...R.filter(r=>r.vid===v.id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
     const info=r=>{
@@ -70,9 +72,10 @@ function dueItems(S,tz){
       if(r.odo!==""&&r.odo!=null){const d=r.odo-lo;st=Math.max(st,d<=0?2:d<=sm?1:0);p.push(d<=0?`${-d} ${unit} over`:`in ${d} ${unit}`)}
       return{st,txt:p.join(" / ")};
     };
-    for(const r of R.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done)){const i=info(r);if(i.st>=1)out.push({id:r.id,name:v.name,what:r.desc||"Reminder",st:i.st,txt:i.txt})}
-    if(v.kind==="offroad"&&v.ohv){const i=info({date:v.ohv,odo:""});if(i.st>=1)out.push({id:"ohv:"+v.id,name:v.name,what:"OHV sticker expires",st:i.st,txt:i.txt})}
-    if(v.kind!=="mower"&&v.reg){const i=info({date:v.reg,odo:""});if(i.st>=1)out.push({id:"reg:"+v.id,name:v.name,what:"Registration expires",st:i.st,txt:i.txt})}
+    for(const r of R.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done)){const i=info(r);if(i.st>=1)out.push({id:r.id,vid:v.id,name:v.name,what:r.desc||"Reminder",st:i.st,txt:i.txt})}
+    if(v.kind==="offroad"&&v.ohv){const i=info({date:v.ohv,odo:""});if(i.st>=1)out.push({id:"ohv:"+v.id,vid:v.id,name:v.name,what:"OHV sticker expires",st:i.st,txt:i.txt})}
+    if(v.kind!=="mower"&&v.reg){const i=info({date:v.reg,odo:""});if(i.st>=1)out.push({id:"reg:"+v.id,vid:v.id,name:v.name,what:"Registration expires",st:i.st,txt:i.txt})}
+    for(const x of v.dts||[]){if(!x.date)continue;const i=info({date:x.date,odo:""});if(i.st>=1)out.push({id:"dt:"+x.id,vid:v.id,name:v.name,what:x.l||"Other date",st:i.st,txt:i.txt})}
   }
   return out.sort((a,b)=>b.st-a.st);
 }
@@ -128,6 +131,7 @@ async function runRecalls(){
   try{
     const S=read(),rc=readRc(),out={},a=S.alert,alertOn=a&&/^https?:\/\//.test(a.url||"");let changed=false;
     for(const v of S.vehicles||[]){
+      if(v.arch)continue;
       const vin=String(v.vin||"").trim().toUpperCase();if(!VINRE.test(vin))continue;
       let e=rc[v.id];
       if(!e||e.vin!==vin||Date.now()-e.at>7*DAY){
@@ -191,6 +195,30 @@ http.createServer((req,res)=>{
       if(!buf.length){res.writeHead(400).end();return}
       try{res.writeHead(200,JSON_H);res.end(JSON.stringify({url:"photos/"+savePhoto(buf,ext)}))}catch(e){res.writeHead(500).end()}
     });
+  }
+  if(u==="/api/doc"&&req.method==="POST"){
+    const ext=DEXT[(req.headers["content-type"]||"").split(";")[0]];
+    if(!ext){req.resume();res.writeHead(415).end();return}
+    return body(req,25e6,buf=>{
+      if(!buf.length){res.writeHead(400).end();return}
+      try{res.writeHead(200,JSON_H);res.end(JSON.stringify({url:"docs/"+saveFile(DOCS,buf,ext)}))}catch(e){res.writeHead(500).end()}
+    });
+  }
+  if(u.startsWith("/docs/")){
+    const n=u.slice(6);
+    if(!/^[a-f0-9]{16}\.(pdf|jpg|png|webp|gif)$/.test(n)){res.writeHead(404).end();return}
+    try{const b=fs.readFileSync(path.join(DOCS,n));res.writeHead(200,{"Content-Type":n.endsWith(".pdf")?"application/pdf":MIME[n.split(".")[1]],"Content-Disposition":"inline","X-Content-Type-Options":"nosniff","Cache-Control":"private, max-age=31536000, immutable"});return res.end(b)}
+    catch(e){res.writeHead(404).end();return}
+  }
+  // Read-only status for dashboards (Home Assistant etc.): what is overdue or due soon, per equipment.
+  if(u==="/api/summary"&&req.method==="GET"){
+    const S=read(),items=dueItems(S,(S.alert||{}).tz||undefined);
+    const vehicles=(S.vehicles||[]).filter(v=>!v.arch).map(v=>{
+      const it=items.filter(i=>i.vid===v.id),over=it.filter(i=>i.st===2).length;
+      return{id:v.id,name:v.name,kind:v.kind,status:over?"overdue":it.length?"due_soon":"ok",overdue:over,due_soon:it.length-over,items:it.map(i=>({what:i.what,status:i.st===2?"overdue":"due_soon",detail:i.txt}))};
+    });
+    const overdue=items.filter(i=>i.st===2).length;
+    res.writeHead(200,JSON_H);return res.end(JSON.stringify({overdue,due_soon:items.length-overdue,total:items.length,vehicles}));
   }
   if(u.startsWith("/photos/")){
     const n=u.slice(8);

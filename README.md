@@ -41,6 +41,7 @@ user 568: on the dataset's **Permissions** screen set the owner to `apps` (568) 
 ## What's in the data folder
 - `db.json` holds your records. `db.json.bak` is the version before the last save.
 - `backups/` keeps one copy of `db.json` per day for the last 14 days. To roll back, stop the app, copy a file over `db.json`, and start it again.
+- `docs/` holds attached documents (PDFs and photos). `recalls.json` holds the last recall lookups.
 - `photos/` holds every cover photo, record photo and receipt as its own file. Existing photos are moved here automatically the first time the new version starts, and a copy of the old `db.json` is kept in `backups/db-before-photo-move.json`.
 - Two phones or tablets can edit at once. If one is out of date when it saves, the app merges the changes by item instead of overwriting the other device.
 
@@ -61,6 +62,28 @@ Press **Send test message** to check it. The server then sends a message once a 
 - In a service, repair or upgrade, **Take from inventory** subtracts what you used from your inventory. Editing or deleting the entry puts the difference back.
 - **Last done** on the dashboard searches descriptions, parts and notes and shows when and at what reading it was last done.
 - **Export records (CSV)** is under **⋯ > Settings & data** (all equipment) and in each equipment's **More** menu (that one only).
+
+## Extra dates, documents and archive
+- Under an equipment's registration date, **+ Add another date** adds your own named dates (inspection, emissions, insurance). They stay hidden until you add one, repeat like registration, show on the dashboard with Renew, and go out in the alerts.
+- **More > Documents** attaches PDFs and photos (manuals, title copies, insurance cards) to a piece of equipment. The files live in the `docs/` folder of your data folder, so a dataset snapshot covers them. The backup file from Settings only lists them; it does not contain the files themselves.
+- **Archive this equipment** (in the equipment's edit screen) takes it out of the garage, the alerts and the recall checks but keeps its history. Archived equipment is listed under **⋯ > Settings & data > Archived equipment**, where you can print its history or restore it.
+
+## Home Assistant
+`http://TRUENAS-IP:30500/api/summary` returns what is overdue or due soon, in total and per equipment:
+`{"overdue":1,"due_soon":2,"total":3,"vehicles":[{"name":"Daily Driver","status":"due_soon","overdue":0,"due_soon":1,"items":[...]}]}`. `status` is `ok`, `due_soon` or `overdue`. Example for `configuration.yaml` (add `authentication: basic`, `username` and `password` under `rest:` if you set a password):
+
+```yaml
+rest:
+  - resource: http://TRUENAS-IP:30500/api/summary
+    scan_interval: 1800
+    sensor:
+      - name: "Garage overdue"
+        value_template: "{{ value_json.overdue }}"
+      - name: "Garage due soon"
+        value_template: "{{ value_json.due_soon }}"
+      - name: "Daily Driver service"
+        value_template: "{{ (value_json.vehicles | selectattr('name','eq','Daily Driver') | map(attribute='status') | list)[0] | default('unknown') }}"
+```
 
 ## Recalls (optional, needs internet on the server)
 Put the VIN on a car or truck and Garage Log asks the US government's NHTSA recall database about it once a week. It looks up the year, make and model from the VIN and lists the recalls NHTSA has for that model year, so the list can include recalls already fixed on your vehicle. Confirm with your VIN at nhtsa.gov/recalls, then tap **Mark handled** on any that are done. New recalls also go to your reminder alert address if you set one. **More > Check for recalls (VIN)** checks right away.

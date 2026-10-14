@@ -156,7 +156,8 @@ const REP=[[0,"Doesn't repeat"],[6,"Every 6 months"],[12,"Every year"],[24,"Ever
 const vrep=n=>REP.filter(x=>x[0]).map(([m,l])=>`<option value="${m}" ${m===+n?"selected":""}>${l}</option>`).join("");
 const repTxt=n=>n%12===0?(n===12?"year":n/12+" years"):n+" months";
 const nextDate=(d,n)=>{let x=addM(d||today(),n),i=0;while(x<=today()&&i++<60)x=addM(x,n);return x};
-const vDates=v=>[v.kind==="offroad"&&v.ohv&&{k:"ohv",l:"OHV sticker expires",date:v.ohv,rep:v.ohvRep??24},v.kind!=="mower"&&v.reg&&{k:"reg",l:"Registration expires",date:v.reg,rep:v.regRep??24}].filter(Boolean);
+const vDates=v=>[v.kind==="offroad"&&v.ohv&&{k:"ohv",l:"OHV sticker expires",date:v.ohv,rep:v.ohvRep??24},v.kind!=="mower"&&v.reg&&{k:"reg",l:"Registration expires",date:v.reg,rep:v.regRep??24}].filter(Boolean).concat((v.dts||[]).filter(x=>x.date).map(x=>({k:"dt:"+x.id,l:x.l||"Other date",date:x.date,rep:x.rep??24})));
+const act=()=>S.vehicles.filter(v=>!v.arch);
 const pseudo=v=>vDates(v).map(x=>({desc:x.l,date:x.date,odo:"",vid:v.id,pk:x.k,rep:x.rep}));
 const partsOf=r=>(r.parts?[r.parts]:[]).concat(r.pl||[]).concat((r.iu||[]).map(x=>x.n+" ×"+x.q+(x.u?" "+x.u:"")));
 const rbtn=r=>r.pk?`<button style="margin-top:8px" data-renew="${r.pk}">Renew</button>`:r.id?(r.rep>0?`<button style="margin-top:8px" data-renew="${r.id}">Renew</button>`:`<button style="margin-top:8px" data-done="${r.id}">Mark done</button>`):"";
@@ -217,7 +218,7 @@ function csvExport(vid){
 }
 function renewDlg(key){
   const v=veh();let title,cur,rep,go;
-  if(key==="ohv"||key==="reg"){const x=vDates(v).find(z=>z.k===key);if(!x)return;title=x.l.replace(" expires","");cur=x.date;rep=x.rep;go=d=>{v[key]=d}}
+  if(key==="ohv"||key==="reg"||key.startsWith("dt:")){const x=vDates(v).find(z=>z.k===key);if(!x)return;title=x.l.replace(" expires","");cur=x.date;rep=x.rep;go=d=>{if(key.startsWith("dt:")){const z=(v.dts||[]).find(y=>"dt:"+y.id===key);if(z)z.date=d}else v[key]=d}}
   else{const r=S.records.find(z=>z.id===key);if(!r)return;title=r.desc||"Reminder";cur=r.date;rep=r.rep;go=d=>{r.done=true;S.records.push(Object.assign(clone(r),{id:uid(),date:d,odo:"",done:false,nrid:""}))}}
   show(`<h3 style="margin:0">Renew</h3><div class="m" style="margin-top:6px">${esc(title)}${rep>0?" · repeats every "+repTxt(rep):""}</div><label>New expiration / due date</label><input type="date" id="rn_d" value="${nextDate(cur,rep||12)}"><div class="m" style="margin-top:6px">Change the date if the new sticker or tag shows a different one.</div>${btns}`);
   $("ok").onclick=()=>{const d=$("rn_d").value;if(!d)return alert("Pick the new date.");go(d);save();$("dlg").close();render()};
@@ -256,17 +257,37 @@ async function recallNow(v){
   }catch(e){msg="Couldn't reach the Garage Log server."}
   if($("rcm"))$("rcm").textContent=msg;
 }
+function docsForm(v){
+  const cur=()=>vOf(v.id)||v;
+  show(`<h3 style="margin:0">Documents</h3><div class="m" style="margin-top:6px">Manuals, title copies, insurance cards. PDFs and photos up to 25 MB, stored on your server.</div><div id="dlist"></div><div class="m" id="dmsg" style="margin-top:10px"></div><input type="file" id="dfi" accept="application/pdf,image/*" multiple hidden><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button><button class="p" id="dadd" style="flex:1">Add document</button></div>`);
+  const draw=()=>{$("dlist").innerHTML=(cur().docs||[]).map(x=>`<div class="sp"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:var(--ac);word-break:break-word">${esc(x.n)}</a><button data-ddel="${x.id}" style="flex:none;padding:4px 10px">✕</button></div>`).join("")||'<div class="m" style="margin-top:10px">No documents yet.</div>'};
+  draw();
+  $("dlist").onclick=ev=>{const i=ev.target.dataset.ddel;if(i&&confirm("Remove this document from the list? The file stays in your data folder.")){cur().docs=(cur().docs||[]).filter(x=>x.id!==i);save();draw()}};
+  $("dadd").onclick=()=>$("dfi").click();
+  $("dfi").onchange=async()=>{
+    for(const f of [...$("dfi").files]){
+      $("dmsg").textContent="Uploading "+f.name+"…";
+      try{
+        const r=await fetch("api/doc",{method:"POST",headers:{"Content-Type":f.type||"application/octet-stream"},body:f});
+        if(r.status===415){$("dmsg").textContent=f.name+": only PDF and image files are supported.";continue}
+        if(!r.ok)throw 0;
+        const j=await r.json(),c=cur();c.docs=[...(c.docs||[]),{id:uid(),n:f.name,url:j.url,t:f.type,at:today()}];save();draw();$("dmsg").textContent="Added "+f.name+"."
+      }catch(e){$("dmsg").textContent="Couldn't upload "+f.name+". Documents need a connection to your server, and files over 25 MB won't fit."}
+    }
+    $("dfi").value="";
+  };
+}
 function moreMenu(){
   const v=veh(),L=vTabs(v).filter(t=>!MAIN.includes(t[0]));
-  show(`<h3 style="margin:0">More</h3>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<button class="mrow" data-pv="1">Print service history</button><button class="mrow" data-csv="1">Export records (CSV)</button>'+(/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
-  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}else if(e.target.dataset.rcnow){recallNow(v)}};
+  show(`<h3 style="margin:0">More</h3>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<button class="mrow" data-pv="1">Print service history</button><button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button><button class="mrow" data-csv="1">Export records (CSV)</button>'+(/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}else if(e.target.dataset.rcnow){recallNow(v)}};
 }
 function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
   const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key}
   const v=veh(),inV=view==="vehicle"&&v;
-  $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><button id="ev">✎</button><button id="more">⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":S.vehicles.length+" in the garage"}</span></div><button id="more">⋯</button>`;
-  const pk=KINDS.filter(k=>S.vehicles.some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
+  $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><button id="ev">✎</button><button id="more">⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><button id="more">⋯</button>`;
+  const pk=KINDS.filter(k=>act().some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
   const vt=inV?vTabs(v):[],tl=inV?[...vt.filter(t=>MAIN.includes(t[0])),["more",(vt.find(t=>t[0]===tab&&!MAIN.includes(t[0]))||[0,"More"])[1]+" ▾"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
   $("tabs").className="tabs"+(inV?" wrap":"");$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)||(k==="more"&&inV&&!MAIN.includes(tab))?"on":""}" data-t="${k}">${l}</button>`).join("");
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
@@ -287,8 +308,8 @@ function dashView(v){
   return `<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">🔍 Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+rclCard(v)+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH;
 }
 function garageView(){
-  if(!S.vehicles.length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
-  return S.vehicles.filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[v.model,isT(v.id)?"":lastOdo(v.id).toLocaleString()+" "+dU(v.id)].filter(Boolean).join(" · ");
+  if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
+  return act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[v.model,isT(v.id)?"":lastOdo(v.id).toLocaleString()+" "+dU(v.id)].filter(Boolean).join(" · ");
     return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${esc(mt)}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
 }
 function recView(v){
@@ -308,7 +329,7 @@ function card(r){
   return `<div class="c${sk?" sc "+sk:""}"><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${em?`<div class="row" style="margin-top:10px"><button class="p" data-edit="${r.id}" style="flex:1">Edit</button><button data-del="${r.id}" style="flex:1">Delete</button></div>`:""}</div>`;
 }
 function partsView(v){
-  const top=[["License plate",["car","trailer"].includes(v.kind)?v.plate:""],["OHV sticker expires",v.kind==="offroad"?v.ohv:""],["Registration expires",v.kind!=="mower"?v.reg:""],["VIN / serial #",v.vin]].filter(x=>x[1]).map(([l,x])=>`<div class="sp"><span class="m">${l}</span><span>${esc(x)}</span></div>`).join("");
+  const top=[["License plate",["car","trailer"].includes(v.kind)?v.plate:""],["OHV sticker expires",v.kind==="offroad"?v.ohv:""],["Registration expires",v.kind!=="mower"?v.reg:""],...(v.dts||[]).map(x=>[x.l||"Other date",x.date]),["VIN / serial #",v.vin]].filter(x=>x[1]).map(([l,x])=>`<div class="sp"><span class="m">${l}</span><span>${esc(x)}</span></div>`).join("");
   return `<div class="c">${top}${(v.plist||[]).map(r=>`<div class="sp"><span class="m">${esc(r.l)}</span><span style="white-space:pre-wrap;text-align:right">${esc(r.v||"—")}</span></div>`).join("")||'<div class="m">No parts yet. Tap + to add one as you go.</div>'}</div>`;
 }
 function invView(){
@@ -411,16 +432,22 @@ function addPart(){
 }
 function vehForm(edit){
   const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
-  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><input type="file" id="cf" accept="image/*"><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="dv" style="margin-top:12px;width:100%">Delete this equipment</button>':""}${btns}`);
+  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><input type="file" id="cf" accept="image/*"><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><div id="v_dts"></div><button type="button" id="v_adt" style="margin-top:10px;width:100%">+ Add another date (inspection, emissions…)</button><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="av" style="margin-top:12px;width:100%">Archive this equipment</button><button id="dv" style="margin-top:8px;width:100%">Delete this equipment</button>':""}${btns}`);
   let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${cover}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
   $("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
   const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none";$("v_rg").style.display=k==="mower"?"none":""};tp();
+  let dts=(v.dts||[]).map(x=>({...x}));
+  const syD2=()=>{dts=[...$("v_dts").querySelectorAll(".dtr0")].map(r=>({id:r.dataset.id,l:r.querySelector(".dtl").value.trim(),date:r.querySelector(".dtd").value,rep:+r.querySelector(".dtr").value||24}))};
+  const ddraw=()=>{$("v_dts").innerHTML=dts.map((x,i)=>`<div class="dtr0" data-id="${x.id}" style="margin-top:12px"><div class="row"><input class="dtl" value="${esc(x.l)}" placeholder="Name, e.g. Inspection / emissions"><button type="button" data-dtx="${i}" style="flex:none">✕</button></div><div class="row" style="margin-top:6px"><input type="date" class="dtd" value="${x.date||""}"><select class="dtr">${vrep(x.rep??24)}</select></div></div>`).join("")};ddraw();
+  $("v_adt").onclick=()=>{syD2();dts.push({id:uid(),l:"",date:"",rep:24});ddraw();const a=$("v_dts").querySelectorAll(".dtl");a[a.length-1].focus()};
+  $("v_dts").onclick=e=>{const i=e.target.dataset.dtx;if(i!=null){syD2();dts.splice(+i,1);ddraw()}};
   const sp=()=>{const t=$("v_t").value;$("v_sm").style.display=t==="time"?"none":"";$("v_sm").placeholder=t==="hrs"?"10 hrs":"500 "+(S.units==="imperial"?"mi":"km")};sp();$("v_t").addEventListener("change",sp);
   $("v_k").onchange=()=>{tp();if(!edit)$("v_t").value={mower:"hrs",trailer:"time"}[$("v_k").value]||"dist";sp()};
   $("ok").onclick=()=>{const n=$("v_n").value.trim()||$("v_m").value.trim();if(!n)return;
-    const f={name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,ohvRep:+$("v_ohr").value||24,reg:$("v_rgd").value,regRep:+$("v_rgr").value||24,kind:$("v_k").value,meter:$("v_t").value,cover,soonDays:+$("v_sd").value||0,soonDist:+$("v_sm").value||0};
+    const f={name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,ohvRep:+$("v_ohr").value||24,reg:$("v_rgd").value,regRep:+$("v_rgr").value||24,kind:$("v_k").value,meter:$("v_t").value,cover,soonDays:+$("v_sd").value||0,soonDist:+$("v_sm").value||0,dts:(syD2(),dts.filter(x=>x.l||x.date))};
     if(edit)Object.assign(v,f);else{const nv=Object.assign({id:uid(),specs:{}},f);fixV(nv);S.vehicles.push(nv)}
     save();$("dlg").close();render()};
+  if(edit)$("av").onclick=()=>{if(!confirm("Archive "+v.name+"? It leaves your garage but keeps its history. You can restore it from Settings & data."))return;v.arch=true;S.cur=null;view="garage";save();$("dlg").close();render()};
   if(edit)$("dv").onclick=()=>{if(!confirm("Delete "+v.name+" and all its records?"))return;S.records=S.records.filter(r=>r.vid!==v.id);S.vehicles=S.vehicles.filter(x=>x.id!==v.id);S.cur=null;view="garage";save();$("dlg").close();render()};
 }
 function invForm(id){
@@ -432,7 +459,7 @@ function invForm(id){
 const restore=t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;const rv=S.rev;S=Object.assign({inv:[],units:"imperial"},d);S.rev=rv;S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
 const inlined=async()=>{const c=clone(S),g=async u=>{if(!u||u.startsWith("data:"))return u;try{const b=await (await fetch(u)).blob();return await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)})}catch(e){return u}};for(const v of c.vehicles)if(v.cover)v.cover=await g(v.cover);for(const r of c.records){r.ph=await Promise.all((r.ph||[]).map(g));r.rc=await Promise.all((r.rc||[]).map(g))}return c};
 function dataForm(){
-  const al=S.alert||{};
+  const al=S.alert||{},arch=S.vehicles.filter(v=>v.arch);
   show(`<h3 style="margin:0">Settings &amp; data</h3>
   <label>Appearance</label><select id="th"><option value="auto">Match my device</option><option value="dark">Dark</option><option value="light">Light</option></select>
   <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
@@ -442,7 +469,7 @@ function dataForm(){
   <div class="row" style="margin-top:6px"><button id="al_t" style="flex:1">Send test message</button></div>
   <div class="m" id="al_m" style="margin-top:6px">The server sends a message when something becomes due soon or overdue, then weekly while it stays overdue. Use "JSON webhook" for Home Assistant or Gotify. Leave the address empty to turn alerts off.</div>
   <div class="m" style="margin-top:12px">Server sync: <span id="ss">${syncMsg}</span></div>
-  <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>
+  <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
   <details style="margin-top:12px"><summary class="m">Copy or paste backup text (no photos)</summary><textarea id="bk" rows="5" style="margin-top:8px">${esc(JSON.stringify(S))}</textarea><button id="imp" style="margin-top:8px;width:100%">Restore from text</button></details>
   <div class="row" style="margin-top:14px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
@@ -458,6 +485,7 @@ function dataForm(){
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
   $("imp").onclick=()=>restore($("bk").value);
   $("csvb").onclick=()=>csvExport();
+  $("dbody").onclick=e=>{const d=e.target.dataset;if(d.unarch){const v=vOf(d.unarch);if(v){delete v.arch;save();$("dlg").close();render();dataForm()}}else if(d.aprint){const v=vOf(d.aprint);$("dlg").close();if(v)printView(v)}};
 }
 $("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more")dataForm();else if(i==="ev")vehForm(true)};
 $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(t==="more")return moreMenu();if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
