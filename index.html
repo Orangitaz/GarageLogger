@@ -94,6 +94,20 @@ dialog input,dialog textarea,dialog select{width:100%;margin-top:6px}
 .mrow{display:block;width:100%;text-align:left;margin-top:8px;padding:14px 16px;font-size:16px}
 .c h3 .tag~.tag{margin-left:0}
 details summary{cursor:pointer;padding:4px 0}
+.qa{display:block;width:100%;margin:0 0 6px;padding:13px 16px;border-radius:16px;font-size:15px;background:color-mix(in srgb,var(--ac) 10%,var(--field));border:1px solid color-mix(in srgb,var(--ac) 30%,var(--bd));color:var(--ac)}
+.qps{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.qps button{padding:7px 13px;border-radius:99px;font-size:13.5px}
+.row select,.row input{flex:1;min-width:0}
+#pv{position:fixed;inset:0;z-index:50;overflow:auto;background:#fff;color:#111;padding:calc(20px + env(safe-area-inset-top,0px)) 18px calc(28px + env(safe-area-inset-bottom,0px));font-size:14px}
+#pv .bar{display:flex;gap:8px;margin-bottom:18px}
+#pv button{color:#111;background:#f2f4f7;border:1px solid #d5dae2;padding:10px 16px;box-shadow:none}
+#pv button.p{color:#fff;background:#0a8fd6;border-color:#0a8fd6}
+#pv h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+#pv .pvm{color:#555;font-size:13px;margin-top:2px}
+#pv table{width:100%;border-collapse:collapse}
+#pv th,#pv td{text-align:left;padding:8px;border-bottom:1px solid #ddd;vertical-align:top}
+#pv td:first-child{white-space:nowrap}
+#pv th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#555}
+@media print{body>*:not(#pv){display:none!important}body::before{display:none}#pv{position:static;overflow:visible;padding:0}#pv .bar{display:none}}
 .fresh .c{animation:rise .4s cubic-bezier(.2,.8,.3,1) both}
 .fresh .c:nth-child(2){animation-delay:.05s}.fresh .c:nth-child(3){animation-delay:.1s}.fresh .c:nth-child(4){animation-delay:.15s}.fresh .c:nth-child(5){animation-delay:.2s}.fresh .c:nth-child(n+6){animation-delay:.25s}
 @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
@@ -108,6 +122,7 @@ details summary{cursor:pointer;padding:4px 0}
 <button class="fab fabl p" id="fabE" title="Edit parts list" style="display:none">✎</button>
 <div id="bn"><button data-v="garage"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>Garage</button><button data-v="inventory"><svg viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>Inventory</button></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
+<div id="pv" hidden></div>
 <script>
 const TYPES=[["dash","Dashboard"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
@@ -150,11 +165,28 @@ function vstat(v){
 const tag=st=>st==2?'<span class="tag bad">Overdue</span>':st==1?'<span class="tag warn">Due soon</span>':'<span class="tag ok">OK</span>';
 
 const MAIN=["dash","service","repair","parts","reminder"];
+const PRE0={
+  car:[["Oil & filter",5000,0,6],["Tire rotation",7500,0,6],["Engine air filter",15000,0,12],["Cabin air filter",15000,0,12],["Brake fluid",30000,0,24],["Coolant",30000,0,24],["Transmission fluid",60000,0,36],["Battery test",0,0,12],["Wiper blades",0,0,12]],
+  offroad:[["Engine oil & filter",1500,25,6],["Air filter clean",1000,20,3],["Differential fluid",3000,50,12],["Greasing",500,10,3],["Coolant",5000,100,24],["Drive belt check",2000,50,12]],
+  mower:[["Oil change",0,50,12],["Blade sharpen",0,25,12],["Air filter",0,50,12],["Spark plug",0,100,12],["Grease deck",0,25,6]],
+  trailer:[["Wheel bearings",0,0,12],["Brake check",0,0,6],["Tire check",0,0,6],["Lights check",0,0,6]],
+  other:[["Oil change",0,50,12],["General service",0,0,12]]};
+const PR=k=>(S.presets&&S.presets[k])||(PRE0[k]||PRE0.other).map(([n,d,h,m])=>({n,d,h,m}));
 const vTabs=v=>TYPES.filter(t=>!(isT(v.id)&&t[0]==="odometer")).map(([k,l])=>[k,k==="odometer"&&isH(v.id)?"Hours":l]);
+function printView(v){
+  const L={service:"Service",repair:"Repair",upgrade:"Upgrade"},tm=isT(v.id);
+  const rows=S.records.filter(r=>r.vid===v.id&&L[r.type]).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));
+  const meta=[v.model,v.vin&&"VIN "+v.vin,["car","trailer"].includes(v.kind)&&v.plate&&"Plate "+v.plate].filter(Boolean).join(" · ");
+  const row=r=>{const work=[r.desc,...(r.dl||[])].filter(Boolean).join("; ")||L[r.type],pt=(r.parts?[r.parts]:[]).concat(r.pl||[]).filter(Boolean);
+    return `<tr><td>${esc(r.date||"")}</td>${tm?"":`<td>${r.odo!==""&&r.odo!=null?(+r.odo).toLocaleString()+" "+dU(v.id):""}</td>`}<td>${L[r.type]}</td><td>${esc(work)}${pt.length?`<div class="pvm">Parts: ${pt.map(x=>esc(x)).join(", ")}</div>`:""}${r.notes?`<div class="pvm">${esc(r.notes)}</div>`:""}</td></tr>`};
+  $("pv").innerHTML=`<div class="bar"><button class="p" id="pv_p">Print</button><button id="pv_x">Close</button></div><h1>${esc(v.name)}</h1>${meta?`<div class="pvm">${esc(meta)}</div>`:""}<div class="pvm" style="margin-bottom:16px">Service history · ${today()}${tm?"":" · "+lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div><table><tr><th>Date</th>${tm?"":`<th>${isH(v.id)?"Hours":"Odometer"}</th>`}<th>Type</th><th>Work done</th></tr>${rows.map(row).join("")||'<tr><td colspan="4">No records yet.</td></tr>'}</table>`;
+  $("pv").hidden=false;$("pv").scrollTop=0;
+  $("pv_p").onclick=()=>{try{window.print()}catch(e){}};$("pv_x").onclick=()=>{$("pv").hidden=true};
+}
 function moreMenu(){
   const v=veh(),L=vTabs(v).filter(t=>!MAIN.includes(t[0]));
-  show(`<h3 style="margin:0">More</h3>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
-  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}};
+  show(`<h3 style="margin:0">More</h3>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<button class="mrow" data-pv="1">Print service history</button><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}};
 }
 function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
@@ -182,7 +214,7 @@ function dashView(v){
   const upH=up.length?up.map(({r,i})=>`<div class="c sc st${i.st}"><h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${r.id?`<button style="margin-top:8px" data-done="${r.id}">Mark done</button>`:""}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders.</div>';
   const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
     return `<div class="c sc st${r.type==="repair"?1:0}"><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
-  return '<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH;
+  return (isT(v.id)?"":`<button class="qa" data-qodo="1">＋ Update ${isH(v.id)?"hours":"odometer"}</button>`)+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH;
 }
 function garageView(){
   if(!S.vehicles.length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
@@ -215,6 +247,7 @@ function invView(){
   return a.map(i=>`<div class="c"><button class="x" data-idel="${i.id}">✕</button><h3 data-iedit="${i.id}">${esc(i.name)}${i.qty<=0?'<span class="tag bad">Out</span>':i.qty<=(i.low!==""&&i.low!=null?+i.low:1)?'<span class="tag warn">Low</span>':""}<span class="tag">${i.cat}</span></h3>${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
 }
 function shrink(f,mx=800,q=.65){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,mx/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",q))};i.src=r.result};r.readAsDataURL(f)})}
+const up=async d=>{try{const b=await (await fetch(d)).blob(),r=await fetch("api/photo",{method:"POST",headers:{"Content-Type":b.type||"image/jpeg"},body:b});if(r.ok){const j=await r.json();if(j&&j.url)return j.url}}catch(e){}return d};
 const btns='<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="ok" style="flex:1">Save</button></div>';
 function show(h){$("dbody").onclick=null;$("dbody").innerHTML=h;$("dlg").showModal();if($("cancel"))$("cancel").onclick=()=>$("dlg").close()}
 function logFrom(r){openForm(null,{type:"service",date:today(),desc:(r.desc||"").replace(/^Next:\s*/,""),banner:"Reminder marked done. Log the service now, or cancel to skip."})}
@@ -222,15 +255,16 @@ function openForm(id,pre){
   const e=id?S.records.find(r=>r.id===id):Object.assign({type:tab,date:today(),odo:"",desc:"",notes:"",parts:"",ph:[]},pre||{});
   const t=e.type,rem=t==="reminder",hp=PH.includes(t),sr=["service","repair","upgrade"].includes(t);const nopts=isT(S.cur)?[[1,"1 month"],[3,"3 months"],[6,"6 months"],[12,"1 year"]]:(isH(S.cur)?[10,25,50,100,150,200,250]:[1000,3000,5000,7500,10000,15000]).map(n=>[n,n.toLocaleString()+" "+dU()]);
   const cs=+e.next>0&&!nopts.some(([n])=>n===+e.next);
+  const pr=t==="service"&&!id&&vOf(S.cur)?PR(vOf(S.cur).kind):[];
   let ph=(e.ph||[]).slice(),rc=(e.rc||[]).slice();
   show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":TYPES.find(x=>x[0]===t)[1].toLowerCase()}</h3>${e.banner?`<div class="m" style="margin-top:6px;color:var(--ac)">${esc(e.banner)}</div>`:""}
   <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
   ${isT(S.cur)?"":`<label>${rem?"Due at "+dU()+" (optional)":(isH(S.cur)?"Hours":"Odometer ("+(S.units==="imperial"?"mi":"km")+")")}</label><input type="number" inputmode="numeric" id="f_odo" value="${e.odo}" placeholder="${lastOdo(S.cur)||""}">`}
-  ${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
+  ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
   ${sr?'<label style="display:flex;align-items:center;gap:8px">Parts used <button class="p" id="addpt" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="pls"></div>':""}
     <label>Notes</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
   ${hp?'<label>Photos</label><div class="ph" id="ph"></div><input type="file" id="pf" accept="image/*" multiple>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><input type="file" id="rf" accept="image/*" multiple>':""}${btns}`);
-  const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${p}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await shrink(f,mx,q));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
+  const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${p}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
   grp("ph","pf",ph,800,.65);grp("rc","rf",rc,1600,.7);
   let pl=sr?[...(e.parts?[e.parts]:[]),...(e.pl||[])]:[];if(sr&&!pl.length)pl=[""];
   const dpl=()=>{if($("pls"))$("pls").innerHTML=pl.map((x,i)=>`<div class="row" style="margin-top:6px"><input class="pt" value="${esc(x)}" placeholder="Part"><button data-pd="${i}">✕</button></div>`).join("")};
@@ -240,10 +274,13 @@ function openForm(id,pre){
     const sy=()=>{arr.splice(0,arr.length,...[...$(box).querySelectorAll("."+box+"i")].map(i=>i.value))};
     d();$(btn).onclick=()=>{sy();arr.push("");d();const a=$(box).querySelectorAll("."+box+"i");a[a.length-1].focus()};
     $(box).onclick=ev=>{const i=ev.target.dataset.ld;if(i!=null){sy();arr.splice(+i,1);if(!arr.length)arr.push("");d()}};
-    return sy};
+    sy.d=d;return sy};
   const dl=sr?[e.desc||"",...(e.dl||[])]:[];if(sr&&!dl.length)dl.push("");
   const syD=sr?listUI("dls","adddc",dl,"Description"):()=>{};
   if($("f_next"))$("f_next").onchange=()=>{$("f_nextc").style.display=$("f_next").value==="c"?"":"none"};
+  if($("qp"))$("qp").onclick=ev=>{const i=ev.target.dataset.qp;if(i==null)return;const x=pr[+i];syD();if(!dl.some(z=>z.trim().toLowerCase()===x.n.toLowerCase())){const k=dl.findIndex(z=>!z.trim());if(k>=0)dl[k]=x.n;else dl.push(x.n);syD.d()}
+    const m=isT(S.cur)?x.m:isH(S.cur)?x.h:x.d,fn=$("f_next");
+    if(fn&&m>0){const o=[...fn.options].find(z=>z.value!=="c"&&+z.value===m);if(o)fn.value=o.value;else{fn.value="c";$("f_nextc").value=m}fn.onchange()}};
   if($("addpt")){$("addpt").onclick=()=>{syncP();pl.push("");dpl();const a=$("pls").querySelectorAll(".pt");a[a.length-1].focus()};$("pls").onclick=ev=>{const i=ev.target.dataset.pd;if(i!=null){syncP();pl.splice(+i,1);if(!pl.length)pl=[""];dpl()}}}
   $("ok").onclick=()=>{
     const g=i=>$(i)?$(i).value:"";
@@ -275,6 +312,19 @@ function specForm(){
   $("dbody").onclick=e=>{const d=e.target.dataset;if(d.prm!=null){sync();rows.splice(+d.prm,1);draw()}else if(d.pup!=null&&+d.pup>0){sync();const i=+d.pup;[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}};
   draw();$("dlg").showModal();
 }
+function presetForm(kind){
+  let rows=PR(kind).map(x=>({...x}));
+  const sync=()=>{rows=[...$("dbody").querySelectorAll(".qr")].map(d=>({n:d.querySelector(".qn").value.trim(),d:+d.querySelector(".qd").value||0,h:+d.querySelector(".qh").value||0,m:+d.querySelector(".qm").value||0}))};
+  const draw=()=>{
+    $("dbody").innerHTML=`<h3 style="margin:0">Quick-pick services</h3><div class="m">${esc((KINDS.find(k=>k[0]===kind)||[])[1]||"")}. Name each service, then how often it repeats. Leave a box empty for none.</div>${rows.map((r,i)=>`<div class="qr" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><div class="row"><input class="qn" value="${esc(r.n)}" placeholder="Service"><button data-pup="${i}">↑</button><button data-prm="${i}">✕</button></div><div class="row" style="margin-top:6px"><input class="qd" type="number" inputmode="numeric" value="${r.d||""}" placeholder="${S.units==="imperial"?"miles":"km"}"><input class="qh" type="number" inputmode="numeric" value="${r.h||""}" placeholder="hours"><input class="qm" type="number" inputmode="numeric" value="${r.m||""}" placeholder="months"></div></div>`).join("")}<button id="addq" style="margin-top:12px;width:100%">+ Add service</button><button id="rstq" style="margin-top:8px;width:100%">Reset to the defaults</button>${btns}`;
+    $("cancel").onclick=()=>$("dlg").close();
+    $("addq").onclick=()=>{sync();rows.push({n:"",d:0,h:0,m:0});draw();const a=$("dbody").querySelectorAll(".qn");a[a.length-1].focus()};
+    $("rstq").onclick=()=>{if(S.presets){delete S.presets[kind];save()}$("dlg").close()};
+    $("ok").onclick=()=>{sync();S.presets=Object.assign({},S.presets,{[kind]:rows.filter(r=>r.n)});save();$("dlg").close()};
+  };
+  $("dbody").onclick=e=>{const d=e.target.dataset;if(d.prm!=null){sync();rows.splice(+d.prm,1);draw()}else if(d.pup!=null&&+d.pup>0){sync();const i=+d.pup;[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}};
+  draw();$("dlg").showModal();
+}
 function addPart(){
   const v=veh(),labs=[...new Set(S.vehicles.flatMap(x=>(x.plist||[]).filter(r=>r.v).map(r=>r.l)))];
   show(`<h3 style="margin:0">Add part</h3><label>Category</label><input id="ap_l" list="ap_s" placeholder="Category" autocomplete="off"><datalist id="ap_s">${labs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist><label>Value</label><input id="ap_v" placeholder="Value">${btns}`);
@@ -284,7 +334,7 @@ function vehForm(edit){
   const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
   show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><input type="file" id="cf" accept="image/*"><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><div id="v_or"><label>OHV sticker expiration</label><input type="date" id="v_oh" value="${v.ohv||""}"></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="dv" style="margin-top:12px;width:100%">Delete this equipment</button>':""}${btns}`);
   let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${cover}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
-  $("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await shrink(f,700,.7);$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
+  $("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
   const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none"};tp();
   const sp=()=>{const t=$("v_t").value;$("v_sm").style.display=t==="time"?"none":"";$("v_sm").placeholder=t==="hrs"?"10 hrs":"500 "+(S.units==="imperial"?"mi":"km")};sp();$("v_t").addEventListener("change",sp);
   $("v_k").onchange=()=>{tp();if(!edit)$("v_t").value={mower:"hrs",trailer:"time"}[$("v_k").value]||"dist";sp()};
@@ -300,19 +350,31 @@ function invForm(id){
   $("ok").onclick=()=>{const n=$("i_n").value.trim();if(!n)return;const o={id:e.id||uid(),name:n,cat:$("i_c").value,qty:+$("i_q").value||0,unit:$("i_u").value.trim(),notes:$("i_notes").value.trim(),low:$("i_l").value===""?"":+$("i_l").value};
     if(id)S.inv[S.inv.findIndex(i=>i.id===id)]=o;else S.inv.push(o);save();$("dlg").close();render()};
 }
-const restore=t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;S=Object.assign({inv:[],units:"imperial"},d);S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
+const restore=t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;const rv=S.rev;S=Object.assign({inv:[],units:"imperial"},d);S.rev=rv;S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
+const inlined=async()=>{const c=clone(S),g=async u=>{if(!u||u.startsWith("data:"))return u;try{const b=await (await fetch(u)).blob();return await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)})}catch(e){return u}};for(const v of c.vehicles)if(v.cover)v.cover=await g(v.cover);for(const r of c.records){r.ph=await Promise.all((r.ph||[]).map(g));r.rc=await Promise.all((r.rc||[]).map(g))}return c};
 function dataForm(){
+  const al=S.alert||{};
   show(`<h3 style="margin:0">Settings &amp; data</h3>
   <label>Appearance</label><select id="th"><option value="auto">Match my device</option><option value="dark">Dark</option><option value="light">Light</option></select>
   <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
+  <label>Quick-pick services</label><div class="row"><select id="qk">${KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select><button id="qke" style="flex:none">Edit list</button></div>
+  <label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
+  <div class="row" style="margin-top:6px"><select id="al_f"><option value="text" ${al.fmt!=="json"?"selected":""}>ntfy / text</option><option value="json" ${al.fmt==="json"?"selected":""}>JSON webhook</option></select><select id="al_h">${[...Array(18).keys()].map(i=>i+5).map(h=>`<option value="${h}" ${(+al.hour||8)===h?"selected":""}>${h%12||12}:00 ${h<12?"AM":"PM"}</option>`).join("")}</select></div>
+  <div class="row" style="margin-top:6px"><button id="al_t" style="flex:1">Send test message</button></div>
+  <div class="m" id="al_m" style="margin-top:6px">The server sends a message when something becomes due soon or overdue, then weekly while it stays overdue. Use "JSON webhook" for Home Assistant or Gotify. Leave the address empty to turn alerts off.</div>
   <div class="m" style="margin-top:12px">Server sync: <span id="ss">${syncMsg}</span></div>
   <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden>
-  <details style="margin-top:12px"><summary class="m">Copy or paste backup text</summary><textarea id="bk" rows="5" style="margin-top:8px">${esc(JSON.stringify(S))}</textarea><button id="imp" style="margin-top:8px;width:100%">Restore from text</button></details>
+  <details style="margin-top:12px"><summary class="m">Copy or paste backup text (no photos)</summary><textarea id="bk" rows="5" style="margin-top:8px">${esc(JSON.stringify(S))}</textarea><button id="imp" style="margin-top:8px;width:100%">Restore from text</button></details>
   <div class="row" style="margin-top:14px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
+  $("qke").onclick=()=>presetForm($("qk").value);
+  const sa=()=>{const u=$("al_u").value.trim();if(u)S.alert={url:u,fmt:$("al_f").value,hour:+$("al_h").value,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};else delete S.alert;save()};
+  ["al_u","al_f","al_h"].forEach(i=>$(i).onchange=sa);
+  $("al_t").onclick=async()=>{const u=$("al_u").value.trim(),m=$("al_m");if(!/^https?:\/\//.test(u)){m.textContent="Enter the address first.";return}sa();m.textContent="Sending…";
+    try{const r=await fetch("api/alert/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u,fmt:$("al_f").value})});m.textContent=r.ok?"Sent. Check your phone.":"The server could not reach that address."}catch(e){m.textContent="Could not reach the Garage Log server."}};
   $("ok").onclick=()=>$("dlg").close();
-  $("dlb").onclick=()=>{const b=new Blob([JSON.stringify(S)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="garage-log-"+today()+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
+  $("dlb").onclick=async()=>{const b=$("dlb");b.textContent="Preparing…";const c=await inlined();b.textContent="Download backup";const bl=new Blob([JSON.stringify(c)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download="garage-log-"+today()+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
   $("rfb").onclick=()=>$("rf").click();
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
   $("imp").onclick=()=>restore($("bk").value);
@@ -327,6 +389,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.del){if(confirm("Delete this entry?")){S.records=S.records.filter(r=>r.id!==d.del);save();render()}}
   else if(d.edit)openForm(d.edit);
   else if(d.done){const r=S.records.find(x=>x.id===d.done);r.done=true;save();render();logFrom(r)}
+  else if(d.qodo)openForm(null,{type:"odometer"});
   else if(d.specs)specForm();
   else if(d.go){tab=d.go;render()}
   else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${S.records.find(r=>r.id===id)[g||"ph"][+i]}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
@@ -335,11 +398,66 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.q){const[id,n]=d.q.split(":"),it=S.inv.find(i=>i.id===id);it.qty=Math.max(0,+(it.qty+ +n).toFixed(2));save();render()}};
 const fixV=v=>{v.specs=v.specs||{};if(!v.plist){const sp=v.specs;v.plist=SPECS.filter(([k])=>sp[k]).map(([k,l])=>({l,v:sp[k]}));if(sp.other)v.plist.push({l:"Other",v:sp.other})}if(!v.pclean){v.plist=v.plist.filter(r=>r.v||!SPECS.some(x=>x[1]===r.l));v.pclean=1}v.kind=v.kind==="atv"||v.kind==="bike"?"offroad":v.kind||"car";v.meter=v.meter||"dist"};S.vehicles.forEach(fixV);
 render();
-let syncMsg="not connected yet",pt=null;
-const api=()=>"api/state";
-const push=()=>{clearTimeout(pt);pt=setTimeout(()=>{pt=null;const u=api();if(!u){syncMsg="no server address set";return}fetch(u,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(S)}).then(r=>{if(!r.ok)throw 0;syncMsg="saved to server"}).catch(()=>{syncMsg="offline (saved on this device only)"})},400)};
-const adopt=d=>{S=Object.assign({inv:[],units:"imperial"},d);S.records=S.records.filter(r=>r.type!=="fuel");S.vehicles.forEach(fixV);try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}};
-const pull=f=>{if(!f&&(pt||$("dlg").open))return Promise.resolve();const u=api();if(!u){syncMsg="no server address set";return Promise.resolve()}return fetch(u,{cache:"no-store"}).then(r=>r.json()).then(d=>{syncMsg="saved to server";if(d&&Array.isArray(d.vehicles)&&(d.vehicles.length||(d.records||[]).length||(d.inv||[]).length)){if(JSON.stringify(d)!==JSON.stringify(S)){adopt(d);if(view==="vehicle"&&!veh())view="garage";render()}}else if(S.vehicles.length)push()}).catch(()=>{syncMsg="offline (saved on this device only)"})};
+let syncMsg="not connected yet",pt=null,busy=false,again=false,base=null;
+const api=()=>"api/state",AK=["vehicles","records","inv"],SK=["units","presets","alert"];
+const clone=o=>JSON.parse(JSON.stringify(o));
+const norm=o=>{o.records=(o.records||[]).filter(r=>r.type!=="fuel");o.vehicles=o.vehicles||[];o.vehicles.forEach(fixV);return o};
+const cmp=o=>JSON.stringify(Object.assign({},o,{cur:null,rev:0}));
+const stash=()=>{try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}};
+const setBase=o=>{base=norm(clone(o));try{localStorage.setItem("garagelog-base",JSON.stringify(base))}catch(e){}};
+try{const b=localStorage.getItem("garagelog-base");if(b)base=norm(JSON.parse(b))}catch(e){}
+// What changed on this device since the last sync, by item id.
+function diff(a,b){
+  const o={};
+  for(const k of AK){
+    const am=new Map((a[k]||[]).map(x=>[x.id,JSON.stringify(x)])),bm=new Map((b[k]||[]).map(x=>[x.id,x])),ups=[];
+    for(const[id,x]of bm)if(am.get(id)!==JSON.stringify(x))ups.push(x);
+    const del=[...am.keys()].filter(id=>!bm.has(id));
+    if(ups.length||del.length)o[k]={ups,del};
+  }
+  for(const k of SK)if(JSON.stringify(a[k])!==JSON.stringify(b[k]))o[k]={set:b[k]};
+  return o;
+}
+function apply(T,o){
+  for(const k of AK)if(o[k]){const m=new Map((T[k]||[]).map(x=>[x.id,x]));o[k].del.forEach(id=>m.delete(id));o[k].ups.forEach(x=>m.set(x.id,x));T[k]=[...m.values()]}
+  for(const k of SK)if(o[k]){if(o[k].set===undefined)delete T[k];else T[k]=o[k].set}
+  return T;
+}
+const adopt=d=>{const cur=S.cur;S=Object.assign({inv:[],units:"imperial"},d,{cur});norm(S);stash()};
+// Put this device's unsynced edits on top of the server's latest state.
+const mergeIn=T=>{const o=base?diff(base,S):{},cur=S.cur;S=apply(norm(clone(T)),o);S.cur=cur;stash();setBase(T)};
+const redraw=()=>{if(view==="vehicle"&&!veh())view="garage";if(!$("dlg").open)render()};
+const push=()=>{clearTimeout(pt);pt=setTimeout(()=>{pt=null;send()},400)};
+async function send(){
+  if(busy){again=true;return}
+  busy=true;let more=false,merged=false;
+  try{
+    for(let n=0;n<4;n++){
+      const sent=JSON.stringify(S),r=await fetch(api(),{method:"PUT",headers:{"Content-Type":"application/json"},body:sent});
+      if(r.status===409){
+        const T=await r.json();
+        if(base){mergeIn(T);merged=true;redraw();continue}
+        adopt(T);setBase(T);syncMsg="loaded changes from another device";redraw();break;
+      }
+      if(!r.ok)throw 0;
+      const j=await r.json();S.rev=j.rev;const b=JSON.parse(sent);b.rev=j.rev;setBase(b);stash();
+      syncMsg=merged?"saved to server (merged with changes from another device)":"saved to server";if(sent.includes('"data:image'))more=true;break;
+    }
+  }catch(e){syncMsg="offline (saved on this device only)"}
+  busy=false;
+  if(again){again=false;send()}else if(more)pull(true);
+}
+const pull=f=>{
+  if(!f&&(pt||busy||$("dlg").open))return Promise.resolve();
+  return fetch(api(),{cache:"no-store"}).then(r=>r.json()).then(d=>{
+    syncMsg="saved to server";
+    if(d&&Array.isArray(d.vehicles)&&(d.vehicles.length||(d.records||[]).length||(d.inv||[]).length)){
+      const o=base?diff(base,S):null;
+      if(o&&Object.keys(o).length){mergeIn(d);redraw();push()}
+      else{if(cmp(norm(clone(d)))===cmp(S)){if(d.rev!==undefined)S.rev=d.rev}else{adopt(d);redraw()}setBase(d)}
+    }else if(S.vehicles.length)push();
+  }).catch(()=>{syncMsg="offline (saved on this device only)"});
+};
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 pull();
 try{if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}

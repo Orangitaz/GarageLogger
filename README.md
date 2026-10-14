@@ -38,6 +38,20 @@ user 568: on the dataset's **Permissions** screen set the owner to `apps` (568) 
 - A file named `db.json` appears in your dataset folder. That one file is your whole garage (photos included).
   Snapshot or replicate the dataset to back it up.
 
+## What's in the data folder
+- `db.json` holds your records. `db.json.bak` is the version before the last save.
+- `backups/` keeps one copy of `db.json` per day for the last 14 days. To roll back, stop the app, copy a file over `db.json`, and start it again.
+- `photos/` holds every cover photo, record photo and receipt as its own file. Existing photos are moved here automatically the first time the new version starts, and a copy of the old `db.json` is kept in `backups/db-before-photo-move.json`.
+- Two phones or tablets can edit at once. If one is out of date when it saves, the app merges the changes by item instead of overwriting the other device.
+
+## Reminder alerts (optional)
+In the app go to **⋯ > Settings & data > Reminder alerts** and paste a web address the server can send to:
+- ntfy: `https://ntfy.sh/your-private-topic` (choose "ntfy / text"), then subscribe to that topic in the ntfy app.
+- Home Assistant: a webhook URL (choose "JSON webhook"). The message arrives as `title` and `message`.
+- Gotify: `https://your-gotify/message?token=APP_TOKEN` (choose "JSON webhook").
+
+Press **Send test message** to check it. The server then sends a message once a day at the time you pick, only when something has newly become due soon or overdue, and again weekly while it stays overdue. The server needs to be able to reach the address (a home server on your network works; ntfy.sh needs internet access).
+
 ## Updating
 Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > garage-log > **Edit**, re-save
 (or use the app's update/redeploy action) so it pulls the newest `latest` image. Your data stays in the dataset.
