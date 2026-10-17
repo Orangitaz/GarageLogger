@@ -131,6 +131,7 @@ details summary{cursor:pointer;padding:4px 0}
 <dialog id="dlg"><div id="dbody"></div></dialog>
 <div id="pv" hidden></div>
 <script>
+const APP_V="__VERSION__",APP_B="__BUILD__";
 const TYPES=[["dash","Dashboard"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
 const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair","upgrade"];
@@ -495,7 +496,8 @@ function dataForm(){
   <div class="m" style="margin-top:12px">Server sync: <span id="ss">${syncMsg}</span></div>
   <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
   
-  <div class="row" style="margin-top:14px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
+  <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}</div>
+  <div class="row" style="margin-top:10px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
   $("qke").onclick=()=>presetForm($("qk").value);

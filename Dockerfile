@@ -1,8 +1,9 @@
 FROM node:22-alpine
 WORKDIR /app
-COPY server.js index.html ./
+COPY server.js index.html VERSION ./
 COPY public ./public
-ENV DATA_DIR=/data PORT=3000 NODE_ENV=production
+ARG GIT_SHA=""
+ENV DATA_DIR=/data PORT=3000 NODE_ENV=production GIT_SHA=$GIT_SHA
 RUN mkdir -p /data && chown 568:568 /data
 USER 568:568
 VOLUME /data

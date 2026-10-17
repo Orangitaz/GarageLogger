@@ -114,6 +114,9 @@ Put the VIN on a car or truck and Garage Log asks the US government's NHTSA reca
 ## Password (optional)
 Set an environment variable `GARAGE_PASSWORD` on the app (TrueNAS: Edit > Environment Variables). The browser then asks for a password (any user name) before showing the app, your data or photos. Without it the app is open to anyone who can reach the port. The password is sent in a form that is only protected when you use the app through HTTPS (a reverse proxy) or a VPN, so it keeps casual visitors out on a home network but is not a substitute for those.
 
+## Versions
+Every release has a number (see `CHANGELOG.md` for what changed in each). The running version is shown at the bottom of **⋯ > Settings & data** and at `/api/version`. The Docker image is tagged with it as well as `latest`, for example `ghcr.io/orangitaz/garagelogger:1.0.0`. To go back to an older version on TrueNAS, change the image tag from `latest` to that number and save. Your data stays as it is. To release a new version, raise the number in the `VERSION` file, add a line to `CHANGELOG.md`, and push to `main`.
+
 ## Updating
 Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > garage-log > **Edit**, re-save
 (or use the app's update/redeploy action) so it pulls the newest `latest` image. Your data stays in the dataset.

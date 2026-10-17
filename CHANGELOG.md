@@ -1,0 +1,36 @@
+# Changelog
+
+Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
+
+## 1.0.0 - 2026-10-14
+First numbered release. Everything below up to this point is rolled into it.
+- Dashboard `+` asks what to add. Service form reordered; photo, receipt and cover-photo buttons; VIN next to the plate.
+- Parts tab split into Info and Parts. More menu grouped into Records and Tools. Tab rows scroll away, only the title bar stays fixed.
+- Undo for deleted entries and inventory items. Warning for an odometer reading lower than the last one. Reorder equipment on the garage screen.
+- Registration, OHV sticker and other dates that fall on the same day show as one reminder.
+- Removed the backup text box and the record count line.
+
+## 0.6.0 - 2026-10-13
+- Optional extra dates under registration (inspection, emissions, insurance).
+- Documents (PDFs and photos) per piece of equipment, stored in the data folder.
+- Archive equipment, restore or print it from Settings & data.
+- `/api/summary` status feed for Home Assistant.
+
+## 0.5.0 - 2026-10-13
+- Repeating reminders (6 months, 1, 2, 3 years or custom) with Renew; registration and OHV sticker renewal, 2 years by default.
+- Estimated due dates for mileage and hours reminders.
+- Parts used can come out of inventory.
+- Recall check by VIN (NHTSA), optional password, CSV export, "when did I last" search.
+
+## 0.4.0 - 2026-10-13
+- Daily backups (14 kept), photos stored as files, merge-safe sync between devices.
+- Reminder alerts through ntfy, Home Assistant or Gotify; quick-pick services; printable service history.
+
+## 0.3.0 - 2026-10-13
+- Install as an app, offline start, log-service prompt after Mark done, backup download and restore, light and dark setting, low-stock badges, per-equipment due-soon window.
+
+## 0.2.0 - 2026-10-13
+- Redesign: modern dark glass look, equipment cards, dashboard per piece of equipment.
+
+## 0.1.0 - 2026-10-10
+- Original app: garage, service and repair records, reminders, inventory, parts lists, photos and receipts.

@@ -1,5 +1,6 @@
 const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto");
 const DIR=process.env.DATA_DIR||"/data",FILE=path.join(DIR,"db.json"),PHOTOS=path.join(DIR,"photos"),BACKUPS=path.join(DIR,"backups"),ALERT_STATE=path.join(DIR,"alert-state.json"),PORT=+process.env.PORT||3000;
+const VERSION=(()=>{try{return fs.readFileSync(path.join(__dirname,"VERSION"),"utf8").trim()}catch(e){return"dev"}})(),BUILD=String(process.env.GIT_SHA||"").slice(0,7);
 const RECALLS=path.join(DIR,"recalls.json"),VPIC=process.env.VPIC_URL||"https://vpic.nhtsa.dot.gov",RAPI=process.env.RECALL_URL||"https://api.nhtsa.gov";
 const PASS=process.env.GARAGE_PASSWORD||"",sha=x=>crypto.createHash("sha256").update(String(x)).digest(),PASSH=PASS?sha(PASS):null;
 const DOCS=path.join(DIR,"docs");
@@ -230,6 +231,7 @@ http.createServer((req,res)=>{
     try{const b=fs.readFileSync(path.join(PHOTOS,n));res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"Cache-Control":"public, max-age=31536000, immutable"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
+  if(u==="/api/version"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({version:VERSION,build:BUILD}))}
   if(u==="/api/recalls"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(readRc()))}
   if(u==="/api/recalls/check"&&req.method==="POST")return body(req,10e3,async buf=>{
     let j;try{j=JSON.parse(buf.toString())}catch(e){res.writeHead(400,JSON_H);return res.end('{"error":"bad"}')}
@@ -257,7 +259,7 @@ http.createServer((req,res)=>{
   if(u==="/healthz"){res.writeHead(200,{"Content-Type":"text/plain"});return res.end("ok")}
   if(u==="/"||u==="/index.html"){
     res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});
-    return res.end(fs.readFileSync(path.join(__dirname,"index.html")));
+    return res.end(fs.readFileSync(path.join(__dirname,"index.html"),"utf8").replace("__VERSION__",VERSION).replace("__BUILD__",BUILD));
   }
   res.writeHead(404).end();
 }).listen(PORT,"0.0.0.0",()=>console.log("Garage Log listening on "+PORT));
