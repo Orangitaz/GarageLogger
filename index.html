@@ -139,6 +139,14 @@ body[data-sync=off] #sd{background:var(--bad);background-clip:content-box}
 <div id="pv" hidden></div>
 <script>
 const APP_V="__VERSION__",APP_B="__BUILD__";
+// Inside the Android app the page is bundled with the app. The server is optional there.
+const APP=!!(window.Capacitor&&(Capacitor.isNativePlatform?Capacitor.isNativePlatform():true));
+let SRV={};try{SRV=JSON.parse(localStorage.getItem("garagelog-server")||"{}")||{}}catch(e){}
+const BASE=APP&&SRV.u?SRV.u:"",SYNC=!APP||!!BASE;
+const b64=t=>btoa(unescape(encodeURIComponent(t)));
+const HDR=()=>SRV.pw?{Authorization:"Basic "+b64("u:"+SRV.pw)}:{};
+const F=(p,o={})=>APP&&!BASE?Promise.reject(new Error("no server")):fetch(BASE+p,Object.assign({},o,{headers:Object.assign({},o.headers,HDR())}));
+const pu=u=>!BASE||!u||/^(data:|blob:|https?:)/.test(u)?u:BASE+u+(SRV.t?"?t="+SRV.t:"");
 const TYPES=[["dash","Dashboard"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
 const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair","upgrade"];
@@ -220,7 +228,8 @@ function printView(v){
     return `<tr><td>${esc(r.date||"")}</td>${tm?"":`<td>${r.odo!==""&&r.odo!=null?(+r.odo).toLocaleString()+" "+dU(v.id):""}</td>`}<td>${L[r.type]}</td><td>${esc(work)}${pt.length?`<div class="pvm">Parts: ${pt.map(x=>esc(x)).join(", ")}</div>`:""}${r.notes?`<div class="pvm">${esc(r.notes)}</div>`:""}</td></tr>`};
   $("pv").innerHTML=`<div class="bar"><button class="p" id="pv_p">Print / Save as PDF</button><button id="pv_x">Close</button></div><h1>${esc(v.name)}</h1>${meta?`<div class="pvm">${esc(meta)}</div>`:""}<div class="pvm" style="margin-bottom:16px">Service history · ${today()}${tm?"":" · "+lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div><table><tr><th>Date</th>${tm?"":`<th>${isH(v.id)?"Hours":"Odometer"}</th>`}<th>Type</th><th>Work done</th></tr>${rows.map(row).join("")||'<tr><td colspan="4">No records yet.</td></tr>'}</table>`;
   $("pv").hidden=false;$("pv").scrollTop=0;
-  $("pv_p").onclick=()=>{try{window.print()}catch(e){}};$("pv_x").onclick=()=>{$("pv").hidden=true};
+  $("pv_p").onclick=()=>{try{window.print()}catch(e){}};
+  if(APP){$("pv_p").textContent="Share as file";$("pv_p").onclick=()=>{const c=$("pv").cloneNode(true),b=c.querySelector(".bar");if(b)b.remove();saveBlob("service-history-"+v.name.replace(/[^\w-]+/g,"-")+".html",new Blob(['<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Service history</title><style>body{font:14px system-ui,sans-serif;padding:18px;color:#111}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:#555}.pvm{color:#555;font-size:13px}</style>'+c.innerHTML],{type:"text/html"}))}}$("pv_x").onclick=()=>{$("pv").hidden=true};
 }
 let tt=null;
 function toast(msg,undo){const t=$("toast");t.innerHTML=`<span>${esc(msg)}</span><button id="tu">Undo</button>`;t.hidden=false;clearTimeout(tt);const hide=()=>{t.hidden=true};tt=setTimeout(hide,8000);$("tu").onclick=()=>{clearTimeout(tt);hide();undo()}}
@@ -267,7 +276,12 @@ function adjInv(a,b){
   const m=new Map();(a||[]).forEach(x=>m.set(x.id,(m.get(x.id)||0)-x.q));(b||[]).forEach(x=>m.set(x.id,(m.get(x.id)||0)+x.q));
   for(const[id,d]of m){const it=S.inv.find(i=>i.id===id);if(it&&d)it.qty=Math.max(0,+(it.qty-d).toFixed(2))}
 }
-function saveBlob(name,bl){const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+function saveBlob(name,bl){
+  if(APP&&window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Filesystem&&Capacitor.Plugins.Share){
+    const fr=new FileReader();
+    fr.onload=async()=>{try{const w=await Capacitor.Plugins.Filesystem.writeFile({path:name,data:String(fr.result).split(",")[1],directory:"CACHE"});await Capacitor.Plugins.Share.share({title:name,url:w.uri,dialogTitle:"Save or send "+name})}catch(e){const m=String(e&&e.message||e);if(!/cancel/i.test(m))alert("Couldn't share the file: "+m)}};
+    fr.readAsDataURL(bl);return;
+  }const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 function csvExport(vid){
   const t=x=>{let s=String(x??"");if(/^[=+\-@\t\r]/.test(s))s="'"+s;return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},n=x=>x===""||x==null?"":+x;
   const H=["Equipment","Type","Date","Odometer / hours","Description","Parts","Notes","Status","Repeats"],nm=id=>(vOf(id)||{}).name||"";
@@ -303,7 +317,7 @@ function rclCard(v){
   const ok=v.rcOk||[],L=(e.items||[]).filter(x=>!ok.includes(x.id));if(!L.length)return"";
   return `<div class="sec">Recalls to check</div><div class="m" style="margin:0 2px 10px">Issued for ${esc([e.year,e.make,e.model].join(" "))}. Confirm yours is still open at nhtsa.gov/recalls with your VIN. If it's already fixed, tap Mark handled.</div>`+L.slice(0,8).map(x=>`<div class="c sc st2"><h3 class="dt">${esc(x.comp||"Recall")}<span class="tag bad">Recall</span></h3><div class="m">${esc(x.id)}${x.date?" · "+esc(x.date):""}</div>${x.park?'<div class="m" style="color:var(--bad)">NHTSA advises not driving it until repaired.</div>':""}<div class="m" style="margin-top:6px;color:var(--tx)">${esc(x.sum.length>260?x.sum.slice(0,260)+"…":x.sum)}</div><button style="margin-top:8px" data-rcok="${esc(x.id)}">Mark handled</button></div>`).join("")+(L.length>8?`<div class="m" style="margin:0 2px">+ ${L.length-8} more</div>`:"");
 }
-const loadRc=()=>fetch("api/recalls",{cache:"no-store"}).then(r=>r.ok?r.json():{}).then(j=>{RC=j&&typeof j==="object"?j:{};redraw()}).catch(()=>{});
+const loadRc=()=>!SYNC?Promise.resolve():F("api/recalls",{cache:"no-store"}).then(r=>r.ok?r.json():{}).then(j=>{RC=j&&typeof j==="object"?j:{};redraw()}).catch(()=>{});
 async function recallNow(v){
   const vin=(v.vin||"").trim().toUpperCase();
   $("dlg").close();
@@ -311,7 +325,7 @@ async function recallNow(v){
   $("dlg").addEventListener("close",()=>{loadRc();render()},{once:true});
   let msg;
   try{
-    const r=await fetch("api/recalls/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({vid:v.id,vin})}),j=await r.json().catch(()=>({}));
+    const r=await F("api/recalls/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({vid:v.id,vin})}),j=await r.json().catch(()=>({}));
     if(r.ok){const n=(j.items||[]).filter(x=>!(v.rcOk||[]).includes(x.id)).length;msg=`${j.year} ${j.make} ${j.model}: `+(n?`${n} recall${n===1?"":"s"} on file. See Recalls on the dashboard. The list covers the whole model year, so confirm yours is still open at nhtsa.gov/recalls.`:"no unhandled recalls on file.")}
     else msg=j.error==="decode"?"NHTSA couldn't read that VIN. Check it for typos.":j.error==="vin"?"That VIN isn't 17 valid characters.":"Couldn't reach NHTSA. The Garage Log server needs internet access."
   }catch(e){msg="Couldn't reach the Garage Log server."}
@@ -320,7 +334,7 @@ async function recallNow(v){
 function docsForm(v){
   const cur=()=>vOf(v.id)||v;
   show(`<h3 style="margin:0">Documents</h3><div class="m" style="margin-top:6px">Manuals, title copies, insurance cards. PDFs and photos up to 25 MB, stored on your server.</div><div id="dlist"></div><div class="m" id="dmsg" style="margin-top:10px"></div><input type="file" id="dfi" accept="application/pdf,image/*" multiple hidden><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button><button class="p" id="dadd" style="flex:1">Add document</button></div>`);
-  const draw=()=>{$("dlist").innerHTML=(cur().docs||[]).map(x=>`<div class="sp"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:var(--ac);word-break:break-word">${esc(x.n)}</a><button data-ddel="${x.id}" style="flex:none;padding:4px 10px">✕</button></div>`).join("")||'<div class="m" style="margin-top:10px">No documents yet.</div>'};
+  const draw=()=>{$("dlist").innerHTML=(cur().docs||[]).map(x=>`<div class="sp"><a href="${esc(pu(x.url))}" target="_blank" rel="noopener" style="color:var(--ac);word-break:break-word">${esc(x.n)}</a><button data-ddel="${x.id}" style="flex:none;padding:4px 10px">✕</button></div>`).join("")||'<div class="m" style="margin-top:10px">No documents yet.</div>'};
   draw();
   $("dlist").onclick=ev=>{const i=ev.target.dataset.ddel;if(i&&confirm("Remove this document from the list? The file stays in your data folder.")){cur().docs=(cur().docs||[]).filter(x=>x.id!==i);save();draw()}};
   $("dadd").onclick=()=>$("dfi").click();
@@ -328,7 +342,7 @@ function docsForm(v){
     for(const f of [...$("dfi").files]){
       $("dmsg").textContent="Uploading "+f.name+"…";
       try{
-        const r=await fetch("api/doc",{method:"POST",headers:{"Content-Type":f.type||"application/octet-stream"},body:f});
+        const r=await F("api/doc",{method:"POST",headers:{"Content-Type":f.type||"application/octet-stream"},body:f});
         if(r.status===415){$("dmsg").textContent=f.name+": only PDF and image files are supported.";continue}
         if(!r.ok)throw 0;
         const j=await r.json(),c=cur();c.docs=[...(c.docs||[]),{id:uid(),n:f.name,url:j.url,t:f.type,at:today()}];save();draw();$("dmsg").textContent="Added "+f.name+"."
@@ -339,7 +353,7 @@ function docsForm(v){
 }
 function moreMenu(){
   const v=veh(),L=vTabs(v).filter(t=>!MAIN.includes(t[0]));
-  show(`<h3 style="margin:0">More</h3><label>Records</label>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<label>Tools</label><button class="mrow" data-pv="1">Service history (print or PDF)</button><button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button><button class="mrow" data-csv="1">Export records (CSV)</button>'+(/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  show(`<h3 style="margin:0">More</h3><label>Records</label>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<label>Tools</label><button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+(SYNC&&/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
   $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}else if(e.target.dataset.rcnow){recallNow(v)}};
 }
 function render(){
@@ -353,7 +367,7 @@ function render(){
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
   $("fab").style.display="";$("fabE").style.display=(inV&&tab!=="dash")||(view==="garage"&&act().length>1)?"":"none";$("fabE").textContent=em&&!(inV&&tab==="parts")?"✓":"✎";
   const L=$("list");L.className=ch?"fresh":"";
-  if(inV)L.innerHTML=`<div class="hero${v.cover?"":" nc"}" style="--k:${KC[v.kind]||KC.other}">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}</div>`+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
+  if(inV)L.innerHTML=`<div class="hero${v.cover?"":" nc"}" style="--k:${KC[v.kind]||KC.other}">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}</div>`+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
   else if(view==="inventory")L.innerHTML=invView();
   else L.innerHTML=garageView();
 }
@@ -370,7 +384,7 @@ function dashView(v){
 function garageView(){
   if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
   return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:6px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join(" · ");
-    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
+    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
 }
 function recView(v){
   let out=isT(v.id)?"":`<div class="m" style="margin-bottom:10px">${lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>`;
@@ -383,7 +397,7 @@ function card(r){
   let title=esc(r.desc||TYPES.find(t=>t[0]===r.type)[1]),meta=[r.date,odo].filter(Boolean).join(" · "),extra="";
   if(r.type==="odometer")title=isH(r.vid)?"Hours reading":"Odometer reading";
   if(r.type==="reminder"){const i=rinfo(r,lastOdo(r.vid));extra=r.done?'<span class="tag">Done</span>':tag(i.st);meta=["Due",r.date,odo].filter(Boolean).join(" · ")+(r.done?"":` (${i.txt})`)+(r.rep>0?" · repeats every "+repTxt(r.rep):"")}
-  const rc=(r.rc||[]).map((p,i)=>`<img src="${p}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${p}" data-ph="${r.id}:${i}">`).join("");
+  const rc=(r.rc||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}">`).join("");
   const sk=r.type==="reminder"?"st"+(r.done?"n":rinfo(r,lastOdo(r.vid)).st):({service:"st0",repair:"st1",upgrade:"stu"})[r.type]||"";
   return `<div class="c${sk?" sc "+sk:""}"><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${PH.includes(r.type)?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}${em?`<div class="row" style="margin-top:10px"><button class="p" data-edit="${r.id}" style="flex:1">Edit</button><button data-del="${r.id}" style="flex:1">Delete</button></div>`:""}</div>`;
 }
@@ -397,7 +411,7 @@ function invView(){
   return a.map(i=>`<div class="c"><button class="x" data-idel="${i.id}">✕</button><h3 data-iedit="${i.id}">${esc(i.name)}${i.qty<=0?'<span class="tag bad">Out</span>':i.qty<=(i.low!==""&&i.low!=null?+i.low:1)?'<span class="tag warn">Low</span>':""}<span class="tag">${i.cat}</span></h3>${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
 }
 function shrink(f,mx=800,q=.65){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,mx/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",q))};i.src=r.result};r.readAsDataURL(f)})}
-const up=async d=>{try{const b=await (await fetch(d)).blob(),r=await fetch("api/photo",{method:"POST",headers:{"Content-Type":b.type||"image/jpeg"},body:b});if(r.ok){const j=await r.json();if(j&&j.url)return j.url}}catch(e){}return d};
+const up=async d=>{try{const b=await (await fetch(d)).blob(),r=await F("api/photo",{method:"POST",headers:{"Content-Type":b.type||"image/jpeg"},body:b});if(r.ok){const j=await r.json();if(j&&j.url)return j.url}}catch(e){}return d};
 const btns='<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="ok" style="flex:1">Save</button></div>';
 function show(h){$("dbody").onclick=null;$("dbody").innerHTML=h;$("dlg").showModal();if($("cancel"))$("cancel").onclick=()=>$("dlg").close()}
 function logFrom(r){openForm(null,{type:"service",date:today(),desc:(r.desc||"").replace(/^Next:\s*/,""),banner:"Reminder marked done. Log the service now, or cancel to skip."})}
@@ -415,7 +429,7 @@ function openForm(id,pre){
   ${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
     <label>Notes</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
   ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${t==="service"&&!id?'<label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--tx)"><input type="checkbox" id="f_job" style="width:auto;margin:0"> Save as a quick job (remembers parts and interval)</label>':""}${btns}`);
-  const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${p}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
+  const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${pu(p)}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
   grp("ph","pf",ph,800,.65);grp("rc","rf",rc,1600,.7);
   if($("pfb"))$("pfb").onclick=()=>$("pf").click();if($("rcb"))$("rcb").onclick=()=>$("rf").click();
   let pl=sr?[...(e.parts?[e.parts]:[]),...(e.pl||[])]:[];if(sr&&!pl.length)pl=[""];
@@ -499,7 +513,7 @@ function addPart(){
 function vehForm(edit){
   const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
   show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><button type="button" id="cfb" style="width:100%;margin-top:8px">Choose photo…</button><input type="file" id="cf" accept="image/*" hidden><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><div id="v_dts"></div><button type="button" id="v_adt" style="margin-top:10px;width:100%">+ Add another date (inspection, emissions…)</button><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="av" style="margin-top:12px;width:100%">Archive this equipment</button><button id="dv" style="margin-top:8px;width:100%">Delete this equipment</button>':""}${btns}`);
-  let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${cover}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
+  let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${pu(cover)}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
   $("cfb").onclick=()=>$("cf").click();$("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
   const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none";$("v_rg").style.display=k==="mower"?"none":""};tp();
   let dts=(v.dts||[]).map(x=>({...x}));
@@ -523,39 +537,72 @@ function invForm(id){
     if(id)S.inv[S.inv.findIndex(i=>i.id===id)]=o;else S.inv.push(o);save();$("dlg").close();render()};
 }
 const restore=t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;const rv=S.rev;S=Object.assign({inv:[],units:"imperial"},d);S.rev=rv;S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
-const inlined=async()=>{const c=clone(S),g=async u=>{if(!u||u.startsWith("data:"))return u;try{const b=await (await fetch(u)).blob();return await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)})}catch(e){return u}};for(const v of c.vehicles)if(v.cover)v.cover=await g(v.cover);for(const r of c.records){r.ph=await Promise.all((r.ph||[]).map(g));r.rc=await Promise.all((r.rc||[]).map(g))}return c};
+const inlined=async()=>{const c=clone(S),g=async u=>{if(!u||u.startsWith("data:"))return u;try{const b=await (await fetch(pu(u))).blob();return await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)})}catch(e){return u}};for(const v of c.vehicles)if(v.cover)v.cover=await g(v.cover);for(const r of c.records){r.ph=await Promise.all((r.ph||[]).map(g));r.rc=await Promise.all((r.rc||[]).map(g))}return c};
+async function connectServer(u,pw){
+  const m=$("sv_m");u=(u||"").trim();if(!u){m.textContent="Enter the server address.";return}
+  if(!/^https?:\/\//i.test(u))u="http://"+u;u=u.replace(/\/+$/,"")+"/";
+  m.textContent="Connecting\u2026";
+  const hd=pw?{Authorization:"Basic "+b64("u:"+pw)}:{};let d,t="";
+  try{
+    const v=await fetch(u+"api/version",{headers:hd,cache:"no-store"});
+    if(v.status===401){m.textContent=pw?"The password was not accepted.":"That server needs a password.";return}
+    const j=v.ok?await v.json():null;if(!j||!j.version)throw 0;
+    const r=await fetch(u+"api/state",{headers:hd,cache:"no-store"});if(!r.ok)throw 0;d=await r.json();
+    try{t=(await (await fetch(u+"api/calendar",{headers:hd})).json()).t||""}catch(e){}
+  }catch(e){m.textContent="Couldn't reach that address. Check it, and that your phone is on the same network (or connected by VPN).";return}
+  const n=o=>(o.vehicles||[]).length,hasS=d&&Array.isArray(d.vehicles)&&(n(d)||(d.records||[]).length||(d.inv||[]).length),hasL=S.vehicles.length||S.records.length||S.inv.length;
+  const finish=mode=>{
+    const cur=S.cur;
+    if(mode==="server"){S=Object.assign({inv:[],units:"imperial"},d,{cur})}
+    else if(mode==="merge"){const mm=(a,b)=>{const x=new Map((a||[]).map(i=>[i.id,i]));(b||[]).forEach(i=>{if(!x.has(i.id))x.set(i.id,i)});return[...x.values()]};S=Object.assign({},S,d,{vehicles:mm(d.vehicles,S.vehicles),records:mm(d.records,S.records),inv:mm(d.inv,S.inv),cur})}
+    else S.rev=d&&d.rev;
+    try{
+      localStorage.setItem("garagelog",JSON.stringify(S));
+      if(mode==="merge"||mode==="server")localStorage.setItem("garagelog-base",JSON.stringify(d));else localStorage.removeItem("garagelog-base");
+      localStorage.setItem("garagelog-server",JSON.stringify({u,pw,t}));
+    }catch(e){m.textContent="Couldn't save the settings on this phone.";return}
+    location.reload();
+  };
+  if(hasS&&hasL){
+    show(`<h3 style="margin:0">The server already has data</h3><div class="m" style="margin-top:6px">This phone has ${S.vehicles.length} equipment and the server has ${n(d)}. What should happen?</div><button class="mrow" data-ch="merge">Combine both (keeps everything)</button><button class="mrow" data-ch="server">Use the server's data (replaces this phone's)</button><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>`);
+    $("dbody").onclick=e=>{const c=e.target.dataset.ch;if(c)finish(c)};
+  }else finish(hasS?"server":"local");
+}
 function dataForm(){
   const al=S.alert||{},arch=S.vehicles.filter(v=>v.arch);
   show(`<h3 style="margin:0">Settings &amp; data</h3>
   <label>Appearance</label><select id="th"><option value="auto">Match my device</option><option value="dark">Dark</option><option value="light">Light</option></select>
   <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
   <label>Quick-pick services</label><div class="row"><select id="qk">${KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select><button id="qke" style="flex:none">Edit list</button></div>
-  <label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
+  ${APP?`<label>Server (optional)</label><div class="m" style="margin-top:4px">${BASE?"Syncing with "+esc(BASE):"Not connected. Everything is saved on this phone only. Add your Garage Log server to sync, back up photos and documents, and get alerts."}</div><input id="sv_u" type="url" inputmode="url" placeholder="http://192.168.1.50:30080" value="${esc(BASE)}" style="margin-top:6px"><input id="sv_p" type="password" placeholder="Server password (if you set one)" value="${esc(SRV.pw||"")}" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="p" id="sv_go" style="flex:1">${BASE?"Save":"Connect"}</button>${BASE?'<button id="sv_off" style="flex:1">Disconnect</button>':""}</div><div class="m" id="sv_m" style="margin-top:6px"></div>`:""}
+  ${SYNC?`<label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
   <div class="row" style="margin-top:6px"><select id="al_f"><option value="text" ${al.fmt!=="json"?"selected":""}>ntfy / text</option><option value="json" ${al.fmt==="json"?"selected":""}>JSON webhook</option></select><select id="al_h">${[...Array(18).keys()].map(i=>i+5).map(h=>`<option value="${h}" ${(+al.hour||8)===h?"selected":""}>${h%12||12}:00 ${h<12?"AM":"PM"}</option>`).join("")}</select></div>
   <div class="row" style="margin-top:6px"><button id="al_t" style="flex:1">Send test message</button></div>
-  <div class="m" id="al_m" style="margin-top:6px">The server sends a message when something becomes due soon or overdue, then weekly while it stays overdue. Use "JSON webhook" for Home Assistant or Gotify. Leave the address empty to turn alerts off.</div>
-  <div class="m" style="margin-top:12px">Server sync: <span id="ss">${syncMsg}</span></div>
+  <div class="m" id="al_m" style="margin-top:6px">The server sends a message when something becomes due soon or overdue, then weekly while it stays overdue. Use "JSON webhook" for Home Assistant or Gotify. Leave the address empty to turn alerts off.</div>`:""}
+  <div class="m" style="margin-top:12px">${SYNC?"Server sync: ":"Storage: "}<span id="ss">${SYNC?syncMsg:"saved on this phone only"}</span></div>
   <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>
-  <details style="margin-top:12px"><summary class="m">Server backups</summary><div class="m" id="bkl" style="margin-top:8px">Loading…</div></details>
-  <label>Calendar</label><div class="row"><button id="cal_b" style="flex:1">Get calendar link</button></div><div class="m" id="cal_m" style="margin-top:6px">Shows reminders and expiration dates that have a date. Subscribe to the link in Apple Calendar or an Android app like ICSx\u2075. Google Calendar can't reach an address on your home network.</div>${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
+  ${SYNC?`<details style="margin-top:12px"><summary class="m">Server backups</summary><div class="m" id="bkl" style="margin-top:8px">Loading…</div></details>
+  <label>Calendar</label><div class="row"><button id="cal_b" style="flex:1">Get calendar link</button></div><div class="m" id="cal_m" style="margin-top:6px">Shows reminders and expiration dates that have a date. Subscribe to the link in Apple Calendar or an Android app like ICSx\u2075. Google Calendar can't reach an address on your home network.</div>`:""}${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
   
-  <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}</div>
+  <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}${APP?" \u00b7 Android app":""}</div>
   <div class="row" style="margin-top:10px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
   $("qke").onclick=()=>presetForm($("qk").value);
   const sa=()=>{const u=$("al_u").value.trim();if(u)S.alert={url:u,fmt:$("al_f").value,hour:+$("al_h").value,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};else delete S.alert;save()};
-  ["al_u","al_f","al_h"].forEach(i=>$(i).onchange=sa);
-  $("al_t").onclick=async()=>{const u=$("al_u").value.trim(),m=$("al_m");if(!/^https?:\/\//.test(u)){m.textContent="Enter the address first.";return}sa();m.textContent="Sending…";
-    try{const r=await fetch("api/alert/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u,fmt:$("al_f").value})});m.textContent=r.ok?"Sent. Check your phone.":"The server could not reach that address."}catch(e){m.textContent="Could not reach the Garage Log server."}};
+  if(SYNC)["al_u","al_f","al_h"].forEach(i=>$(i).onchange=sa);
+  if($("al_t"))$("al_t").onclick=async()=>{const u=$("al_u").value.trim(),m=$("al_m");if(!/^https?:\/\//.test(u)){m.textContent="Enter the address first.";return}sa();m.textContent="Sending…";
+    try{const r=await F("api/alert/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u,fmt:$("al_f").value})});m.textContent=r.ok?"Sent. Check your phone.":"The server could not reach that address."}catch(e){m.textContent="Could not reach the Garage Log server."}};
   $("ok").onclick=()=>$("dlg").close();
-  $("dlb").onclick=async()=>{const b=$("dlb");b.textContent="Preparing…";const c=await inlined();b.textContent="Download backup";const bl=new Blob([JSON.stringify(c)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download="garage-log-"+today()+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
+  $("dlb").onclick=async()=>{const b=$("dlb");b.textContent="Preparing…";const c=await inlined();b.textContent="Download backup";saveBlob("garage-log-"+today()+".json",new Blob([JSON.stringify(c)],{type:"application/json"}))};
   $("rfb").onclick=()=>$("rf").click();
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
   $("csvb").onclick=()=>csvExport();
-  fetch("api/backups",{cache:"no-store"}).then(r=>r.json()).then(L=>{const b=$("bkl");if(!b)return;b.innerHTML=L.length?`A copy is saved before the first change each day, and up to 14 are kept on your server. Tap one to download it, then use Restore from file.`+L.map(x=>`<div class="sp"><a href="backups/${esc(x.name)}" download style="color:var(--ac)">${esc(x.date)}</a><span class="m">${Math.max(1,Math.round(x.size/1024))} KB</span></div>`).join(""):"No copies yet. The first one appears after your next change."}).catch(()=>{if($("bkl"))$("bkl").textContent="Couldn't load the list."});
-  $("cal_b").onclick=async()=>{const m=$("cal_m");m.textContent="Getting the link…";
-    try{const j=await (await fetch("api/calendar",{cache:"no-store"})).json(),u=new URL(j.path,location.href).href;
+  if($("sv_go")){$("sv_go").onclick=()=>connectServer($("sv_u").value,$("sv_p").value);
+    if($("sv_off"))$("sv_off").onclick=()=>{if(!confirm("Disconnect from the server? Your data stays on this phone and on the server."))return;try{localStorage.removeItem("garagelog-server");localStorage.removeItem("garagelog-base")}catch(e){}location.reload()}}
+  if(SYNC)F("api/backups",{cache:"no-store"}).then(r=>r.json()).then(L=>{const b=$("bkl");if(!b)return;b.innerHTML=L.length?`A copy is saved before the first change each day, and up to 14 are kept on your server. Tap one to download it, then use Restore from file.`+L.map(x=>`<div class="sp"><a href="backups/${esc(x.name)}" download style="color:var(--ac)">${esc(x.date)}</a><span class="m">${Math.max(1,Math.round(x.size/1024))} KB</span></div>`).join(""):"No copies yet. The first one appears after your next change."}).catch(()=>{if($("bkl"))$("bkl").textContent="Couldn't load the list."});
+  if($("cal_b"))$("cal_b").onclick=async()=>{const m=$("cal_m");m.textContent="Getting the link…";
+    try{const j=await (await F("api/calendar",{cache:"no-store"})).json(),u=new URL(j.path,BASE||location.href).href;
       m.innerHTML='Copy this link into your calendar app:<input readonly id="cal_u" style="margin-top:6px;width:100%" value="'+esc(u)+'">';const i=$("cal_u");i.focus();i.select();try{navigator.clipboard&&navigator.clipboard.writeText(u).catch(()=>{})}catch(e){}}
     catch(e){m.textContent="Couldn't reach the Garage Log server."}};
   $("dbody").onclick=e=>{const d=e.target.dataset;if(d.unarch){const v=vOf(d.unarch);if(v){delete v.arch;save();$("dlg").close();render();dataForm()}}else if(d.aprint){const v=vOf(d.aprint);$("dlg").close();if(v)printView(v)}};
@@ -580,14 +627,14 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.again){const r=S.records.find(x=>x.id===d.again);if(r)openForm(null,{type:r.type,date:today(),desc:r.desc||"",dl:(r.dl||[]).slice(),pl:[...(r.parts?[r.parts]:[]),...(r.pl||[])],iu:(r.iu||[]).filter(x=>S.inv.some(i=>i.id===x.id)).map(x=>({...x})),next:r.next||0,odo:"",notes:"",ph:[],rc:[],banner:"Copied from "+(r.date||"an earlier entry")+". Set the date and "+(isH(S.cur)?"hours":"odometer")+", then save."})}
   else if(d.specs)specForm();
   else if(d.go){tab=d.go;render()}
-  else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${S.records.find(r=>r.id===id)[g||"ph"][+i]}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
+  else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${pu(S.records.find(r=>r.id===id)[g||"ph"][+i])}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
   else if(d.idel){const k=S.inv.findIndex(i=>i.id===d.idel);if(k>=0){const it=S.inv[k];S.inv.splice(k,1);save();render();toast("Item removed",()=>{S.inv.splice(Math.min(k,S.inv.length),0,it);save();render()})}}
   else if(d.iedit)invForm(d.iedit);
   else if(d.q){const[id,n]=d.q.split(":"),it=S.inv.find(i=>i.id===id);it.qty=Math.max(0,+(it.qty+ +n).toFixed(2));save();render()}};
 const fixV=v=>{v.specs=v.specs||{};if(!v.plist){const sp=v.specs;v.plist=SPECS.filter(([k])=>sp[k]).map(([k,l])=>({l,v:sp[k]}));if(sp.other)v.plist.push({l:"Other",v:sp.other})}if(!v.pclean){v.plist=v.plist.filter(r=>r.v||!SPECS.some(x=>x[1]===r.l));v.pclean=1}v.kind=v.kind==="atv"||v.kind==="bike"?"offroad":v.kind||"car";v.meter=v.meter||"dist"};S.vehicles.forEach(fixV);
 render();
 let syncMsg="not connected yet",pt=null,busy=false,again=false,base=null;
-document.body.dataset.sync="busy";
+document.body.dataset.sync=SYNC?"busy":"local";
 const setSync=(st,msg)=>{syncMsg=msg;document.body.dataset.sync=st;const e=$("ss");if(e)e.textContent=msg};
 const api=()=>"api/state",AK=["vehicles","records","inv"],SK=["units","presets","alert"];
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -619,11 +666,12 @@ const mergeIn=T=>{const o=base?diff(base,S):{},cur=S.cur;S=apply(norm(clone(T)),
 const redraw=()=>{if(view==="vehicle"&&!veh())view="garage";if(!$("dlg").open)render()};
 const push=()=>{clearTimeout(pt);pt=setTimeout(()=>{pt=null;send()},400)};
 async function send(){
+  if(!SYNC)return;
   if(busy){again=true;return}
   busy=true;let more=false,merged=false;setSync("busy","saving…");
   try{
     for(let n=0;n<4;n++){
-      const sent=JSON.stringify(S),r=await fetch(api(),{method:"PUT",headers:{"Content-Type":"application/json"},body:sent});
+      const sent=JSON.stringify(S),r=await F(api(),{method:"PUT",headers:{"Content-Type":"application/json"},body:sent});
       if(r.status===409){
         const T=await r.json();
         if(base){mergeIn(T);merged=true;redraw();continue}
@@ -639,8 +687,9 @@ async function send(){
   if(again){again=false;send()}else if(more)pull(true);
 }
 const pull=f=>{
+  if(!SYNC)return Promise.resolve();
   if(!f&&(pt||busy||$("dlg").open))return Promise.resolve();
-  return fetch(api(),{cache:"no-store"}).then(r=>r.json()).then(d=>{
+  return F(api(),{cache:"no-store"}).then(r=>r.json()).then(d=>{
     setSync("ok","saved to server");
     if(d&&Array.isArray(d.vehicles)&&(d.vehicles.length||(d.records||[]).length||(d.inv||[]).length)){
       const o=base?diff(base,S):null;
@@ -660,7 +709,7 @@ pull();loadRc();
     if(L.length===1)go(L[0].id);
     else{show('<h3 style="margin:0">Log a service</h3><label>Which one?</label>'+L.map(v=>`<button class="mrow" data-pk="${v.id}">${kIc(v.kind)} ${esc(v.name)}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');$("dbody").onclick=e=>{const i=e.target.dataset.pk;if(i){$("dlg").close();go(i)}}}}
 })();
-try{if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
+try{if(!APP&&"serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
 </script>
 </body>
 </html>

@@ -195,10 +195,17 @@ function authed(req){
   const t=Buffer.from(m[1],"base64").toString(),i=t.indexOf(":");
   return i>=0&&crypto.timingSafeEqual(sha(t.slice(i+1)),PASSH);
 }
+// The Android app talks to this server from its own origin, so only those origins (plus any in CORS_ORIGINS) get CORS headers.
+const ORIGINS=["http://localhost","https://localhost","capacitor://localhost","ionic://localhost",...String(process.env.CORS_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean)];
 http.createServer((req,res)=>{
-  const u=req.url.split("?")[0];
+  const u=req.url.split("?")[0],og=req.headers.origin;
+  if(og&&ORIGINS.includes(og)){
+    res.setHeader("Access-Control-Allow-Origin",og);res.setHeader("Vary","Origin");
+    res.setHeader("Access-Control-Allow-Headers","Authorization, Content-Type");res.setHeader("Access-Control-Allow-Methods","GET, PUT, POST, OPTIONS");res.setHeader("Access-Control-Max-Age","86400");
+  }
+  if(req.method==="OPTIONS"){res.writeHead(204).end();return}
   // Optional password (GARAGE_PASSWORD). The icons, manifest and health check stay open so installing the app still works.
-  if(PASS&&!ST[u]&&u!=="/healthz"&&!(u==="/calendar.ics"&&calOk(req))&&!authed(req)){
+  if(PASS&&!ST[u]&&u!=="/healthz"&&!((u==="/calendar.ics"||u.startsWith("/photos/")||u.startsWith("/docs/"))&&calOk(req))&&!authed(req)){
     req.resume();
     return setTimeout(()=>{res.writeHead(401,{"WWW-Authenticate":'Basic realm="Garage Log", charset="UTF-8"',"Content-Type":"text/plain"});res.end("Password required")},400);
   }
@@ -252,7 +259,7 @@ http.createServer((req,res)=>{
     res.writeHead(200,JSON_H);return res.end(JSON.stringify({overdue,due_soon:items.length-overdue,total:items.length,vehicles}));
   }
   if(u==="/calendar.ics"&&req.method==="GET"){res.writeHead(200,{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"no-store"});return res.end(calendar(read()))}
-  if(u==="/api/calendar"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({path:"calendar.ics"+(CALT?"?t="+CALT:"")}))}
+  if(u==="/api/calendar"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({path:"calendar.ics"+(CALT?"?t="+CALT:""),t:CALT}))}
   if(u==="/api/backups"&&req.method==="GET"){
     let L=[];try{L=fs.readdirSync(BACKUPS).filter(x=>/^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().reverse().map(n=>({name:n,date:n.slice(3,13),size:fs.statSync(path.join(BACKUPS,n)).size}))}catch(e){}
     res.writeHead(200,JSON_H);return res.end(JSON.stringify(L));
