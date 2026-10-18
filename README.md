@@ -126,3 +126,14 @@ Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > gara
 - Change `30500` to any free port; the container always listens on 3000.
 - No GitHub? Build on any PC with Docker: `docker build -t YOURUSER/garage-log .` then
   `docker push YOURUSER/garage-log` (Docker Hub), and use `YOURUSER/garage-log` as the image name.
+
+## Android APK
+
+Optional. The app also installs from Chrome (⋮ > Install app). To get a real APK instead:
+
+1. On GitHub open **Actions > Build Android APK > Run workflow**.
+2. When it finishes (about 5 minutes), open the run and download **garage-log-apk** under *Artifacts*, then unzip it.
+3. Install the `.apk` on your phone (allow "install unknown apps" for the app you opened it from).
+4. On first launch enter your server address, e.g. `http://192.168.1.50:30080`. It is remembered.
+
+The APK only wraps your server, so it rarely needs rebuilding; server updates show up in it automatically. It is signed with the key in `android/debug.keystore`, so newer APKs install over older ones.

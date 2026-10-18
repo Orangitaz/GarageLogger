@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06080c"><title>Garage Log</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#06080c;color:#e8ecf3;font:16px system-ui,sans-serif}
+main{width:100%;max-width:420px;padding:24px;box-sizing:border-box}
+h1{font-size:22px;margin:0 0 6px}p{color:#9aa4b5;margin:0 0 18px;line-height:1.4}
+input{width:100%;box-sizing:border-box;padding:14px;border-radius:10px;border:1px solid #2a3342;background:#0f141c;color:inherit;font-size:16px}
+button{width:100%;margin-top:12px;padding:14px;border:0;border-radius:10px;background:#22c55e;color:#04210f;font-size:16px;font-weight:700}
+#err{color:#f87171;margin-top:12px;min-height:1.2em;font-size:14px}
+</style></head><body><main>
+<h1>Garage Log</h1>
+<p>Enter the address of your Garage Log server, for example <b>http://192.168.1.50:30080</b></p>
+<input id="u" type="url" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="http://server:port">
+<button id="go">Connect</button><div id="err"></div>
+</main><script>
+var K="garagelog.server",u=document.getElementById("u"),err=document.getElementById("err");
+function norm(v){v=(v||"").trim();if(!v)return"";if(!/^https?:\/\//i.test(v))v="http://"+v;return v.replace(/\/+$/,"")+"/"}
+function go(v){location.replace(v)}
+async function tryGo(v,auto){
+  err.textContent=auto?"":"Checking…";
+  try{
+    var c=new AbortController(),t=setTimeout(function(){c.abort()},6000);
+    var r=await fetch(v+"healthz",{signal:c.signal});clearTimeout(t);
+    if(!r.ok)throw 0;
+    localStorage.setItem(K,v);go(v);
+  }catch(e){
+    if(auto){u.value=v;err.textContent="Can't reach "+v+". Check the address or your network."}
+    else err.textContent="Can't reach that address. Check it and that your phone is on the same network.";
+  }
+}
+document.getElementById("go").onclick=function(){var v=norm(u.value);if(v)tryGo(v,false)};
+u.onkeydown=function(e){if(e.key==="Enter")document.getElementById("go").click()};
+var s=null;try{s=localStorage.getItem(K)}catch(e){}
+if(location.hash==="#change"){try{localStorage.removeItem(K)}catch(e){}}
+else if(s){tryGo(s,true)}
+</script></body></html>
