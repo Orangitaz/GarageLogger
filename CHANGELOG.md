@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.5.0 - 2026-10-18
+- **Several part numbers per inventory item.** Each item has a **Part numbers / brands** list (one per line, + Add another, ✕ to remove) shown on its card. Existing notes stay in **Notes**.
+
 ## 1.4.0 - 2026-10-18
 - **Several part numbers per category.** In the Parts list, each category can hold more than one number or brand (one per line), with **+ Add another** under it and an ✕ on each line. **Add part** to an existing category now adds another line instead of replacing it. The garage card shows the first one and "+2" when there are more.
 
