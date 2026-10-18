@@ -163,6 +163,32 @@ const body=(req,limit,cb)=>{
   req.on("end",()=>{if(!dead)cb(Buffer.concat(b))});
   req.on("error",()=>{});
 };
+// Calendar subscriptions can't send a password, so when one is set the feed uses a private link instead.
+const CALT=PASS?crypto.createHmac("sha256",PASS).update("garagelog-calendar").digest("hex").slice(0,32):"";
+const calOk=req=>{if(!CALT)return true;const t=new URLSearchParams(req.url.split("?")[1]||"").get("t")||"";return t.length===CALT.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(CALT))};
+const icsText=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
+const icsFold=l=>(l.match(/[\s\S]{1,72}/g)||[l]).join("\r\n ");
+const d8=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||"")?s.replace(/-/g,""):null;
+function calendar(S){
+  const ev=[],now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  for(const v of (S.vehicles||[]).filter(v=>!v.arch)){
+    for(const r of (S.records||[]).filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done&&d8(r.date)))ev.push({uid:r.id,date:r.date,sum:v.name+": "+(r.desc||"Reminder")});
+    const ds=[];
+    if(v.kind==="offroad"&&v.ohv)ds.push({k:"ohv",w:"OHV sticker expires",date:v.ohv});
+    if(v.kind!=="mower"&&v.reg)ds.push({k:"reg",w:"Registration expires",date:v.reg});
+    for(const x of v.dts||[])if(x.date)ds.push({k:"dt"+x.id,w:x.l||"Other date",date:x.date});
+    const g=new Map();for(const x of ds)if(d8(x.date))g.set(x.date,[...(g.get(x.date)||[]),x]);
+    for(const[date,a]of g)ev.push({uid:v.id+"-"+a.map(x=>x.k).join("+"),date,sum:v.name+": "+(a.length===1?a[0].w:a.map(x=>x.w.replace(/ expires$/,"")).join(" + ")+" expire")});
+  }
+  const out=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Garage Log//EN","CALSCALE:GREGORIAN","X-WR-CALNAME:Garage Log","REFRESH-INTERVAL;VALUE=DURATION:PT12H","X-PUBLISHED-TTL:PT12H"];
+  for(const e of ev){
+    const nx=new Date(e.date+"T00:00:00Z");nx.setUTCDate(nx.getUTCDate()+1);
+    out.push("BEGIN:VEVENT","UID:"+icsText(e.uid)+"@garagelog","DTSTAMP:"+now,"DTSTART;VALUE=DATE:"+d8(e.date),"DTEND;VALUE=DATE:"+nx.toISOString().slice(0,10).replace(/-/g,""),"SUMMARY:"+icsText(e.sum),"TRANSP:TRANSPARENT",
+      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsText(e.sum),"TRIGGER:-PT15H","END:VALARM","BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsText(e.sum),"TRIGGER:PT9H","END:VALARM","END:VEVENT");
+  }
+  out.push("END:VCALENDAR");
+  return out.map(icsFold).join("\r\n")+"\r\n";
+}
 function authed(req){
   if(!PASS)return true;
   const m=/^Basic (.+)$/i.exec(req.headers.authorization||"");if(!m)return false;
@@ -172,7 +198,7 @@ function authed(req){
 http.createServer((req,res)=>{
   const u=req.url.split("?")[0];
   // Optional password (GARAGE_PASSWORD). The icons, manifest and health check stay open so installing the app still works.
-  if(PASS&&!ST[u]&&u!=="/healthz"&&!authed(req)){
+  if(PASS&&!ST[u]&&u!=="/healthz"&&!(u==="/calendar.ics"&&calOk(req))&&!authed(req)){
     req.resume();
     return setTimeout(()=>{res.writeHead(401,{"WWW-Authenticate":'Basic realm="Garage Log", charset="UTF-8"',"Content-Type":"text/plain"});res.end("Password required")},400);
   }
@@ -224,6 +250,18 @@ http.createServer((req,res)=>{
     });
     const overdue=items.filter(i=>i.st===2).length;
     res.writeHead(200,JSON_H);return res.end(JSON.stringify({overdue,due_soon:items.length-overdue,total:items.length,vehicles}));
+  }
+  if(u==="/calendar.ics"&&req.method==="GET"){res.writeHead(200,{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"no-store"});return res.end(calendar(read()))}
+  if(u==="/api/calendar"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({path:"calendar.ics"+(CALT?"?t="+CALT:"")}))}
+  if(u==="/api/backups"&&req.method==="GET"){
+    let L=[];try{L=fs.readdirSync(BACKUPS).filter(x=>/^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().reverse().map(n=>({name:n,date:n.slice(3,13),size:fs.statSync(path.join(BACKUPS,n)).size}))}catch(e){}
+    res.writeHead(200,JSON_H);return res.end(JSON.stringify(L));
+  }
+  if(u.startsWith("/backups/")&&req.method==="GET"){
+    const n=u.slice(9);
+    if(!/^db-\d{4}-\d{2}-\d{2}\.json$/.test(n)){res.writeHead(404).end();return}
+    try{const b=fs.readFileSync(path.join(BACKUPS,n));res.writeHead(200,{"Content-Type":"application/json","Content-Disposition":'attachment; filename="garage-log-'+n.slice(3)+'"',"Cache-Control":"no-store"});return res.end(b)}
+    catch(e){res.writeHead(404).end();return}
   }
   if(u.startsWith("/photos/")){
     const n=u.slice(8);

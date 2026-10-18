@@ -17,6 +17,7 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 - **Reminders** by date, miles or hours, with repeats (every 6 months, 1, 2 or 3 years). Mileage reminders show an estimated date. Registration, the OHV sticker and your own dates (inspection, emissions, insurance) renew with one tap.
 - **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges.
 - **Alerts** to your phone through ntfy, Home Assistant or Gotify, and a status feed for Home Assistant dashboards.
+- **Fast logging:** **Log again** copies an earlier service, **quick jobs** remember parts and intervals, tap the odometer on a garage card to update it, and **Snooze** pushes a reminder back.
 - **Recall check** by VIN against the US government's NHTSA database.
 - **Documents** (PDFs and photos), **printable service history**, **CSV export**, **"when did I last" search**, **archive** for sold equipment, and **Undo** for deletes.
 - Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes. Optional password.
@@ -90,6 +91,12 @@ Press **Send test message** to check it. The server then sends a message once a 
 - Under an equipment's registration date, **+ Add another date** adds your own named dates (inspection, emissions, insurance). They stay hidden until you add one, repeat like registration, show on the dashboard with Renew, and go out in the alerts. Dates that fall on the same day (Oregon registration with inspection and emissions, say) show as one reminder, and Renew then asks for each new date.
 - **More > Documents** attaches PDFs and photos (manuals, title copies, insurance cards) to a piece of equipment. The files live in the `docs/` folder of your data folder, so a dataset snapshot covers them. The backup file from Settings only lists them; it does not contain the files themselves.
 - **Archive this equipment** (in the equipment's edit screen) takes it out of the garage, the alerts and the recall checks but keeps its history. Archived equipment is listed under **⋯ > Settings & data > Archived equipment**, where you can print its history or restore it.
+
+## Calendar, backups and shortcuts
+- **Calendar link:** **⋯ > Settings & data > Get calendar link** gives an address to subscribe to in Apple Calendar or an Android app such as ICSx⁵. It lists reminders and expiration dates that have a date. If you set a password, the link carries its own private key, so keep it to yourself. Google Calendar can't reach an address on your home network.
+- **Server backups:** the server saves a copy of your data before the first change each day and keeps 14. They are listed under **Settings & data > Server backups**; download one and use **Restore from file**. Photos and documents stay in their folders and are not inside the copies.
+- **Home-screen shortcuts:** long-press the installed app icon for **Add service** and **Inventory**.
+- The dot in the title bar shows sync: green saved, orange saving, red offline (changes are kept on the phone and sent when it reconnects). Tap it for details.
 
 ## Home Assistant
 `http://TRUENAS-IP:30500/api/summary` returns what is overdue or due soon, in total and per equipment:

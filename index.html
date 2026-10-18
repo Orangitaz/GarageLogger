@@ -118,6 +118,13 @@ details summary{cursor:pointer;padding:4px 0}
 @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes pop{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(max-width:640px){dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:26px 26px 0 0;max-height:92vh;padding:12px 20px calc(20px + env(safe-area-inset-bottom,0px))}dialog[open]{animation:sheet .28s cubic-bezier(.2,.9,.3,1)}dialog::before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:var(--bd);margin:0 auto 12px}}
+@keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
+#sd{flex:none;width:31px;height:31px;padding:10px;background:var(--mu);background-clip:content-box;border-radius:50%;cursor:pointer}
+body[data-sync=ok] #sd{background:var(--ac);background-clip:content-box}
+body[data-sync=busy] #sd{background:var(--warn);background-clip:content-box;animation:pulse 1s ease-in-out infinite}
+body[data-sync=off] #sd{background:var(--bad);background-clip:content-box}
+@keyframes pulse{50%{opacity:.35}}
 </style>
 </head>
 <body>
@@ -169,7 +176,9 @@ const act=()=>S.vehicles.filter(v=>!v.arch);
 const pseudo=v=>{const g=new Map();for(const x of vDates(v))g.set(x.date,[...(g.get(x.date)||[]),x]);
   return [...g.values()].map(a=>a.length===1?{desc:a[0].l,date:a[0].date,odo:"",vid:v.id,pk:a[0].k,rep:a[0].rep}:{desc:a.map(x=>x.l.replace(/ expires$/,"")).join(" + ")+" expire",date:a[0].date,odo:"",vid:v.id,pk:a.map(x=>x.k).join(","),rep:a.every(x=>x.rep===a[0].rep)?a[0].rep:0})};
 const partsOf=r=>(r.parts?[r.parts]:[]).concat(r.pl||[]).concat((r.iu||[]).map(x=>x.n+" ×"+x.q+(x.u?" "+x.u:"")));
-const rbtn=r=>r.pk?`<button style="margin-top:8px" data-renew="${r.pk}">Renew</button>`:r.id?(r.rep>0?`<button style="margin-top:8px" data-renew="${r.id}">Renew</button>`:`<button style="margin-top:8px" data-done="${r.id}">Mark done</button>`):"";
+const rbtn=r=>r.pk?`<div class="row" style="margin-top:8px"><button data-renew="${r.pk}">Renew</button></div>`:r.id?`<div class="row" style="margin-top:8px">${r.rep>0?`<button data-renew="${r.id}">Renew</button>`:`<button data-done="${r.id}">Mark done</button>`}<button data-snz="${r.id}">Snooze</button></div>`:"";
+const fmtD=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const addD=(s,n)=>{const d=new Date(s+"T00:00:00");d.setDate(d.getDate()+n);return fmtD(d)};
 // Rough date a distance/hours reminder will come due, from how fast the readings have been climbing.
 function estTxt(id,d){
   const a=S.records.filter(r=>r.vid===id&&r.type!=="reminder"&&r.date&&r.odo!==""&&r.odo!=null).map(r=>[Date.parse(r.date+"T00:00:00Z"),+r.odo]).sort((x,y)=>x[0]-y[0]);
@@ -209,7 +218,7 @@ function printView(v){
   const meta=[v.model,v.vin&&"VIN "+v.vin,["car","trailer"].includes(v.kind)&&v.plate&&"Plate "+v.plate].filter(Boolean).join(" · ");
   const row=r=>{const work=[r.desc,...(r.dl||[])].filter(Boolean).join("; ")||L[r.type],pt=partsOf(r).filter(Boolean);
     return `<tr><td>${esc(r.date||"")}</td>${tm?"":`<td>${r.odo!==""&&r.odo!=null?(+r.odo).toLocaleString()+" "+dU(v.id):""}</td>`}<td>${L[r.type]}</td><td>${esc(work)}${pt.length?`<div class="pvm">Parts: ${pt.map(x=>esc(x)).join(", ")}</div>`:""}${r.notes?`<div class="pvm">${esc(r.notes)}</div>`:""}</td></tr>`};
-  $("pv").innerHTML=`<div class="bar"><button class="p" id="pv_p">Print</button><button id="pv_x">Close</button></div><h1>${esc(v.name)}</h1>${meta?`<div class="pvm">${esc(meta)}</div>`:""}<div class="pvm" style="margin-bottom:16px">Service history · ${today()}${tm?"":" · "+lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div><table><tr><th>Date</th>${tm?"":`<th>${isH(v.id)?"Hours":"Odometer"}</th>`}<th>Type</th><th>Work done</th></tr>${rows.map(row).join("")||'<tr><td colspan="4">No records yet.</td></tr>'}</table>`;
+  $("pv").innerHTML=`<div class="bar"><button class="p" id="pv_p">Print / Save as PDF</button><button id="pv_x">Close</button></div><h1>${esc(v.name)}</h1>${meta?`<div class="pvm">${esc(meta)}</div>`:""}<div class="pvm" style="margin-bottom:16px">Service history · ${today()}${tm?"":" · "+lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div><table><tr><th>Date</th>${tm?"":`<th>${isH(v.id)?"Hours":"Odometer"}</th>`}<th>Type</th><th>Work done</th></tr>${rows.map(row).join("")||'<tr><td colspan="4">No records yet.</td></tr>'}</table>`;
   $("pv").hidden=false;$("pv").scrollTop=0;
   $("pv_p").onclick=()=>{try{window.print()}catch(e){}};$("pv_x").onclick=()=>{$("pv").hidden=true};
 }
@@ -219,6 +228,35 @@ function addChooser(){
   const v=veh(),L=[["service","Service"],["repair","Repair"],["upgrade","Upgrade"],["reminder","Reminder"],["note","Note"]];
   show(`<h3 style="margin:0">Add to ${esc(v.name)}</h3>`+L.map(([k,l])=>`<button class="mrow" data-add="${k}">${l}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');
   $("dbody").onclick=e=>{const k=e.target.dataset.add;if(k){$("dlg").close();openForm(null,{type:k})}};
+}
+function snoozeDlg(id){
+  const r=S.records.find(z=>z.id===id);if(!r)return;
+  const hs=isH(r.vid),du=dU(r.vid),B=(a,l)=>`<button class="mrow" data-sn="${a}">${l}</button>`;
+  let h=`<h3 style="margin:0">Snooze</h3><div class="m" style="margin-top:6px">${esc(r.desc||"Reminder")}</div>`;
+  if(r.date)h+="<label>Push the date back</label>"+B("d:7","1 week")+B("d:14","2 weeks")+B("m:1","1 month")+B("m:3","3 months");
+  if(r.odo!==""&&r.odo!=null)h+=`<label>Push the ${hs?"hours":"reading"} back</label>`+(hs?[5,10,25]:S.units==="imperial"?[100,250,500,1000]:[200,500,1000]).map(n=>B("o:"+n,"+ "+n+" "+du)).join("");
+  show(h+'<div class="m" style="margin-top:10px">Counts from today if it is already overdue.</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');
+  $("dbody").onclick=e=>{const a=e.target.dataset.sn;if(!a)return;
+    const old={date:r.date,odo:r.odo},[k,n]=a.split(":"),b=r.date&&r.date>today()?r.date:today();
+    if(k==="d")r.date=addD(b,+n);else if(k==="m")r.date=addM(b,+n);else r.odo=Math.max(+r.odo,lastOdo(r.vid))+ +n;
+    save();$("dlg").close();render();toast("Snoozed",()=>{r.date=old.date;r.odo=old.odo;save();render()})};
+}
+function qOdo(id){
+  const v=vOf(id);if(!v||isT(id))return;
+  const lo=lastOdo(id),u=dU(id),hs=isH(id);
+  show(`<h3 style="margin:0">${hs?"Hours":"Odometer"} \u00b7 ${esc(v.name)}</h3><div class="m" style="margin-top:6px">Last reading: ${lo?lo.toLocaleString()+" "+u:"none yet"}</div><label>New reading (${u})</label><input type="number" inputmode="decimal" id="qo_v" placeholder="${lo||""}">${btns}`);
+  setTimeout(()=>{const i=$("qo_v");if(i)i.focus()},80);
+  const go=()=>{const n=$("qo_v").value;if(n==="")return;const x=+n;
+    if(x<lo&&!confirm("That's lower than the last reading ("+lo.toLocaleString()+" "+u+"). Save anyway?"))return;
+    const rec={id:uid(),vid:id,type:"odometer",date:today(),odo:x,desc:"",parts:"",pl:[],dl:[],notes:"",ph:[],rc:[],done:false,nrid:"",next:0,iu:[],rep:0};
+    S.records.push(rec);save();$("dlg").close();render();toast((hs?"Hours":"Odometer")+" updated",()=>{S.records=S.records.filter(r=>r!==rec);save();render()})};
+  $("ok").onclick=go;$("qo_v").onkeydown=e=>{if(e.key==="Enter")go()};
+}
+function saveJob(o){
+  const k=vOf(o.vid).kind,rows=PR(k).map(x=>({...x})),i=rows.findIndex(x=>x.n.toLowerCase()===o.desc.toLowerCase()),x=i>=0?rows[i]:{n:o.desc,d:0,h:0,m:0};
+  if(o.next>0){if(isT(o.vid))x.m=o.next;else if(isH(o.vid))x.h=o.next;else x.d=o.next}
+  x.pl=o.pl.slice();x.iu=o.iu.map(z=>({id:z.id,n:z.n,u:z.u,q:z.q}));
+  if(i<0)rows.push(x);S.presets=Object.assign({},S.presets,{[k]:rows});
 }
 function mvVeh(spec){
   const[id,n]=spec.split(":"),vis=act().filter(v=>gk==="All"||v.kind===gk),i=vis.findIndex(v=>v.id===id),j=i+ +n;
@@ -301,14 +339,14 @@ function docsForm(v){
 }
 function moreMenu(){
   const v=veh(),L=vTabs(v).filter(t=>!MAIN.includes(t[0]));
-  show(`<h3 style="margin:0">More</h3><label>Records</label>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<label>Tools</label><button class="mrow" data-pv="1">Print service history</button><button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button><button class="mrow" data-csv="1">Export records (CSV)</button>'+(/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  show(`<h3 style="margin:0">More</h3><label>Records</label>`+L.map(([k,l])=>`<button class="mrow" data-mt="${k}">${l}</button>`).join("")+'<label>Tools</label><button class="mrow" data-pv="1">Service history (print or PDF)</button><button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button><button class="mrow" data-csv="1">Export records (CSV)</button>'+(/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
   $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}else if(e.target.dataset.rcnow){recallNow(v)}};
 }
 function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
   const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key}
   const v=veh(),inV=view==="vehicle"&&v;
-  $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><button id="ev">✎</button><button id="more">⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><button id="more">⋯</button>`;
+  $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="ev">✎</button><button id="more">⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="more">⋯</button>`;
   const pk=KINDS.filter(k=>act().some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
   const vt=inV?vTabs(v):[],tl=inV?[...vt.filter(t=>MAIN.includes(t[0])),["more",(vt.find(t=>t[0]===tab&&!MAIN.includes(t[0]))||[0,"More"])[1]+" ▾"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
   $("tabs").className="tabs"+(inV?" wrap":"");$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)||(k==="more"&&inV&&!MAIN.includes(tab))?"on":""}" data-t="${k}">${l}</button>`).join("");
@@ -326,13 +364,13 @@ function dashView(v){
   const rec=S.records.filter(r=>r.vid===v.id&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,6);
   const upH=up.length?up.map(({r,i})=>`<div class="c sc st${i.st}"><h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders.</div>';
   const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
-    return `<div class="c sc st${r.type==="repair"?1:0}"><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
+    return `<div class="c sc st${r.type==="repair"?1:0}"><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div><button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
   return `<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">🔍 Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+rclCard(v)+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH;
 }
 function garageView(){
   if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
-  return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[v.model,isT(v.id)?"":lastOdo(v.id).toLocaleString()+" "+dU(v.id)].filter(Boolean).join(" · ");
-    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${esc(mt)}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
+  return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:6px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join(" · ");
+    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${v.cover}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
 }
 function recView(v){
   let out=isT(v.id)?"":`<div class="m" style="margin-bottom:10px">${lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>`;
@@ -347,7 +385,7 @@ function card(r){
   if(r.type==="reminder"){const i=rinfo(r,lastOdo(r.vid));extra=r.done?'<span class="tag">Done</span>':tag(i.st);meta=["Due",r.date,odo].filter(Boolean).join(" · ")+(r.done?"":` (${i.txt})`)+(r.rep>0?" · repeats every "+repTxt(r.rep):"")}
   const rc=(r.rc||[]).map((p,i)=>`<img src="${p}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${p}" data-ph="${r.id}:${i}">`).join("");
   const sk=r.type==="reminder"?"st"+(r.done?"n":rinfo(r,lastOdo(r.vid)).st):({service:"st0",repair:"st1",upgrade:"stu"})[r.type]||"";
-  return `<div class="c${sk?" sc "+sk:""}"><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${em?`<div class="row" style="margin-top:10px"><button class="p" data-edit="${r.id}" style="flex:1">Edit</button><button data-del="${r.id}" style="flex:1">Delete</button></div>`:""}</div>`;
+  return `<div class="c${sk?" sc "+sk:""}"><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${PH.includes(r.type)?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}${em?`<div class="row" style="margin-top:10px"><button class="p" data-edit="${r.id}" style="flex:1">Edit</button><button data-del="${r.id}" style="flex:1">Delete</button></div>`:""}</div>`;
 }
 function partsView(v){
   const top=[["License plate",["car","trailer"].includes(v.kind)?v.plate:""],["OHV sticker expires",v.kind==="offroad"?v.ohv:""],["Registration expires",v.kind!=="mower"?v.reg:""],...(v.dts||[]).map(x=>[x.l||"Other date",x.date]),["VIN / serial #",v.vin]].filter(x=>x[1]).map(([l,x])=>`<div class="sp"><span class="m">${l}</span><span>${esc(x)}</span></div>`).join("");
@@ -372,11 +410,11 @@ function openForm(id,pre){
   show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":(({repair:"repair",upgrade:"upgrade",reminder:"reminder",note:"note"})[t]||TYPES.find(x=>x[0]===t)[1].toLowerCase())}</h3>${e.banner?`<div class="m" style="margin-top:6px;color:var(--ac)">${esc(e.banner)}</div>`:""}
   <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${rem?`<label>Repeats</label><select id="f_rep">${REP.map(([n,l])=>`<option value="${n}" ${+e.rep===n||(!e.rep&&n===0)?"selected":""}>${l}</option>`).join("")}<option value="c" ${repC?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_repc" value="${repC?e.rep:""}" placeholder="Months" style="margin-top:6px;display:${repC?"":"none"}">`:""}
   ${isT(S.cur)?"":`<label>${rem?"Due at "+dU()+" (optional)":(isH(S.cur)?"Hours":"Odometer ("+(S.units==="imperial"?"mi":"km")+")")}</label><input type="number" inputmode="numeric" id="f_odo" value="${e.odo}" placeholder="${lastOdo(S.cur)||""}">`}
-  ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
+  ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}${(x.pl||[]).length||(x.iu||[]).length?" \u25cf":""}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
   ${sr?'<label style="display:flex;align-items:center;gap:8px">Parts used <button class="p" id="addpt" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="pls"></div>'+(S.inv.length?'<label>Take from inventory</label><select id="ivs"></select><div id="ius"></div>':""):""}
   ${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
     <label>Notes</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
-  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${btns}`);
+  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${t==="service"&&!id?'<label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--tx)"><input type="checkbox" id="f_job" style="width:auto;margin:0"> Save as a quick job (remembers parts and interval)</label>':""}${btns}`);
   const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${p}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
   grp("ph","pf",ph,800,.65);grp("rc","rf",rc,1600,.7);
   if($("pfb"))$("pfb").onclick=()=>$("pf").click();if($("rcb"))$("rcb").onclick=()=>$("rf").click();
@@ -400,6 +438,8 @@ function openForm(id,pre){
   const syD=sr?listUI("dls","adddc",dl,"Description"):()=>{};
   if($("f_next"))$("f_next").onchange=()=>{$("f_nextc").style.display=$("f_next").value==="c"?"":"none"};
   if($("qp"))$("qp").onclick=ev=>{const i=ev.target.dataset.qp;if(i==null)return;const x=pr[+i];syD();if(!dl.some(z=>z.trim().toLowerCase()===x.n.toLowerCase())){const k=dl.findIndex(z=>!z.trim());if(k>=0)dl[k]=x.n;else dl.push(x.n);syD.d()}
+    if((x.pl||[]).length){syncP();const have=pl.map(z=>z.trim().toLowerCase());pl=pl.filter(z=>z.trim());x.pl.forEach(z=>{if(!have.includes(z.toLowerCase()))pl.push(z)});if(!pl.length)pl=[""];dpl()}
+    if((x.iu||[]).length&&$("ivs")){syncI();x.iu.forEach(z=>{const it=S.inv.find(i=>i.id===z.id);if(it&&!iu.some(w=>w.id===z.id))iu.push({id:it.id,n:it.name,u:it.unit||"",q:z.q})});dI()}
     const m=isT(S.cur)?x.m:isH(S.cur)?x.h:x.d,fn=$("f_next");
     if(fn&&m>0){const o=[...fn.options].find(z=>z.value!=="c"&&+z.value===m);if(o)fn.value=o.value;else{fn.value="c";$("f_nextc").value=m}fn.onchange()}};
   if($("addpt")){$("addpt").onclick=()=>{syncP();pl.push("");dpl();const a=$("pls").querySelectorAll(".pt");a[a.length-1].focus()};$("pls").onclick=ev=>{const i=ev.target.dataset.pd;if(i!=null){syncP();pl.splice(+i,1);if(!pl.length)pl=[""];dpl()}}}
@@ -420,9 +460,10 @@ function openForm(id,pre){
         if(old&&!old.done){Object.assign(old,f,{desc:dsc});o.nrid=old.id}
         else{const nr=Object.assign({id:uid(),vid:S.cur,type:"reminder",desc:dsc,parts:"",pl:[],dl:[],notes:"",ph:[],rc:[],done:false},f);S.records.push(nr);o.nrid=nr.id}}
       else{if(old&&!old.done)S.records=S.records.filter(r=>r!==old);o.nrid=""}}
-    if(sr)adjInv(e.iu,o.iu);
+    if(sr)adjInv(id?e.iu:[],o.iu);
+    let jobUndo=null;if($("f_job")&&$("f_job").checked&&o.desc){const old=S.presets;saveJob(o);jobUndo=()=>{if(old)S.presets=old;else delete S.presets;save();render()}}
     if(id)S.records[S.records.findIndex(r=>r.id===id)]=o;else S.records.push(o);
-    save();$("dlg").close();render();
+    save();$("dlg").close();render();if(jobUndo)toast("Saved as a quick job",jobUndo);
   };
 }
 function specForm(){
@@ -438,14 +479,14 @@ function specForm(){
   draw();$("dlg").showModal();
 }
 function presetForm(kind){
-  let rows=PR(kind).map(x=>({...x}));
-  const sync=()=>{rows=[...$("dbody").querySelectorAll(".qr")].map(d=>({n:d.querySelector(".qn").value.trim(),d:+d.querySelector(".qd").value||0,h:+d.querySelector(".qh").value||0,m:+d.querySelector(".qm").value||0}))};
+  let rows=PR(kind).map(x=>({...x,k:uid()}));
+  const sync=()=>{const old=new Map(rows.map(r=>[r.k,r]));rows=[...$("dbody").querySelectorAll(".qr")].map(d=>{const o=old.get(d.dataset.k)||{};return{k:d.dataset.k,n:d.querySelector(".qn").value.trim(),d:+d.querySelector(".qd").value||0,h:+d.querySelector(".qh").value||0,m:+d.querySelector(".qm").value||0,pl:o.pl,iu:o.iu}})};
   const draw=()=>{
-    $("dbody").innerHTML=`<h3 style="margin:0">Quick-pick services</h3><div class="m">${esc((KINDS.find(k=>k[0]===kind)||[])[1]||"")}. Name each service, then how often it repeats. Leave a box empty for none.</div>${rows.map((r,i)=>`<div class="qr" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><div class="row"><input class="qn" value="${esc(r.n)}" placeholder="Service"><button data-pup="${i}">↑</button><button data-prm="${i}">✕</button></div><div class="row" style="margin-top:6px"><input class="qd" type="number" inputmode="numeric" value="${r.d||""}" placeholder="${S.units==="imperial"?"miles":"km"}"><input class="qh" type="number" inputmode="numeric" value="${r.h||""}" placeholder="hours"><input class="qm" type="number" inputmode="numeric" value="${r.m||""}" placeholder="months"></div></div>`).join("")}<button id="addq" style="margin-top:12px;width:100%">+ Add service</button><button id="rstq" style="margin-top:8px;width:100%">Reset to the defaults</button>${btns}`;
+    $("dbody").innerHTML=`<h3 style="margin:0">Quick-pick services</h3><div class="m">${esc((KINDS.find(k=>k[0]===kind)||[])[1]||"")}. Name each service, then how often it repeats. Leave a box empty for none.</div>${rows.map((r,i)=>`<div class="qr" data-k="${r.k}" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><div class="row"><input class="qn" value="${esc(r.n)}" placeholder="Service"><button data-pup="${i}">↑</button><button data-prm="${i}">✕</button></div><div class="row" style="margin-top:6px"><input class="qd" type="number" inputmode="numeric" value="${r.d||""}" placeholder="${S.units==="imperial"?"miles":"km"}"><input class="qh" type="number" inputmode="numeric" value="${r.h||""}" placeholder="hours"><input class="qm" type="number" inputmode="numeric" value="${r.m||""}" placeholder="months"></div>${(r.pl||[]).length||(r.iu||[]).length?`<div class="m" style="margin-top:6px">Remembers ${(r.pl||[]).length+(r.iu||[]).length} part${(r.pl||[]).length+(r.iu||[]).length===1?"":"s"}</div>`:""}</div>`).join("")}<button id="addq" style="margin-top:12px;width:100%">+ Add service</button><button id="rstq" style="margin-top:8px;width:100%">Reset to the defaults</button>${btns}`;
     $("cancel").onclick=()=>$("dlg").close();
-    $("addq").onclick=()=>{sync();rows.push({n:"",d:0,h:0,m:0});draw();const a=$("dbody").querySelectorAll(".qn");a[a.length-1].focus()};
+    $("addq").onclick=()=>{sync();rows.push({k:uid(),n:"",d:0,h:0,m:0});draw();const a=$("dbody").querySelectorAll(".qn");a[a.length-1].focus()};
     $("rstq").onclick=()=>{if(S.presets){delete S.presets[kind];save()}$("dlg").close()};
-    $("ok").onclick=()=>{sync();S.presets=Object.assign({},S.presets,{[kind]:rows.filter(r=>r.n)});save();$("dlg").close()};
+    $("ok").onclick=()=>{sync();S.presets=Object.assign({},S.presets,{[kind]:rows.filter(r=>r.n).map(({k,...r})=>r)});save();$("dlg").close()};
   };
   $("dbody").onclick=e=>{const d=e.target.dataset;if(d.prm!=null){sync();rows.splice(+d.prm,1);draw()}else if(d.pup!=null&&+d.pup>0){sync();const i=+d.pup;[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}};
   draw();$("dlg").showModal();
@@ -494,7 +535,9 @@ function dataForm(){
   <div class="row" style="margin-top:6px"><button id="al_t" style="flex:1">Send test message</button></div>
   <div class="m" id="al_m" style="margin-top:6px">The server sends a message when something becomes due soon or overdue, then weekly while it stays overdue. Use "JSON webhook" for Home Assistant or Gotify. Leave the address empty to turn alerts off.</div>
   <div class="m" style="margin-top:12px">Server sync: <span id="ss">${syncMsg}</span></div>
-  <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
+  <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>
+  <details style="margin-top:12px"><summary class="m">Server backups</summary><div class="m" id="bkl" style="margin-top:8px">Loading…</div></details>
+  <label>Calendar</label><div class="row"><button id="cal_b" style="flex:1">Get calendar link</button></div><div class="m" id="cal_m" style="margin-top:6px">Shows reminders and expiration dates that have a date. Subscribe to the link in Apple Calendar or an Android app like ICSx\u2075. Google Calendar can't reach an address on your home network.</div>${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
   
   <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}</div>
   <div class="row" style="margin-top:10px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
@@ -510,15 +553,21 @@ function dataForm(){
   $("rfb").onclick=()=>$("rf").click();
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
   $("csvb").onclick=()=>csvExport();
+  fetch("api/backups",{cache:"no-store"}).then(r=>r.json()).then(L=>{const b=$("bkl");if(!b)return;b.innerHTML=L.length?`A copy is saved before the first change each day, and up to 14 are kept on your server. Tap one to download it, then use Restore from file.`+L.map(x=>`<div class="sp"><a href="backups/${esc(x.name)}" download style="color:var(--ac)">${esc(x.date)}</a><span class="m">${Math.max(1,Math.round(x.size/1024))} KB</span></div>`).join(""):"No copies yet. The first one appears after your next change."}).catch(()=>{if($("bkl"))$("bkl").textContent="Couldn't load the list."});
+  $("cal_b").onclick=async()=>{const m=$("cal_m");m.textContent="Getting the link…";
+    try{const j=await (await fetch("api/calendar",{cache:"no-store"})).json(),u=new URL(j.path,location.href).href;
+      m.innerHTML='Copy this link into your calendar app:<input readonly id="cal_u" style="margin-top:6px;width:100%" value="'+esc(u)+'">';const i=$("cal_u");i.focus();i.select();try{navigator.clipboard&&navigator.clipboard.writeText(u).catch(()=>{})}catch(e){}}
+    catch(e){m.textContent="Couldn't reach the Garage Log server."}};
   $("dbody").onclick=e=>{const d=e.target.dataset;if(d.unarch){const v=vOf(d.unarch);if(v){delete v.arch;save();$("dlg").close();render();dataForm()}}else if(d.aprint){const v=vOf(d.aprint);$("dlg").close();if(v)printView(v)}};
 }
-$("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more")dataForm();else if(i==="ev")vehForm(true)};
+$("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more"||i==="sd")dataForm();else if(i==="ev")vehForm(true)};
 $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(t==="more")return moreMenu();if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
 $("bn").onclick=e=>{const v=e.target.dataset.v;if(v){view=v;render()}};
 $("fab").onclick=()=>view==="vehicle"?(tab==="dash"?addChooser():tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
 $("fabE").onclick=()=>{if(view==="vehicle"&&tab==="parts")specForm();else{em=!em;render()}};
 $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");
-  if(d.mv)mvVeh(d.mv);
+  if(d.qodo2)qOdo(d.qodo2);
+  else if(d.mv)mvVeh(d.mv);
   else if(op){S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
   else if(d.del){const k=S.records.findIndex(r=>r.id===d.del);if(k>=0){const r0=S.records[k];adjInv(r0.iu,[]);S.records.splice(k,1);save();render();toast("Entry deleted",()=>{S.records.splice(Math.min(k,S.records.length),0,r0);adjInv([],r0.iu);save();render()})}}
   else if(d.edit)openForm(d.edit);
@@ -526,7 +575,9 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.renew)renewDlg(d.renew);
   else if(d.rcok){const v=veh();v.rcOk=[...(v.rcOk||[]),d.rcok];save();render()}
   else if(d.srch)searchForm(veh());
-  else if(d.qodo)openForm(null,{type:"odometer"});
+  else if(d.qodo)qOdo(S.cur);
+  else if(d.snz)snoozeDlg(d.snz);
+  else if(d.again){const r=S.records.find(x=>x.id===d.again);if(r)openForm(null,{type:r.type,date:today(),desc:r.desc||"",dl:(r.dl||[]).slice(),pl:[...(r.parts?[r.parts]:[]),...(r.pl||[])],iu:(r.iu||[]).filter(x=>S.inv.some(i=>i.id===x.id)).map(x=>({...x})),next:r.next||0,odo:"",notes:"",ph:[],rc:[],banner:"Copied from "+(r.date||"an earlier entry")+". Set the date and "+(isH(S.cur)?"hours":"odometer")+", then save."})}
   else if(d.specs)specForm();
   else if(d.go){tab=d.go;render()}
   else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${S.records.find(r=>r.id===id)[g||"ph"][+i]}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
@@ -536,6 +587,8 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
 const fixV=v=>{v.specs=v.specs||{};if(!v.plist){const sp=v.specs;v.plist=SPECS.filter(([k])=>sp[k]).map(([k,l])=>({l,v:sp[k]}));if(sp.other)v.plist.push({l:"Other",v:sp.other})}if(!v.pclean){v.plist=v.plist.filter(r=>r.v||!SPECS.some(x=>x[1]===r.l));v.pclean=1}v.kind=v.kind==="atv"||v.kind==="bike"?"offroad":v.kind||"car";v.meter=v.meter||"dist"};S.vehicles.forEach(fixV);
 render();
 let syncMsg="not connected yet",pt=null,busy=false,again=false,base=null;
+document.body.dataset.sync="busy";
+const setSync=(st,msg)=>{syncMsg=msg;document.body.dataset.sync=st;const e=$("ss");if(e)e.textContent=msg};
 const api=()=>"api/state",AK=["vehicles","records","inv"],SK=["units","presets","alert"];
 const clone=o=>JSON.parse(JSON.stringify(o));
 const norm=o=>{o.records=(o.records||[]).filter(r=>r.type!=="fuel");o.vehicles=o.vehicles||[];o.vehicles.forEach(fixV);return o};
@@ -567,36 +620,46 @@ const redraw=()=>{if(view==="vehicle"&&!veh())view="garage";if(!$("dlg").open)re
 const push=()=>{clearTimeout(pt);pt=setTimeout(()=>{pt=null;send()},400)};
 async function send(){
   if(busy){again=true;return}
-  busy=true;let more=false,merged=false;
+  busy=true;let more=false,merged=false;setSync("busy","saving…");
   try{
     for(let n=0;n<4;n++){
       const sent=JSON.stringify(S),r=await fetch(api(),{method:"PUT",headers:{"Content-Type":"application/json"},body:sent});
       if(r.status===409){
         const T=await r.json();
         if(base){mergeIn(T);merged=true;redraw();continue}
-        adopt(T);setBase(T);syncMsg="loaded changes from another device";redraw();break;
+        adopt(T);setBase(T);setSync("ok","loaded changes from another device");redraw();break;
       }
       if(!r.ok)throw 0;
       const j=await r.json();S.rev=j.rev;const b=JSON.parse(sent);b.rev=j.rev;setBase(b);stash();
-      syncMsg=merged?"saved to server (merged with changes from another device)":"saved to server";if(sent.includes('"data:image'))more=true;break;
+      setSync("ok",merged?"saved to server (merged with changes from another device)":"saved to server");if(sent.includes('"data:image'))more=true;break;
     }
-  }catch(e){syncMsg="offline (saved on this device only)"}
+  }catch(e){setSync("off","offline (saved on this device only)")}
+  if(document.body.dataset.sync==="busy")setSync("off","couldn't save yet, will retry");
   busy=false;
   if(again){again=false;send()}else if(more)pull(true);
 }
 const pull=f=>{
   if(!f&&(pt||busy||$("dlg").open))return Promise.resolve();
   return fetch(api(),{cache:"no-store"}).then(r=>r.json()).then(d=>{
-    syncMsg="saved to server";
+    setSync("ok","saved to server");
     if(d&&Array.isArray(d.vehicles)&&(d.vehicles.length||(d.records||[]).length||(d.inv||[]).length)){
       const o=base?diff(base,S):null;
       if(o&&Object.keys(o).length){mergeIn(d);redraw();push()}
       else{if(cmp(norm(clone(d)))===cmp(S)){if(d.rev!==undefined)S.rev=d.rev}else{adopt(d);redraw()}setBase(d)}
     }else if(S.vehicles.length)push();
-  }).catch(()=>{syncMsg="offline (saved on this device only)"});
+  }).catch(()=>{setSync("off","offline (saved on this device only)")});
 };
+addEventListener("online",()=>pull());addEventListener("offline",()=>setSync("off","offline (saved on this device only)"));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 pull();loadRc();
+(function(){let a="";try{a=new URLSearchParams(location.search).get("a")||""}catch(e){}
+  if(!a)return;try{history.replaceState(null,"",location.pathname)}catch(e){}
+  if(a==="inventory"){view="inventory";render()}
+  else if(a==="service"){const L=act();if(!L.length)return;
+    const go=id=>{S.cur=id;view="vehicle";tab="service";render();openForm(null,{type:"service"})};
+    if(L.length===1)go(L[0].id);
+    else{show('<h3 style="margin:0">Log a service</h3><label>Which one?</label>'+L.map(v=>`<button class="mrow" data-pk="${v.id}">${kIc(v.kind)} ${esc(v.name)}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');$("dbody").onclick=e=>{const i=e.target.dataset.pk;if(i){$("dlg").close();go(i)}}}}
+})();
 try{if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
 </script>
 </body>

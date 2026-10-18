@@ -2,6 +2,19 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.1.0 - 2026-10-17
+- **Log again** on every service, repair and upgrade: a new entry with the same work, parts, inventory use and interval, ready for a new date and reading.
+- **Snooze** on reminders (1 or 2 weeks, 1 or 3 months, or push the reading back). Counts from today if it is overdue, with Undo.
+- **Quick odometer / hours**: tap the reading on a garage card, or the + button on the dashboard, for a one-field dialog.
+- **Quick jobs remember parts**: tick "Save as a quick job" when logging a service. Its parts and inventory use fill in next time you pick it.
+- Forms open as bottom sheets on phones.
+- **Calendar link** (Settings & data): subscribe to reminders and expiration dates from Apple Calendar or an Android app.
+- **Server backups** are listed in Settings & data and can be downloaded.
+- **Sync dot** in the title bar (green saved, orange saving, red offline). Tap it for details.
+- Home-screen shortcuts: long-press the app icon for Add service and Inventory.
+- "Service history" is labeled Print / Save as PDF.
+- Fixed: logging a service with inventory parts from a copied entry no longer skips the stock deduction.
+
 ## 1.0.0 - 2026-10-14
 First numbered release. Everything below up to this point is rolled into it.
 - Dashboard `+` asks what to add. Service form reordered; photo, receipt and cover-photo buttons; VIN next to the plate.
