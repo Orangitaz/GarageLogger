@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.4.0 - 2026-10-18
+- **Several part numbers per category.** In the Parts list, each category can hold more than one number or brand (one per line), with **+ Add another** under it and an ✕ on each line. **Add part** to an existing category now adds another line instead of replacing it. The garage card shows the first one and "+2" when there are more.
+
 ## 1.3.0 - 2026-10-18
 - **Standalone Android app.** The app can now carry Garage Log inside it and keep its data on the phone with no server. A server address is optional and can be added in Settings & data, which syncs and merges like the web version. Backups, CSV and service history go to the Android share sheet.
 - Server: accepts requests from the Android app (only from the app's own address, or ones listed in `CORS_ORIGINS`). Photos and documents can be read with the same private key as the calendar link, so the app can show them when a password is set.

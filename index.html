@@ -383,7 +383,7 @@ function dashView(v){
 }
 function garageView(){
   if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
-  return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(x.v)}</span>`).join(""),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:6px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join(" · ");
+  return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(String(x.v).split("\n")[0])}${String(x.v).split("\n").length>1?" +"+(String(x.v).split("\n").length-1):""}</span>`).join(""),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:6px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join(" · ");
     return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
 }
 function recView(v){
@@ -481,15 +481,20 @@ function openForm(id,pre){
   };
 }
 function specForm(){
-  const v=veh();let rows=v.plist.map(x=>({...x}));
-  const sync=()=>{rows=[...$("dbody").querySelectorAll(".pr")].map(d=>({l:d.querySelector(".pl").value.trim(),v:d.querySelector(".pv").value.trim()}))};
+  const v=veh();let rows=v.plist.map(x=>({l:x.l,v:String(x.v||"").split("\n")}));
+  rows.forEach(r=>{if(!r.v.length)r.v=[""]});
+  const sync=()=>{rows=[...$("dbody").querySelectorAll(".pr")].map(d=>({l:d.querySelector(".pl").value.trim(),v:[...d.querySelectorAll(".pv")].map(i=>i.value)}))};
   const draw=()=>{
-    $("dbody").innerHTML=`<h3 style="margin:0">Parts list</h3><div class="m">Rename, add, reorder or remove your own categories.</div>${rows.map((r,i)=>`<div class="pr" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><div class="row"><input class="pl" value="${esc(r.l)}" placeholder="Category"><button data-pup="${i}">↑</button><button data-prm="${i}">✕</button></div><input class="pv" value="${esc(r.v)}" placeholder="Value" style="margin-top:6px"></div>`).join("")}<button id="addp" style="margin-top:12px;width:100%">+ Add category</button>${btns}`;
+    $("dbody").innerHTML=`<h3 style="margin:0">Parts list</h3><div class="m">Rename, add, reorder or remove your own categories. Tap + Add another to list a second part number or brand under a category.</div>${rows.map((r,i)=>`<div class="pr" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><div class="row"><input class="pl" value="${esc(r.l)}" placeholder="Category"><button data-pup="${i}">\u2191</button><button data-prm="${i}">\u2715</button></div>${r.v.map((x,k)=>`<div class="row" style="margin-top:6px"><input class="pv" value="${esc(x)}" placeholder="Part number / brand"><button data-vx="${i}:${k}">\u2715</button></div>`).join("")}<button class="p" data-vadd="${i}" style="margin-top:8px;width:100%">+ Add another</button></div>`).join("")}<button id="addp" style="margin-top:12px;width:100%">+ Add category</button>${btns}`;
     $("cancel").onclick=()=>$("dlg").close();
-    $("addp").onclick=()=>{sync();rows.push({l:"",v:""});draw();const a=$("dbody").querySelectorAll(".pl");a[a.length-1].focus()};
-    $("ok").onclick=()=>{sync();v.plist=rows.filter(r=>r.l);save();$("dlg").close();render()};
+    $("addp").onclick=()=>{sync();rows.push({l:"",v:[""]});draw();const a=$("dbody").querySelectorAll(".pl");a[a.length-1].focus()};
+    $("ok").onclick=()=>{sync();v.plist=rows.filter(r=>r.l).map(r=>({l:r.l,v:r.v.map(x=>x.trim()).filter(Boolean).join("\n")}));save();$("dlg").close();render()};
   };
-  $("dbody").onclick=e=>{const d=e.target.dataset;if(d.prm!=null){sync();rows.splice(+d.prm,1);draw()}else if(d.pup!=null&&+d.pup>0){sync();const i=+d.pup;[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}};
+  $("dbody").onclick=e=>{const d=e.target.dataset;
+    if(d.prm!=null){sync();rows.splice(+d.prm,1);draw()}
+    else if(d.pup!=null&&+d.pup>0){sync();const i=+d.pup;[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}
+    else if(d.vx!=null){sync();const[i,k]=d.vx.split(":").map(Number);rows[i].v.splice(k,1);if(!rows[i].v.length)rows[i].v=[""];draw()}
+    else if(d.vadd!=null){sync();const i=+d.vadd;rows[i].v.push("");draw();const a=$("dbody").querySelectorAll(".pr")[i].querySelectorAll(".pv");a[a.length-1].focus()}};
   draw();$("dlg").showModal();
 }
 function presetForm(kind){
@@ -507,8 +512,12 @@ function presetForm(kind){
 }
 function addPart(){
   const v=veh(),labs=[...new Set(S.vehicles.flatMap(x=>(x.plist||[]).filter(r=>r.v).map(r=>r.l)))];
-  show(`<h3 style="margin:0">Add part</h3><label>Category</label><input id="ap_l" list="ap_s" placeholder="Category" autocomplete="off"><datalist id="ap_s">${labs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist><label>Value</label><input id="ap_v" placeholder="Value">${btns}`);
-  $("ok").onclick=()=>{const l=$("ap_l").value.trim(),x=$("ap_v").value.trim();if(!l)return;const r=v.plist.find(r=>r.l.toLowerCase()===l.toLowerCase());if(r)r.v=x;else v.plist.push({l,v:x});save();$("dlg").close();render()};
+  show(`<h3 style="margin:0">Add part</h3><label>Category</label><input id="ap_l" list="ap_s" placeholder="Category" autocomplete="off"><datalist id="ap_s">${labs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist><div class="m" id="ap_h" style="margin-top:6px;min-height:1.2em"></div><label>Part number / brand</label><input id="ap_v" placeholder="Value">${btns}`);
+  const find=()=>v.plist.find(r=>r.l.toLowerCase()===$("ap_l").value.trim().toLowerCase());
+  $("ap_l").oninput=()=>{const r=find();$("ap_h").textContent=r&&r.v?"Adds another under "+r.l+" (now: "+String(r.v).split("\n").join(", ")+")":""};
+  $("ok").onclick=()=>{const l=$("ap_l").value.trim(),x=$("ap_v").value.trim();if(!l)return;const r=find();
+    if(r){const ls=String(r.v||"").split("\n").filter(Boolean);if(x&&!ls.some(z=>z.toLowerCase()===x.toLowerCase()))ls.push(x);r.v=ls.join("\n")}else v.plist.push({l,v:x});
+    save();$("dlg").close();render()};
 }
 function vehForm(edit){
   const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
