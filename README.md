@@ -13,7 +13,7 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 
 ## What it does
 - **Garage and dashboards:** every piece of equipment gets a card with a status, and a dashboard with upcoming reminders and recent services and repairs.
-- **Service, repair and upgrade records** with notes, photos, receipts, quick-pick services and parts used. Parts used can come out of your inventory automatically.
+- **Service, repair and upgrade records** with notes, photos, receipts, quick-pick services and parts used. Parts used are either **bought for this job** or **taken from inventory** (which deducts the stock automatically).
 - **Reminders** by date, miles or hours, with repeats (every 6 months, 1, 2 or 3 years). Mileage reminders show an estimated date. Registration, the OHV sticker and your own dates (inspection, emissions, insurance) renew with one tap.
 - **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges.
 - **Alerts** to your phone through ntfy, Home Assistant or Gotify, and a status feed for Home Assistant dashboards.

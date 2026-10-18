@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.2.0 - 2026-10-17
+- Parts used on a service now has two clear buttons: **+ Bought for this job** (typed part, inventory unchanged) and **− Take from inventory** (deducts stock). Restock leftovers from the Inventory tab when the job is done.
+
 ## 1.1.0 - 2026-10-17
 - **Log again** on every service, repair and upgrade: a new entry with the same work, parts, inventory use and interval, ready for a new date and reading.
 - **Snooze** on reminders (1 or 2 weeks, 1 or 3 months, or push the reading back). Counts from today if it is overdue, with Undo.
