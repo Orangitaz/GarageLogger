@@ -1,7 +1,0 @@
-{
-  "appId": "com.garagelog.app",
-  "appName": "Garage Log",
-  "webDir": "www",
-  "backgroundColor": "#06080c",
-  "server": { "cleartext": true, "allowNavigation": ["*"] }
-}
