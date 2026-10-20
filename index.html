@@ -119,6 +119,10 @@ details summary{cursor:pointer;padding:4px 0}
 @keyframes pop{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media(max-width:640px){dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:26px 26px 0 0;max-height:92vh;padding:12px 20px calc(20px + env(safe-area-inset-bottom,0px))}dialog[open]{animation:sheet .28s cubic-bezier(.2,.9,.3,1)}dialog::before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:var(--bd);margin:0 auto 12px}}
+.ed{position:absolute;top:10px;right:10px;width:36px;height:36px;padding:0;border-radius:50%;font-size:16px;line-height:1;background:var(--field);color:var(--mu);z-index:2}
+.c.ce{padding-right:58px}
+.vc-b{position:relative}.vc-b .ed{top:12px}.vc-b h3,.vc-b>.m{padding-right:44px}
+.ed2{flex:none;width:34px;height:34px;padding:0;border-radius:50%;font-size:15px;line-height:1;background:var(--field);color:var(--mu);align-self:center}
 @keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
 #sd{flex:none;width:31px;height:31px;padding:10px;background:var(--mu);background-clip:content-box;border-radius:50%;cursor:pointer}
 body[data-sync=ok] #sd{background:var(--ac);background-clip:content-box}
@@ -132,7 +136,7 @@ body[data-sync=off] #sd{background:var(--bad);background-clip:content-box}
 <div class="tabs" id="tabs"></div>
 <main id="list"></main>
 <button class="fab p" id="fab">+</button>
-<button class="fab fabl p" id="fabE" title="Edit parts list" style="display:none">✎</button>
+<button class="fab fabl p" id="fabE" title="Reorder equipment" style="display:none">⇅</button>
 <div id="bn"><button data-v="garage"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>Garage</button><button data-v="inventory"><svg viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>Inventory</button></div>
 <div id="toast" hidden></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
@@ -237,6 +241,22 @@ function addChooser(){
   const v=veh(),L=[["service","Service"],["repair","Repair"],["upgrade","Upgrade"],["reminder","Reminder"],["note","Note"]];
   show(`<h3 style="margin:0">Add to ${esc(v.name)}</h3>`+L.map(([k,l])=>`<button class="mrow" data-add="${k}">${l}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');
   $("dbody").onclick=e=>{const k=e.target.dataset.add;if(k){$("dlg").close();openForm(null,{type:k})}};
+}
+function delRec(id){
+  const k=S.records.findIndex(r=>r.id===id);if(k<0)return;const r0=S.records[k];
+  adjInv(r0.iu,[]);S.records.splice(k,1);save();render();
+  toast("Entry deleted",()=>{S.records.splice(Math.min(k,S.records.length),0,r0);adjInv([],r0.iu);save();render()});
+}
+function partEdit(i){
+  const v=veh(),x=v.plist[i];if(!x)return;
+  let vals=String(x.v||"").split("\n");if(!vals.length)vals=[""];
+  show(`<h3 style="margin:0">Edit part</h3><label>Category</label><input id="pe_l" value="${esc(x.l)}"><label>Part numbers / brands</label><div id="pe_v"></div><button type="button" class="p" id="pe_a" style="margin-top:8px;width:100%">+ Add another</button>${btns}<button type="button" id="pe_d" style="margin-top:8px;width:100%;color:var(--bad)">Delete this category</button>`);
+  const sy=()=>{vals=[...$("pe_v").querySelectorAll(".pev")].map(z=>z.value)};
+  const dr=()=>{$("pe_v").innerHTML=vals.map((z,k)=>`<div class="row" style="margin-top:6px"><input class="pev" value="${esc(z)}" placeholder="Part number / brand"><button type="button" data-px="${k}">\u2715</button></div>`).join("")};dr();
+  $("pe_a").onclick=()=>{sy();vals.push("");dr();const a=$("pe_v").querySelectorAll(".pev");a[a.length-1].focus()};
+  $("pe_v").onclick=e=>{const k=e.target.dataset.px;if(k!=null){sy();vals.splice(+k,1);if(!vals.length)vals=[""];dr()}};
+  $("ok").onclick=()=>{const l=$("pe_l").value.trim();if(!l)return;sy();x.l=l;x.v=vals.map(z=>z.trim()).filter(Boolean).join("\n");save();$("dlg").close();render()};
+  $("pe_d").onclick=()=>{const old=v.plist.slice();v.plist.splice(i,1);save();$("dlg").close();render();toast("Category deleted",()=>{v.plist=old;save();render()})};
 }
 function snoozeDlg(id){
   const r=S.records.find(z=>z.id===id);if(!r)return;
@@ -365,7 +385,7 @@ function render(){
   const vt=inV?vTabs(v):[],tl=inV?[...vt.filter(t=>MAIN.includes(t[0])),["more",(vt.find(t=>t[0]===tab&&!MAIN.includes(t[0]))||[0,"More"])[1]+" ▾"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
   $("tabs").className="tabs"+(inV?" wrap":"");$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)||(k==="more"&&inV&&!MAIN.includes(tab))?"on":""}" data-t="${k}">${l}</button>`).join("");
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
-  $("fab").style.display="";$("fabE").style.display=(inV&&tab!=="dash")||(view==="garage"&&act().length>1)?"":"none";$("fabE").textContent=em&&!(inV&&tab==="parts")?"✓":"✎";
+  $("fab").style.display="";$("fabE").style.display=view==="garage"&&act().length>1?"":"none";$("fabE").textContent=em?"✓":"⇅";
   const L=$("list");L.className=ch?"fresh":"";
   if(inV)L.innerHTML=`<div class="hero${v.cover?"":" nc"}" style="--k:${KC[v.kind]||KC.other}">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}</div>`+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
   else if(view==="inventory")L.innerHTML=invView();
@@ -376,21 +396,21 @@ function dashView(v){
   pseudo(v).forEach(r=>up.push({r,i:rinfo(r,lo)}));
   up.sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
   const rec=S.records.filter(r=>r.vid===v.id&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,6);
-  const upH=up.length?up.map(({r,i})=>`<div class="c sc st${i.st}"><h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders.</div>';
+  const upH=up.length?up.map(({r,i})=>`<div class="c ce sc st${i.st}">${r.id?`<button class="ed" data-edit="${r.id}" title="Edit">\u270e</button>`:r.pk?`<button class="ed" data-vedit="1" title="Edit dates">\u270e</button>`:""}<h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders.</div>';
   const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
-    return `<div class="c sc st${r.type==="repair"?1:0}"><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div><button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
+    return `<div class="c ce sc st${r.type==="repair"?1:0}"><button class="ed" data-edit="${r.id}" title="Edit">\u270e</button><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div><button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
   return `<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">🔍 Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+rclCard(v)+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH;
 }
 function garageView(){
   if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
   return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(String(x.v).split("\n")[0])}${String(x.v).split("\n").length>1?" +"+(String(x.v).split("\n").length-1):""}</span>`).join(""),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:6px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join(" · ");
-    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
+    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><button class="ed" data-vedit2="${v.id}" title="Edit">\u270e</button><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
 }
 function recView(v){
   let out=isT(v.id)?"":`<div class="m" style="margin-bottom:10px">${lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>`;
   const rows=S.records.filter(r=>r.vid===v.id&&r.type===tab).sort((a,b)=>tab==="reminder"?(a.date||"9").localeCompare(b.date||"9"):(b.date||"").localeCompare(a.date||"")||b.odo-a.odo);
   if(!rows.length)out+='<div class="empty"><div class="ei">🔧</div>Nothing here yet.<br>Tap + to add.</div>';
-  return out+(em?'<div class="m" style="margin-bottom:8px;color:var(--ac)">Edit mode: use Edit or Delete on an entry, then tap ✓ when done.</div>':"")+rows.map(card).join("");
+  return out+rows.map(card).join("");
 }
 function card(r){
   const odo=r.odo!==""&&r.odo!=null?`${(+r.odo).toLocaleString()} ${dU(r.vid)}`:"";
@@ -399,16 +419,16 @@ function card(r){
   if(r.type==="reminder"){const i=rinfo(r,lastOdo(r.vid));extra=r.done?'<span class="tag">Done</span>':tag(i.st);meta=["Due",r.date,odo].filter(Boolean).join(" · ")+(r.done?"":` (${i.txt})`)+(r.rep>0?" · repeats every "+repTxt(r.rep):"")}
   const rc=(r.rc||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}">`).join("");
   const sk=r.type==="reminder"?"st"+(r.done?"n":rinfo(r,lastOdo(r.vid)).st):({service:"st0",repair:"st1",upgrade:"stu"})[r.type]||"";
-  return `<div class="c${sk?" sc "+sk:""}"><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${PH.includes(r.type)?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}${em?`<div class="row" style="margin-top:10px"><button class="p" data-edit="${r.id}" style="flex:1">Edit</button><button data-del="${r.id}" style="flex:1">Delete</button></div>`:""}</div>`;
+  return `<div class="c ce${sk?" sc "+sk:""}"><button class="ed" data-edit="${r.id}" title="Edit">✎</button><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${PH.includes(r.type)?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`;
 }
 function partsView(v){
   const top=[["License plate",["car","trailer"].includes(v.kind)?v.plate:""],["OHV sticker expires",v.kind==="offroad"?v.ohv:""],["Registration expires",v.kind!=="mower"?v.reg:""],...(v.dts||[]).map(x=>[x.l||"Other date",x.date]),["VIN / serial #",v.vin]].filter(x=>x[1]).map(([l,x])=>`<div class="sp"><span class="m">${l}</span><span>${esc(x)}</span></div>`).join("");
-  return (top?`<div class="sec" style="margin-top:4px">Info</div><div class="c">${top}</div>`:"")+`<div class="sec"${top?"":' style="margin-top:4px"'}>Parts</div><div class="c">${(v.plist||[]).map(r=>`<div class="sp"><span class="m">${esc(r.l)}</span><span style="white-space:pre-wrap;text-align:right">${esc(r.v||"—")}</span></div>`).join("")||'<div class="m">No parts yet. Tap + to add one as you go.</div>'}</div>`;
+  return (top?`<div class="sec" style="margin-top:4px">Info<a data-vedit="1">Edit</a></div><div class="c">${top}</div>`:"")+`<div class="sec"${top?"":' style="margin-top:4px"'}>Parts${(v.plist||[]).length>1?'<a data-specs="1">Reorder</a>':""}</div><div class="c">${(v.plist||[]).map((r,i)=>`<div class="sp"><span class="m">${esc(r.l)}</span><span style="white-space:pre-wrap;text-align:right;flex:1">${esc(r.v||"—")}</span><button class="ed2" data-pedit="${i}" title="Edit">\u270e</button></div>`).join("")||'<div class="m">No parts yet. Tap + to add one as you go.</div>'}</div>`;
 }
 function invView(){
   let a=S.inv.filter(i=>ic==="All"||i.cat===ic).sort((x,y)=>x.cat.localeCompare(y.cat)||x.name.localeCompare(y.name));
   if(!a.length)return'<div class="empty"><div class="ei">🛢️</div>No items yet.<br>Tap + to add oil, grease, filters or parts on hand.</div>';
-  return a.map(i=>`<div class="c"><button class="x" data-idel="${i.id}">✕</button><h3 data-iedit="${i.id}">${esc(i.name)}${i.qty<=0?'<span class="tag bad">Out</span>':i.qty<=(i.low!==""&&i.low!=null?+i.low:1)?'<span class="tag warn">Low</span>':""}<span class="tag">${i.cat}</span></h3>${(i.pns||[]).map(x=>`<div class="m">${esc(x)}</div>`).join("")}${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
+  return a.map(i=>`<div class="c"><button class="x" data-idel="${i.id}" title="Remove">✕</button><button class="x" data-iedit="${i.id}" title="Edit">\u270e</button><h3 data-iedit="${i.id}">${esc(i.name)}${i.qty<=0?'<span class="tag bad">Out</span>':i.qty<=(i.low!==""&&i.low!=null?+i.low:1)?'<span class="tag warn">Low</span>':""}<span class="tag">${i.cat}</span></h3>${(i.pns||[]).map(x=>`<div class="m">${esc(x)}</div>`).join("")}${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
 }
 function shrink(f,mx=800,q=.65){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,mx/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",q))};i.src=r.result};r.readAsDataURL(f)})}
 const up=async d=>{try{const b=await (await fetch(d)).blob(),r=await F("api/photo",{method:"POST",headers:{"Content-Type":b.type||"image/jpeg"},body:b});if(r.ok){const j=await r.json();if(j&&j.url)return j.url}}catch(e){}return d};
@@ -428,7 +448,8 @@ function openForm(id,pre){
   ${sr?'<label>Parts used</label><div class="row" style="margin-top:6px"><button type="button" class="p" id="addpt" style="flex:1">+ Bought for this job</button>'+(S.inv.length?'<button type="button" id="addiv" style="flex:1">\u2212 Take from inventory</button>':"")+'</div><div id="pls"></div>'+(S.inv.length?'<select id="ivs" style="display:none"></select><div id="ius"></div>':""):""}
   ${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
     <label>Notes</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
-  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${t==="service"&&!id?'<label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--tx)"><input type="checkbox" id="f_job" style="width:auto;margin:0"> Save as a quick job (remembers parts and interval)</label>':""}${btns}`);
+  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${t==="service"&&!id?'<label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--tx)"><input type="checkbox" id="f_job" style="width:auto;margin:0"> Save as a quick job (remembers parts and interval)</label>':""}${btns}${id?'<button type="button" id="f_del" style="margin-top:8px;width:100%;color:var(--bad)">Delete this entry</button>':""}`);
+  if($("f_del"))$("f_del").onclick=()=>{$("dlg").close();delRec(id)};
   const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${pu(p)}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
   grp("ph","pf",ph,800,.65);grp("rc","rf",rc,1600,.7);
   if($("pfb"))$("pfb").onclick=()=>$("pf").click();if($("rcb"))$("rcb").onclick=()=>$("rf").click();
@@ -625,12 +646,14 @@ $("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}el
 $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(t==="more")return moreMenu();if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
 $("bn").onclick=e=>{const v=e.target.dataset.v;if(v){view=v;render()}};
 $("fab").onclick=()=>view==="vehicle"?(tab==="dash"?addChooser():tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
-$("fabE").onclick=()=>{if(view==="vehicle"&&tab==="parts")specForm();else{em=!em;render()}};
+$("fabE").onclick=()=>{em=!em;render()};
 $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");
-  if(d.qodo2)qOdo(d.qodo2);
+  if(d.vedit2){S.cur=d.vedit2;vehForm(true)}
+  else if(d.vedit)vehForm(true);
+  else if(d.pedit!=null)partEdit(+d.pedit);
+  else if(d.qodo2)qOdo(d.qodo2);
   else if(d.mv)mvVeh(d.mv);
   else if(op){S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
-  else if(d.del){const k=S.records.findIndex(r=>r.id===d.del);if(k>=0){const r0=S.records[k];adjInv(r0.iu,[]);S.records.splice(k,1);save();render();toast("Entry deleted",()=>{S.records.splice(Math.min(k,S.records.length),0,r0);adjInv([],r0.iu);save();render()})}}
   else if(d.edit)openForm(d.edit);
   else if(d.done){const r=S.records.find(x=>x.id===d.done);r.done=true;save();render();logFrom(r)}
   else if(d.renew)renewDlg(d.renew);
