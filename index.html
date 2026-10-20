@@ -123,6 +123,7 @@ details summary{cursor:pointer;padding:4px 0}
 .c.ce{padding-right:58px}
 .vc-b{position:relative}.vc-b .ed{top:12px}.vc-b h3,.vc-b>.m{padding-right:44px}
 .ed2{flex:none;width:34px;height:34px;padding:0;border-radius:50%;font-size:15px;line-height:1;background:var(--field);color:var(--mu);align-self:center}
+.upd{position:relative}.upd::after{content:"";position:absolute;top:7px;right:7px;width:10px;height:10px;border-radius:50%;background:var(--ac);box-shadow:0 0 0 2px var(--bg)}
 @keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
 #sd{flex:none;width:31px;height:31px;padding:10px;background:var(--mu);background-clip:content-box;border-radius:50%;cursor:pointer}
 body[data-sync=ok] #sd{background:var(--ac);background-clip:content-box}
@@ -144,6 +145,7 @@ body[data-sync=off] #sd{background:var(--bad);background-clip:content-box}
 <script>
 const APP_V="__VERSION__",APP_B="__BUILD__";
 // Inside the Android app the page is bundled with the app. The server is optional there.
+let UPD=null;
 const APP=!!(window.Capacitor&&(Capacitor.isNativePlatform?Capacitor.isNativePlatform():true));
 let SRV={};try{SRV=JSON.parse(localStorage.getItem("garagelog-server")||"{}")||{}}catch(e){}
 const BASE=APP&&SRV.u?SRV.u:"",SYNC=!APP||!!BASE;
@@ -380,7 +382,7 @@ function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
   const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key}
   const v=veh(),inV=view==="vehicle"&&v;
-  $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="ev">✎</button><button id="more">⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="more">⋯</button>`;
+  $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="ev">✎</button><button id="more"${UPD?' class="upd"':""}>⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="more"${UPD?' class="upd"':""}>⋯</button>`;
   const pk=KINDS.filter(k=>act().some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
   const vt=inV?vTabs(v):[],tl=inV?[...vt.filter(t=>MAIN.includes(t[0])),["more",(vt.find(t=>t[0]===tab&&!MAIN.includes(t[0]))||[0,"More"])[1]+" ▾"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
   $("tabs").className="tabs"+(inV?" wrap":"");$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)||(k==="more"&&inV&&!MAIN.includes(tab))?"on":""}" data-t="${k}">${l}</button>`).join("");
@@ -573,6 +575,21 @@ function invForm(id){
 }
 const restore=t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;const rv=S.rev;S=Object.assign({inv:[],units:"imperial"},d);S.rev=rv;S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
 const inlined=async()=>{const c=clone(S),g=async u=>{if(!u||u.startsWith("data:"))return u;try{const b=await (await fetch(pu(u))).blob();return await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)})}catch(e){return u}};for(const v of c.vehicles)if(v.cover)v.cover=await g(v.cover);for(const r of c.records){r.ph=await Promise.all((r.ph||[]).map(g));r.rc=await Promise.all((r.rc||[]).map(g))}return c};
+// Android app: ask GitHub whether a newer build has been published. Looks once a day, or when asked.
+async function checkUpd(force){
+  if(!APP||/^__/.test(APP_V))return;
+  const old=s=>String(s||"").replace(/^v/,"").split(".").map(Number),gt=(a,b)=>{a=old(a);b=old(b);for(let i=0;i<3;i++){if((a[i]||0)!==(b[i]||0))return(a[i]||0)>(b[i]||0)}return false};
+  let c=null;try{c=JSON.parse(localStorage.getItem("garagelog-upd")||"null")}catch(e){}
+  if(!force&&c&&Date.now()-c.t<864e5){UPD=c.v&&gt(c.v,APP_V)?c:null;return}
+  try{
+    const r=await fetch("https://api.github.com/repos/Orangitaz/garagelogger-android/releases/latest",{headers:{Accept:"application/vnd.github+json"}});
+    if(!r.ok)throw 0;const j=await r.json(),v=String(j.tag_name||"").replace(/^v/,"");
+    const a=(j.assets||[]).find(x=>/\.apk$/.test(x.name)),url=a?a.browser_download_url:j.html_url;
+    c={t:Date.now(),v,url};try{localStorage.setItem("garagelog-upd",JSON.stringify(c))}catch(e){}
+    UPD=v&&gt(v,APP_V)?c:null;
+  }catch(e){}
+  if(!force&&$("hd"))redraw();
+}
 async function connectServer(u,pw){
   const m=$("sv_m");u=(u||"").trim();if(!u){m.textContent="Enter the server address.";return}
   if(!/^https?:\/\//i.test(u))u="http://"+u;u=u.replace(/\/+$/,"")+"/";
@@ -610,6 +627,7 @@ function dataForm(){
   <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
   <label>Quick-pick services</label><div class="row"><select id="qk">${KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select><button id="qke" style="flex:none">Edit list</button></div>
   ${APP?`<label>Server (optional)</label><div class="m" style="margin-top:4px">${BASE?"Syncing with "+esc(BASE):"Not connected. Everything is saved on this phone only. Add your Garage Log server to sync, back up photos and documents, and get alerts."}</div><input id="sv_u" type="url" inputmode="url" placeholder="http://192.168.1.50:30080" value="${esc(BASE)}" style="margin-top:6px"><input id="sv_p" type="password" placeholder="Server password (if you set one)" value="${esc(SRV.pw||"")}" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="p" id="sv_go" style="flex:1">${BASE?"Save":"Connect"}</button>${BASE?'<button id="sv_off" style="flex:1">Disconnect</button>':""}</div><div class="m" id="sv_m" style="margin-top:6px"></div>`:""}
+  ${APP?`<label>App updates</label><div class="m" id="up_m" style="margin-top:4px">Checking\u2026</div>`:""}
   ${SYNC?`<label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
   <div class="row" style="margin-top:6px"><select id="al_f"><option value="text" ${al.fmt!=="json"?"selected":""}>ntfy / text</option><option value="json" ${al.fmt==="json"?"selected":""}>JSON webhook</option></select><select id="al_h">${[...Array(18).keys()].map(i=>i+5).map(h=>`<option value="${h}" ${(+al.hour||8)===h?"selected":""}>${h%12||12}:00 ${h<12?"AM":"PM"}</option>`).join("")}</select></div>
   <div class="row" style="margin-top:6px"><button id="al_t" style="flex:1">Send test message</button></div>
@@ -633,6 +651,7 @@ function dataForm(){
   $("rfb").onclick=()=>$("rf").click();
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
   $("csvb").onclick=()=>csvExport();
+  if(APP)checkUpd(true).then(()=>{const m=$("up_m");if(!m)return;m.innerHTML=UPD?`Version ${esc(UPD.v)} is available (you have ${esc(APP_V)}). <a href="${esc(UPD.url)}" style="color:var(--ac);font-weight:700">Download the update</a>, open it, and Android will update the app. Your data stays.`:"You have the latest version ("+esc(APP_V)+")."});
   if($("sv_go")){$("sv_go").onclick=()=>connectServer($("sv_u").value,$("sv_p").value);
     if($("sv_off"))$("sv_off").onclick=()=>{if(!confirm("Disconnect from the server? Your data stays on this phone and on the server."))return;try{localStorage.removeItem("garagelog-server");localStorage.removeItem("garagelog-base")}catch(e){}location.reload()}}
   if(SYNC)F("api/backups",{cache:"no-store"}).then(r=>r.json()).then(L=>{const b=$("bkl");if(!b)return;b.innerHTML=L.length?`A copy is saved before the first change each day, and up to 14 are kept on your server. Tap one to download it, then use Restore from file.`+L.map(x=>`<div class="sp"><a href="backups/${esc(x.name)}" download style="color:var(--ac)">${esc(x.date)}</a><span class="m">${Math.max(1,Math.round(x.size/1024))} KB</span></div>`).join(""):"No copies yet. The first one appears after your next change."}).catch(()=>{if($("bkl"))$("bkl").textContent="Couldn't load the list."});
@@ -738,6 +757,7 @@ const pull=f=>{
 addEventListener("online",()=>pull());addEventListener("offline",()=>setSync("off","offline (saved on this device only)"));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 pull();loadRc();
+if(APP)checkUpd();
 (function(){let a="";try{a=new URLSearchParams(location.search).get("a")||""}catch(e){}
   if(!a)return;try{history.replaceState(null,"",location.pathname)}catch(e){}
   if(a==="inventory"){view="inventory";render()}

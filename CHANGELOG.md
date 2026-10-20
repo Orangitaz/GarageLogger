@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.7.0 - 2026-10-20
+- **Android app tells you when an update is out.** A green dot appears on the ⋯ button, and Settings & data > App updates links straight to the new APK. The APK is now published as a GitHub Release automatically.
+
 ## 1.6.0 - 2026-10-20
 - **Edit pencil on each tile.** Every service, repair, upgrade, reminder, note and odometer tile, every dashboard tile, every part category, every inventory item and every garage card has its own ✎ that opens just that item. The floating edit button inside equipment is gone.
 - **Delete** moved inside the edit form (with Undo). On the Parts tab, **Edit** (Info) and **Reorder** (Parts) sit in the section headings.
