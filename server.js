@@ -165,6 +165,8 @@ const body=(req,limit,cb)=>{
 };
 // Calendar subscriptions can't send a password, so when one is set the feed uses a private link instead.
 const CALT=PASS?crypto.createHmac("sha256",PASS).update("garagelog-calendar").digest("hex").slice(0,32):"";
+const ROT=PASS?crypto.createHmac("sha256",PASS).update("garagelog-readonly").digest("hex").slice(0,32):"";
+const roOk=req=>{if(!ROT)return false;const q=new URLSearchParams(req.url.split("?")[1]||""),t=q.get("t")||q.get("ro")||"";return t.length===ROT.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(ROT))};
 const calOk=req=>{if(!CALT)return true;const t=new URLSearchParams(req.url.split("?")[1]||"").get("t")||"";return t.length===CALT.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(CALT))};
 const icsText=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
 const icsFold=l=>(l.match(/[\s\S]{1,72}/g)||[l]).join("\r\n ");
@@ -205,13 +207,14 @@ http.createServer((req,res)=>{
   }
   if(req.method==="OPTIONS"){res.writeHead(204).end();return}
   // Optional password (GARAGE_PASSWORD). The icons, manifest and health check stay open so installing the app still works.
-  if(PASS&&!ST[u]&&u!=="/healthz"&&!((u==="/calendar.ics"||u.startsWith("/photos/")||u.startsWith("/docs/"))&&calOk(req))&&!authed(req)){
+  if(PASS&&!ST[u]&&u!=="/healthz"&&!((u==="/calendar.ics"||u.startsWith("/photos/")||u.startsWith("/docs/"))&&(calOk(req)||(u!=="/calendar.ics"&&roOk(req))))&&!((u==="/api/state"||u==="/"||u==="/index.html")&&req.method==="GET"&&roOk(req))&&!authed(req)){
     req.resume();
     return setTimeout(()=>{res.writeHead(401,{"WWW-Authenticate":'Basic realm="Garage Log", charset="UTF-8"',"Content-Type":"text/plain"});res.end("Password required")},400);
   }
   if(u==="/api/state"){
     if(req.method==="GET"){
       let d="{}";try{d=fs.readFileSync(FILE,"utf8")}catch(e){}
+      if(!authed(req)){try{const j=JSON.parse(d);delete j.alert;d=JSON.stringify(j)}catch(e){d="{}"}}
       res.writeHead(200,JSON_H);return res.end(d);
     }
     if(req.method==="PUT")return body(req,300e6,buf=>{
@@ -259,6 +262,7 @@ http.createServer((req,res)=>{
     res.writeHead(200,JSON_H);return res.end(JSON.stringify({overdue,due_soon:items.length-overdue,total:items.length,vehicles}));
   }
   if(u==="/calendar.ics"&&req.method==="GET"){res.writeHead(200,{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"no-store"});return res.end(calendar(read()))}
+  if(u==="/api/readonly"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({t:ROT}))}
   if(u==="/api/calendar"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({path:"calendar.ics"+(CALT?"?t="+CALT:""),t:CALT}))}
   if(u==="/api/backups"&&req.method==="GET"){
     let L=[];try{L=fs.readdirSync(BACKUPS).filter(x=>/^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().reverse().map(n=>({name:n,date:n.slice(3,13),size:fs.statSync(path.join(BACKUPS,n)).size}))}catch(e){}
