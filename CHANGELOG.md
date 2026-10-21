@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.8.2 - 2026-10-21
+- Fixed the empty record lists showing a code (U0001F527) instead of the wrench icon.
+
 ## 1.8.1 - 2026-10-21
 - Removed the Android app lock option (it did not work on the phone).
 

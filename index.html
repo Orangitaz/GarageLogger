@@ -447,8 +447,8 @@ function recRows(v){
     if(rch!=="all"){if(tab==="reminder"){const st=r.done?-1:rinfo(r,lo).st;if(rch==="over"&&st!==2)return false;if(rch==="up"&&!(st>=0&&st<2))return false;if(rch==="done"&&!r.done)return false}else if((r.date||"").slice(0,4)!==rch)return false}
     if(q){const h=[r.desc,...(r.dl||[]),r.notes,r.date,r.odo,...partsOf(r)].join(" ").toLowerCase();if(!q.split(/\s+/).every(w=>h.includes(w)))return false}
     return true});
-  if(!all.length)return`<div class="empty"><div class="ei">\U0001F527</div>Nothing here yet.<br>Tap + to add.<br><button class="p" data-addrec="1">＋ Add ${esc((TYPES.find(t=>t[0]===tab)||[0,"record"])[1].toLowerCase())}</button></div>`;
-  if(!rows.length)return'<div class="empty"><div class="ei">\U0001F50D</div>Nothing matches.<br>Clear the search or pick All.</div>';
+  if(!all.length)return`<div class="empty"><div class="ei">\u{1F527}</div>Nothing here yet.<br>Tap + to add.<br><button class="p" data-addrec="1">＋ Add ${esc((TYPES.find(t=>t[0]===tab)||[0,"record"])[1].toLowerCase())}</button></div>`;
+  if(!rows.length)return'<div class="empty"><div class="ei">\u{1F50D}</div>Nothing matches.<br>Clear the search or pick All.</div>';
   return rows.map(card).join("");
 }
 function usageCard(v){
