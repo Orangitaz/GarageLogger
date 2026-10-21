@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.8.1 - 2026-10-21
+- Removed the Android app lock option (it did not work on the phone).
+
 ## 1.8.0 - 2026-10-21
 - **Swipe on reminders:** swipe right to mark done (or renew), swipe left to snooze.
 - **Search and filter** on every record list: a search box (notes, parts, dates) and chips for years, or Overdue / Upcoming / Done on reminders.
@@ -10,7 +13,6 @@ Each release has a number: **major.minor.patch**. A new feature raises the minor
 - **Accent color per piece of equipment** (Edit equipment > Color).
 - **Friendlier empty screens**, smoother screen and sheet motion, and pull down to sync.
 - **Help & tips** in Settings & data, with search.
-- **Android app lock:** optional fingerprint, face or screen lock (Settings & data > App lock). Install the new APK once to get it.
 
 ## 1.7.0 - 2026-10-20
 - **Android app tells you when an update is out.** A green dot appears on the ⋯ button, and Settings & data > App updates links straight to the new APK. The APK is now published as a GitHub Release automatically.

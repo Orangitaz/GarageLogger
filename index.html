@@ -155,9 +155,6 @@ body{overscroll-behavior-y:contain}
 .uc svg{display:block;width:100%;height:auto}
 .uc .big{font-size:22px;font-weight:800;letter-spacing:-.02em}
 #ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);z-index:30;padding:8px 16px;border-radius:99px;background:var(--pop);border:1px solid var(--bd);box-shadow:var(--sh);font-size:13px;color:var(--mu);opacity:0;pointer-events:none}
-#lock{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
-#lock[hidden]{display:none}
-#lock .ei{font-size:60px;margin-bottom:10px}
 .hp summary{cursor:pointer;font-weight:700;padding:14px 4px;list-style:none}.hp summary::-webkit-details-marker{display:none}
 .hp summary::after{content:"+";float:right;color:var(--ac);font-size:20px;line-height:1}.hp[open] summary::after{content:"\2212"}
 .hp{border-bottom:1px solid var(--bd)}.hp .hb{padding:0 4px 14px;color:var(--mu);font-size:14px;line-height:1.55}.hp .hb p{margin:0 0 8px}
@@ -173,7 +170,6 @@ body{overscroll-behavior-y:contain}
 <button class="fab fabl p" id="fabE" title="Reorder equipment" style="display:none">⇅</button>
 <div id="bn"><button data-v="garage"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>Garage</button><button data-v="inventory"><svg viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>Inventory</button></div>
 <div id="toast" hidden></div>
-<div id="lock" hidden><div><div class="ei">🔒</div><h2 style="margin:0 0 6px">Garage Log is locked</h2><div class="m" style="margin-bottom:18px">Use your fingerprint, face or screen lock to open it.</div><button class="p" id="lkb">Unlock</button></div></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
 <div id="pv" hidden></div>
 <script>
@@ -508,7 +504,7 @@ const HELP=[
 ["Syncing with your server","<p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
 ["Backups and moving to a new phone","<p>Settings &amp; data has <b>Download backup</b> and <b>Restore from file</b>. With a server, a copy is also saved there every day and the last 14 are kept. To move the Android app to a new phone, take a backup first and restore it on the new one.</p>"],
 ["Reminder alerts and calendar","<p>With a server, <b>Settings &amp; data &gt; Reminder alerts</b> sends a notification when something becomes due. Enter an ntfy address (such as https://ntfy.sh/your-topic) or a JSON webhook for Home Assistant or Gotify, then press <b>Send test message</b>.</p><p><b>Get calendar link</b> gives you an address to subscribe to in a calendar app so due dates show up there.</p>"],
-["Android app: updates and lock","<p>A green dot on the ⋯ button means a newer version of the app is available. Open <b>Settings &amp; data &gt; App updates</b> and tap the link to download it, then install it over the old one. Your data is kept.</p><p>You can also lock the app with your fingerprint, face or screen lock under <b>Settings &amp; data &gt; App lock</b>.</p>"],
+["Android app: updates","<p>A green dot on the ⋯ button means a newer version of the app is available. Open <b>Settings &amp; data &gt; App updates</b> and tap the link to download it, then install it over the old one. Your data is kept.</p>"],
 ["Something is not working","<p><b>Can't connect to the server:</b> check the address and port, that the phone is on the same network, and open the same address in the phone's browser.</p><p><b>A change did not appear on another device:</b> pull down to refresh, or check the header dot. Changes made on two devices are merged.</p><p><b>An old version is showing on the NAS:</b> set the image tag to the newest version number instead of <b>latest</b>.</p>"]
 ];
 function helpForm(){
@@ -737,7 +733,6 @@ function dataForm(){
   <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
   <label>Quick-pick services</label><div class="row"><select id="qk">${KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select><button id="qke" style="flex:none">Edit list</button></div>
   ${APP?`<label>Server (optional)</label><div class="m" style="margin-top:4px">${BASE?"Syncing with "+esc(BASE):"Not connected. Everything is saved on this phone only. Add your Garage Log server to sync, back up photos and documents, and get alerts."}</div><input id="sv_u" type="url" inputmode="url" placeholder="http://192.168.1.50:30080" value="${esc(BASE)}" style="margin-top:6px"><input id="sv_p" type="password" placeholder="Server password (if you set one)" value="${esc(SRV.pw||"")}" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="p" id="sv_go" style="flex:1">${BASE?"Save":"Connect"}</button>${BASE?'<button id="sv_off" style="flex:1">Disconnect</button>':""}</div><div class="m" id="sv_m" style="margin-top:6px"></div>`:""}
-  ${APP?`<label>App lock</label><select id="lk_s"><option value="0">Off</option><option value="1">Fingerprint, face or screen lock</option></select><div class="m" id="lk_m" style="margin-top:4px">Ask for it when the app opens or comes back after a while.</div>`:""}
   ${APP?`<label>App updates</label><div class="m" id="up_m" style="margin-top:4px">Checking\u2026</div>`:""}
   ${SYNC?`<label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
   <div class="row" style="margin-top:6px"><select id="al_f"><option value="text" ${al.fmt!=="json"?"selected":""}>ntfy / text</option><option value="json" ${al.fmt==="json"?"selected":""}>JSON webhook</option></select><select id="al_h">${[...Array(18).keys()].map(i=>i+5).map(h=>`<option value="${h}" ${(+al.hour||8)===h?"selected":""}>${h%12||12}:00 ${h<12?"AM":"PM"}</option>`).join("")}</select></div>
@@ -753,12 +748,6 @@ function dataForm(){
   $("hlp").onclick=()=>helpForm();
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
-  if($("lk_s")){$("lk_s").value=lockOn()?"1":"0";$("lk_s").onchange=async()=>{const m=$("lk_m");
-    if($("lk_s").value==="0"){try{localStorage.removeItem("garagelog-lock")}catch(e){}m.textContent="App lock is off.";return}
-    const B=BIO();let ok=false;try{ok=!!B&&(await B.checkBiometry()).isAvailable}catch(e){}
-    if(!ok){$("lk_s").value="0";m.textContent="This phone has no fingerprint, face or screen lock set up, or this app version can't use it.";return}
-    try{await B.authenticate({reason:"Turn on app lock",cancelTitle:"Cancel",allowDeviceCredential:true,androidTitle:"Garage Log"});try{localStorage.setItem("garagelog-lock","1")}catch(e){}m.textContent="App lock is on."}
-    catch(e){$("lk_s").value="0";m.textContent="App lock was not turned on."}}}
   $("qke").onclick=()=>presetForm($("qk").value);
   const sa=()=>{const u=$("al_u").value.trim();if(u)S.alert={url:u,fmt:$("al_f").value,hour:+$("al_h").value,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};else delete S.alert;save()};
   if(SYNC)["al_u","al_f","al_h"].forEach(i=>$(i).onchange=sa);
@@ -903,19 +892,6 @@ if(APP)checkUpd();
   addEventListener("touchend",async()=>{if(y0==null)return;const go=pd>70;y0=null;if(!go){rst();return}el.textContent="Refreshing…";el.style.transition="transform .2s";el.style.transform="translate(-50%,16px)";
     try{if(SYNC)await pull(true);else render()}catch(e){}el.textContent=SYNC?"Up to date":"Refreshed";setTimeout(rst,700)});
 })();
-// ---- app lock (Android app)
-const BIO=()=>APP&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.BiometricAuth;
-const lockOn=()=>{try{return localStorage.getItem("garagelog-lock")==="1"}catch(e){return false}};
-let lockAt=Date.now();
-async function unlock(){const B=BIO(),o=$("lock");
-  if(!B){o.hidden=true;return}
-  try{const c=await B.checkBiometry();if(!c||!c.isAvailable){o.hidden=true;return}}catch(e){o.hidden=true;return}
-  try{await B.authenticate({reason:"Unlock Garage Log",cancelTitle:"Cancel",allowDeviceCredential:true,androidTitle:"Garage Log"});o.hidden=true}catch(e){}
-}
-function showLock(){if(!lockOn()||!BIO())return;$("lock").hidden=false;unlock()}
-$("lkb").onclick=unlock;
-document.addEventListener("visibilitychange",()=>{if(document.hidden)lockAt=Date.now();else if(Date.now()-lockAt>30e3)showLock()});
-showLock();
 (function(){let a="";try{a=new URLSearchParams(location.search).get("a")||""}catch(e){}
   if(!a)return;try{history.replaceState(null,"",location.pathname)}catch(e){}
   if(a==="inventory"){view="inventory";render()}
