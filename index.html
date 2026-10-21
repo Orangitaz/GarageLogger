@@ -66,7 +66,7 @@ main{padding:16px;max-width:640px;margin:auto}
 .hero{position:relative;height:170px;border-radius:22px;overflow:hidden;margin-bottom:14px;border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 75% 15%,color-mix(in srgb,var(--k) 70%,transparent),transparent 60%),linear-gradient(135deg,color-mix(in srgb,var(--k) 38%,#000),color-mix(in srgb,var(--k) 8%,var(--pop)))}
 .hero.nc{height:112px}
 .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.4),transparent 55%)}
+.hero::after{pointer-events:none;content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.4),transparent 55%)}
 .fab{position:fixed;right:18px;bottom:calc(92px + env(safe-area-inset-bottom,0px));width:60px;height:60px;border-radius:50%;font-size:30px;line-height:1;padding:0;z-index:6;box-shadow:0 14px 30px -8px var(--ac)}
 .fabl{right:auto;left:18px}
 #bn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(92vw,380px);display:flex;gap:6px;padding:6px;background:var(--hbg);-webkit-backdrop-filter:blur(20px) saturate(1.5);backdrop-filter:blur(20px) saturate(1.5);border:1px solid var(--bd);border-radius:26px;box-shadow:0 18px 40px -14px rgba(0,0,0,.6);z-index:6}
@@ -130,6 +130,39 @@ body[data-sync=ok] #sd{background:var(--ac);background-clip:content-box}
 body[data-sync=busy] #sd{background:var(--warn);background-clip:content-box;animation:pulse 1s ease-in-out infinite}
 body[data-sync=off] #sd{background:var(--bad);background-clip:content-box}
 @keyframes pulse{50%{opacity:.35}}
+
+:root{--okc:var(--ac)}
+.st0{--sc:var(--okc)}.tag.ok{--c:var(--okc)}
+body{overscroll-behavior-y:contain}
+.c[data-sw]{touch-action:pan-y;position:relative;transition:transform .2s}
+.c.swr,.c.swl{transition:none}
+.c.swr{border-color:var(--ac)}.c.swl{border-color:var(--warn)}
+.c.swr::after,.c.swl::after{position:absolute;right:56px;top:16px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--field)}
+.c.swr::after{content:"\2713 Release for done";color:var(--ac)}.c.swl::after{content:"Release to snooze";color:var(--warn)}
+.rsb{margin:0 0 10px}.chs{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px}
+.chs button{flex:none;padding:7px 14px;border-radius:99px;font-size:13px}
+.chs button.on{background:color-mix(in srgb,var(--ac) 18%,var(--field));border-color:var(--ac);color:var(--ac)}
+.empty button.p{margin-top:16px}
+#lb{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;overflow:hidden;animation:pop .2s both}
+#lb img{max-width:100%;max-height:100%;touch-action:none;user-select:none;-webkit-user-drag:none;transition:transform .12s}
+#lb .lbx{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;width:44px;height:44px;border-radius:50%;padding:0;z-index:2}
+#lb .lbn{position:absolute;top:50%;width:44px;height:64px;margin-top:-32px;padding:0;font-size:30px;border-radius:14px;z-index:2;opacity:.8}
+#lb .lbp{left:8px}#lb .lbf{right:8px}
+#lb .lbc{position:absolute;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#fff;font-size:14px}
+.cs{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.cs button{width:34px;height:34px;padding:0;border-radius:50%;border:2px solid transparent;font-size:12px}
+.cs button.on{border-color:var(--tx);box-shadow:0 0 0 2px var(--bg)}
+.uc svg{display:block;width:100%;height:auto}
+.uc .big{font-size:22px;font-weight:800;letter-spacing:-.02em}
+#ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-60px);z-index:30;padding:8px 16px;border-radius:99px;background:var(--pop);border:1px solid var(--bd);box-shadow:var(--sh);font-size:13px;color:var(--mu);opacity:0;pointer-events:none}
+#lock{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+#lock[hidden]{display:none}
+#lock .ei{font-size:60px;margin-bottom:10px}
+.hp summary{cursor:pointer;font-weight:700;padding:14px 4px;list-style:none}.hp summary::-webkit-details-marker{display:none}
+.hp summary::after{content:"+";float:right;color:var(--ac);font-size:20px;line-height:1}.hp[open] summary::after{content:"\2212"}
+.hp{border-bottom:1px solid var(--bd)}.hp .hb{padding:0 4px 14px;color:var(--mu);font-size:14px;line-height:1.55}.hp .hb p{margin:0 0 8px}
+.c[data-open]:active,.fab:active,.tabs button:active,#bn button:active,.mrow:active,.qa:active,button.p:active{transform:scale(.97)}
+.c[data-open],.fab,.tabs button,#bn button,.mrow,.qa,button.p{transition:transform .12s,border-color .2s,box-shadow .2s}
 </style>
 </head>
 <body>
@@ -140,6 +173,7 @@ body[data-sync=off] #sd{background:var(--bad);background-clip:content-box}
 <button class="fab fabl p" id="fabE" title="Reorder equipment" style="display:none">⇅</button>
 <div id="bn"><button data-v="garage"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>Garage</button><button data-v="inventory"><svg viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>Inventory</button></div>
 <div id="toast" hidden></div>
+<div id="lock" hidden><div><div class="ei">🔒</div><h2 style="margin:0 0 6px">Garage Log is locked</h2><div class="m" style="margin-bottom:18px">Use your fingerprint, face or screen lock to open it.</div><button class="p" id="lkb">Unlock</button></div></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
 <div id="pv" hidden></div>
 <script>
@@ -172,7 +206,7 @@ const uid=()=>Math.random().toString(36).slice(2,10);
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const addM=(s,n)=>{const d=new Date(s+"T00:00:00"),day=d.getDate();d.setMonth(d.getMonth()+n);if(d.getDate()!==day)d.setDate(0);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const KINDS=[["car","Car / Truck","🚗"],["offroad","Off-road","🏞️","Off-road (UTV / ATV / dirt bike)"],["trailer","Trailer","🚚"],["mower","Lawn mower","🌿"],["other","Other","🔧"]];
-const KC={car:"#4da3ff",offroad:"#ff7a3d",trailer:"#b07cff",mower:"#2bf0a0",other:"#9aa7b8"},SC=["var(--ac)","var(--warn)","var(--bad)"];
+const KC={car:"#4da3ff",offroad:"#ff7a3d",trailer:"#b07cff",mower:"#2bf0a0",other:"#9aa7b8"},SC=["var(--okc)","var(--warn)","var(--bad)"],CLRS=["#4da3ff","#ff7a3d","#b07cff","#2bf0a0","#ff5b78","#ffb23d","#18b7ff","#9aa7b8"],vcol=v=>v.color||KC[v.kind]||KC.other;
 const vOf=id=>S.vehicles.find(v=>v.id===id);
 const isH=id=>(vOf(id)||{}).meter==="hrs",isT=id=>(vOf(id)||{}).meter==="time";
 const dU=(id=S.cur)=>isH(id)?"hrs":S.units==="imperial"?"mi":"km";
@@ -260,6 +294,7 @@ function partEdit(i){
   $("ok").onclick=()=>{const l=$("pe_l").value.trim();if(!l)return;sy();x.l=l;x.v=vals.map(z=>z.trim()).filter(Boolean).join("\n");save();$("dlg").close();render()};
   $("pe_d").onclick=()=>{const old=v.plist.slice();v.plist.splice(i,1);save();$("dlg").close();render();toast("Category deleted",()=>{v.plist=old;save();render()})};
 }
+function doneRem(id){const r=S.records.find(x=>x.id===id);if(!r)return;if(r.rep>0)return renewDlg(id);r.done=true;save();render();logFrom(r)}
 function snoozeDlg(id){
   const r=S.records.find(z=>z.id===id);if(!r)return;
   const hs=isH(r.vid),du=dU(r.vid),B=(a,l)=>`<button class="mrow" data-sn="${a}">${l}</button>`;
@@ -380,7 +415,8 @@ function moreMenu(){
 }
 function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
-  const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key}
+  {const b=document.body.style,c=view==="vehicle"&&v0&&v0.color;if(c){b.setProperty("--ac",c);b.setProperty("--ac2",`color-mix(in srgb,${c} 62%,#18b7ff)`)}else{b.removeProperty("--ac");b.removeProperty("--ac2")}}
+  const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key;rq="";rch="all"}
   const v=veh(),inV=view==="vehicle"&&v;
   $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="ev">✎</button><button id="more"${UPD?' class="upd"':""}>⋯</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="more"${UPD?' class="upd"':""}>⋯</button>`;
   const pk=KINDS.filter(k=>act().some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
@@ -389,7 +425,7 @@ function render(){
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
   $("fab").style.display="";$("fabE").style.display=view==="garage"&&act().length>1?"":"none";$("fabE").textContent=em?"✓":"⇅";
   const L=$("list");L.className=ch?"fresh":"";
-  if(inV)L.innerHTML=`<div class="hero${v.cover?"":" nc"}" style="--k:${KC[v.kind]||KC.other}">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}</div>`+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
+  if(inV)L.innerHTML=`<div class="hero${v.cover?"":" nc"}" style="--k:${vcol(v)}">${v.cover?`<img src="${pu(v.cover)}" alt="" data-cover="1" style="cursor:zoom-in;z-index:1">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}</div>`+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
   else if(view==="inventory")L.innerHTML=invView();
   else L.innerHTML=garageView();
 }
@@ -398,21 +434,45 @@ function dashView(v){
   pseudo(v).forEach(r=>up.push({r,i:rinfo(r,lo)}));
   up.sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
   const rec=S.records.filter(r=>r.vid===v.id&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,6);
-  const upH=up.length?up.map(({r,i})=>`<div class="c ce sc st${i.st}">${r.id?`<button class="ed" data-edit="${r.id}" title="Edit">\u270e</button>`:r.pk?`<button class="ed" data-vedit="1" title="Edit dates">\u270e</button>`:""}<h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders.</div>';
+  const upH=up.length?up.map(({r,i})=>`<div class="c ce sc st${i.st}"${r.id?` data-sw="${r.id}"`:""}>${r.id?`<button class="ed" data-edit="${r.id}" title="Edit">\u270e</button>`:r.pk?`<button class="ed" data-vedit="1" title="Edit dates">\u270e</button>`:""}<h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders. <a data-addrem="1" style="color:var(--ac);font-weight:600;cursor:pointer">Add one</a></div>';
   const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
     return `<div class="c ce sc st${r.type==="repair"?1:0}"><button class="ed" data-edit="${r.id}" title="Edit">\u270e</button><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div><button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button></div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
   return `<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">🔍 Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+rclCard(v)+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH;
 }
 function garageView(){
-  if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Tap + to add a vehicle, ATV, dirt bike, mower or other equipment.</div>';
+  if(!act().length)return'<div class="empty"><div class="ei">🏁</div>Your garage is empty.<br>Add a vehicle, ATV, dirt bike, mower or other equipment.<br><button class="p" data-addv="1">\uff0b Add equipment</button><br><button data-help="1" style="margin-top:10px">How does this work?</button></div>';
   return (em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(String(x.v).split("\n")[0])}${String(x.v).split("\n").length>1?" +"+(String(x.v).split("\n").length-1):""}</span>`).join(""),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:6px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join(" · ");
-    return `<div class="c vc" data-open="${v.id}" style="--k:${KC[v.kind]||KC.other};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><button class="ed" data-vedit2="${v.id}" title="Edit">\u270e</button><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
+    return `<div class="c vc" data-open="${v.id}" style="--k:${vcol(v)};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><button class="ed" data-vedit2="${v.id}" title="Edit">\u270e</button><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${chips}</div></div>`}).join("");
+}
+let rq="",rch="all";
+function recRows(v){
+  const all=S.records.filter(r=>r.vid===v.id&&r.type===tab).sort((a,b)=>tab==="reminder"?(a.date||"9").localeCompare(b.date||"9"):(b.date||"").localeCompare(a.date||"")||b.odo-a.odo),lo=lastOdo(v.id),q=rq.trim().toLowerCase();
+  const rows=all.filter(r=>{
+    if(rch!=="all"){if(tab==="reminder"){const st=r.done?-1:rinfo(r,lo).st;if(rch==="over"&&st!==2)return false;if(rch==="up"&&!(st>=0&&st<2))return false;if(rch==="done"&&!r.done)return false}else if((r.date||"").slice(0,4)!==rch)return false}
+    if(q){const h=[r.desc,...(r.dl||[]),r.notes,r.date,r.odo,...partsOf(r)].join(" ").toLowerCase();if(!q.split(/\s+/).every(w=>h.includes(w)))return false}
+    return true});
+  if(!all.length)return`<div class="empty"><div class="ei">\U0001F527</div>Nothing here yet.<br>Tap + to add.<br><button class="p" data-addrec="1">＋ Add ${esc((TYPES.find(t=>t[0]===tab)||[0,"record"])[1].toLowerCase())}</button></div>`;
+  if(!rows.length)return'<div class="empty"><div class="ei">\U0001F50D</div>Nothing matches.<br>Clear the search or pick All.</div>';
+  return rows.map(card).join("");
+}
+function usageCard(v){
+  if(isT(v.id))return"";
+  const m=new Map();S.records.filter(r=>r.vid===v.id&&r.type!=="reminder"&&r.date&&r.odo!==""&&r.odo!=null&&!isNaN(+r.odo)).forEach(r=>{if(!m.has(r.date)||+r.odo>m.get(r.date))m.set(r.date,+r.odo)});
+  const P=[...m].sort((a,b)=>a[0].localeCompare(b[0]));if(P.length<2)return"";
+  const t=d=>new Date(d+"T00:00:00").getTime(),t0=t(P[0][0]),t1=t(P[P.length-1][0]),o0=Math.min(...P.map(x=>x[1])),o1=Math.max(...P.map(x=>x[1])),W=320,H=96,pd=8;
+  const X=d=>t1===t0?W/2:pd+(t(d)-t0)/(t1-t0)*(W-2*pd),Y=o=>o1===o0?H/2:H-pd-(o-o0)/(o1-o0)*(H-2*pd);
+  const pts=P.map(([d,o])=>X(d).toFixed(1)+","+Y(o).toFixed(1)),ln="M"+pts.join(" L"),area=ln+` L${X(P[P.length-1][0]).toFixed(1)},${H} L${X(P[0][0]).toFixed(1)},${H} Z`,lp=pts[pts.length-1].split(",");
+  const days=(t1-t0)/864e5,tot=P[P.length-1][1]-P[0][1],yr=days>=30&&tot>0?Math.round(tot/days*365):0,u=dU(v.id);
+  return`<div class="c uc"><div class="m">${isH(v.id)?"Hours":"Odometer"} over time</div><div class="big">${(+P[P.length-1][1]).toLocaleString()} ${u}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart of ${isH(v.id)?"hours":"odometer"} readings over time"><defs><linearGradient id="ug" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--ac)" stop-opacity=".35"/><stop offset="1" stop-color="var(--ac)" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#ug)"/><path d="${ln}" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lp[0]}" cy="${lp[1]}" r="4.5" fill="var(--ac)"/></svg><div class="m" style="display:flex;justify-content:space-between"><span>${P[0][0]}</span><span>${P[P.length-1][0]}</span></div>${yr?`<div class="m" style="margin-top:6px">About ${yr.toLocaleString()} ${u} per year</div>`:""}</div>`;
 }
 function recView(v){
   let out=isT(v.id)?"":`<div class="m" style="margin-bottom:10px">${lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>`;
-  const rows=S.records.filter(r=>r.vid===v.id&&r.type===tab).sort((a,b)=>tab==="reminder"?(a.date||"9").localeCompare(b.date||"9"):(b.date||"").localeCompare(a.date||"")||b.odo-a.odo);
-  if(!rows.length)out+='<div class="empty"><div class="ei">🔧</div>Nothing here yet.<br>Tap + to add.</div>';
-  return out+rows.map(card).join("");
+  if(tab==="odometer")out+=usageCard(v);
+  const all=S.records.filter(r=>r.vid===v.id&&r.type===tab),yrs=[...new Set(all.map(r=>(r.date||"").slice(0,4)).filter(Boolean))].sort().reverse();
+  const chips=tab==="reminder"?[["all","All"],["over","Overdue"],["up","Upcoming"],["done","Done"]]:yrs.length>1?[["all","All"],...yrs.map(y=>[y,y])]:[];
+  if(all.length>3||rq)out+=`<input id="rs" class="rsb" type="search" placeholder="Search notes, parts, dates…" value="${esc(rq)}" aria-label="Search">`;
+  if(chips.length&&all.length>3)out+='<div class="chs">'+chips.map(([k,l])=>`<button class="${k===rch?"on":""}" data-rch="${k}">${l}</button>`).join("")+"</div>";
+  return out+'<div id="rl">'+recRows(v)+"</div>";
 }
 function card(r){
   const odo=r.odo!==""&&r.odo!=null?`${(+r.odo).toLocaleString()} ${dU(r.vid)}`:"";
@@ -421,7 +481,7 @@ function card(r){
   if(r.type==="reminder"){const i=rinfo(r,lastOdo(r.vid));extra=r.done?'<span class="tag">Done</span>':tag(i.st);meta=["Due",r.date,odo].filter(Boolean).join(" · ")+(r.done?"":` (${i.txt})`)+(r.rep>0?" · repeats every "+repTxt(r.rep):"")}
   const rc=(r.rc||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}">`).join("");
   const sk=r.type==="reminder"?"st"+(r.done?"n":rinfo(r,lastOdo(r.vid)).st):({service:"st0",repair:"st1",upgrade:"stu"})[r.type]||"";
-  return `<div class="c ce${sk?" sc "+sk:""}"><button class="ed" data-edit="${r.id}" title="Edit">✎</button><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${PH.includes(r.type)?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`;
+  return `<div class="c ce${sk?" sc "+sk:""}"${r.type==="reminder"&&!r.done?` data-sw="${r.id}"`:""}><button class="ed" data-edit="${r.id}" title="Edit">✎</button><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${PH.includes(r.type)?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`;
 }
 function partsView(v){
   const top=[["License plate",["car","trailer"].includes(v.kind)?v.plate:""],["OHV sticker expires",v.kind==="offroad"?v.ohv:""],["Registration expires",v.kind!=="mower"?v.reg:""],...(v.dts||[]).map(x=>[x.l||"Other date",x.date]),["VIN / serial #",v.vin]].filter(x=>x[1]).map(([l,x])=>`<div class="sp"><span class="m">${l}</span><span>${esc(x)}</span></div>`).join("");
@@ -429,8 +489,56 @@ function partsView(v){
 }
 function invView(){
   let a=S.inv.filter(i=>ic==="All"||i.cat===ic).sort((x,y)=>x.cat.localeCompare(y.cat)||x.name.localeCompare(y.name));
-  if(!a.length)return'<div class="empty"><div class="ei">🛢️</div>No items yet.<br>Tap + to add oil, grease, filters or parts on hand.</div>';
+  if(!a.length)return'<div class="empty"><div class="ei">🛢️</div>No items yet.<br>Add oil, grease, filters or parts on hand.<br><button class="p" data-addi="1">\uff0b Add an item</button></div>';
   return a.map(i=>`<div class="c"><button class="x" data-idel="${i.id}" title="Remove">✕</button><button class="x" data-iedit="${i.id}" title="Edit">\u270e</button><h3 data-iedit="${i.id}">${esc(i.name)}${i.qty<=0?'<span class="tag bad">Out</span>':i.qty<=(i.low!==""&&i.low!=null?+i.low:1)?'<span class="tag warn">Low</span>':""}<span class="tag">${i.cat}</span></h3>${(i.pns||[]).map(x=>`<div class="m">${esc(x)}</div>`).join("")}${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
+}
+
+
+const HELP=[
+["Getting started","<p>Tap <b>＋</b> on My Garage to add a vehicle, ATV, dirt bike, trailer, mower or other equipment. Tap it to open it.</p><p>Inside, the <b>Dashboard</b> shows upcoming reminders and your recent services and repairs. The tabs along the top hold Service, Repair, Upgrades, Reminders, Odometer / Hours, Notes and Parts. The green <b>＋</b> adds to whichever tab you are on.</p>"],
+["Log a service or repair","<p>Open the equipment, go to the Service tab and tap ＋. Enter the date and odometer or hours, describe the work, and add parts, notes, photos and receipts.</p><p>Under <b>Parts used</b>, <b>Bought for this job</b> types a part in, and <b>Take from inventory</b> uses what you have on hand and lowers the count. Set <b>Next service due</b> to create a reminder automatically.</p><p>Done a job before? Tap <b>Log again</b> on any tile to copy it with today's date.</p>"],
+["Reminders: done, renew, snooze","<p>Reminders turn orange when due soon and red when overdue. On a reminder tile you can <b>swipe right</b> to mark it done (or renew it if it repeats) and <b>swipe left</b> to snooze it. The buttons on the tile do the same thing.</p><p>Marking a reminder done offers to log the service. Repeating reminders (every 1 or 2 years, for example) move to the next date when renewed.</p>"],
+["Search and filters","<p>Lists with more than a few records show a search box and filter chips. Search looks through descriptions, notes, parts, dates and odometer values. Service, Repair and Upgrade lists can be filtered by year, and Reminders by Overdue, Upcoming or Done.</p><p>On the dashboard, <b>Last done…</b> finds the most recent time you did something, such as an oil change.</p>"],
+["Odometer / Hours and the usage chart","<p>Tap <b>＋ Odometer</b> on the dashboard or garage card to record a reading quickly. The Odometer / Hours tab lists the readings and, once there are two or more, draws a chart of how it changed and the average use per year.</p><p>Time-tracked equipment (such as a trailer) has no odometer and uses dates only.</p>"],
+["Parts and part numbers","<p>The <b>Parts</b> tab holds your own list, such as oil weight and capacity or filter numbers. Tap ＋ to add a category, and use the pencil on a row to edit it. Each category can hold several lines, so you can list different brands.</p>"],
+["Inventory","<p>The Inventory tab lists oil, grease, filters and parts on hand with quantities. Use − and + to adjust. Items show <b>Low</b> or <b>Out</b> when they run short, and each item can have several part numbers.</p>"],
+["Photos and receipts","<p>Add photos and receipt pictures on any record. Tap a photo to view it full screen: swipe for the next one, pinch or double-tap to zoom, and tap ✕ to close. The equipment's cover photo opens the same way.</p><p>Photos are shrunk before they are saved, which keeps the app fast and your storage small.</p>"],
+["Colors and layout","<p>Edit a piece of equipment (the pencil on its card) to give it a color. The color tints that equipment's screen. <b>Settings &amp; data</b> sets light or dark appearance and miles or kilometers.</p><p>Use the ⇅ button on My Garage to reorder equipment. Pull down at the top of a screen to refresh.</p>"],
+["Editing and deleting","<p>Every tile has its own pencil that opens just that item. <b>Delete</b> is inside the edit form, and an <b>Undo</b> appears for a few seconds afterwards. Equipment can also be archived instead of deleted, and restored from Settings &amp; data.</p>"],
+["Syncing with your server","<p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
+["Backups and moving to a new phone","<p>Settings &amp; data has <b>Download backup</b> and <b>Restore from file</b>. With a server, a copy is also saved there every day and the last 14 are kept. To move the Android app to a new phone, take a backup first and restore it on the new one.</p>"],
+["Reminder alerts and calendar","<p>With a server, <b>Settings &amp; data &gt; Reminder alerts</b> sends a notification when something becomes due. Enter an ntfy address (such as https://ntfy.sh/your-topic) or a JSON webhook for Home Assistant or Gotify, then press <b>Send test message</b>.</p><p><b>Get calendar link</b> gives you an address to subscribe to in a calendar app so due dates show up there.</p>"],
+["Android app: updates and lock","<p>A green dot on the ⋯ button means a newer version of the app is available. Open <b>Settings &amp; data &gt; App updates</b> and tap the link to download it, then install it over the old one. Your data is kept.</p><p>You can also lock the app with your fingerprint, face or screen lock under <b>Settings &amp; data &gt; App lock</b>.</p>"],
+["Something is not working","<p><b>Can't connect to the server:</b> check the address and port, that the phone is on the same network, and open the same address in the phone's browser.</p><p><b>A change did not appear on another device:</b> pull down to refresh, or check the header dot. Changes made on two devices are merged.</p><p><b>An old version is showing on the NAS:</b> set the image tag to the newest version number instead of <b>latest</b>.</p>"]
+];
+function helpForm(){
+  const draw=q=>{q=(q||"").trim().toLowerCase();const L=HELP.filter(([t,b])=>!q||(t+" "+b.replace(/<[^>]+>/g," ")).toLowerCase().includes(q));
+    $("hl").innerHTML=L.length?L.map(([t,b])=>`<details class="hp"${q?" open":""}><summary>${t}</summary><div class="hb">${b}</div></details>`).join(""):'<div class="m" style="padding:14px 4px">No help topics match. Try a different word.</div>'};
+  show('<h3 style="margin:0">Help &amp; tips</h3><input id="hq" type="search" placeholder="Search help…" aria-label="Search help" style="margin-top:12px"><div id="hl" style="margin-top:6px"></div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  draw();$("hq").oninput=()=>draw($("hq").value);
+}
+function lightbox(imgs,i){
+  imgs=(imgs||[]).filter(Boolean).map(pu);if(!imgs.length)return;
+  let z=1,tx=0,ty=0;const o=document.createElement("div");o.id="lb";o.setAttribute("role","dialog");o.setAttribute("aria-label","Photo viewer");
+  o.innerHTML='<button class="lbx" aria-label="Close">✕</button><img alt="">'+(imgs.length>1?'<button class="lbn lbp" aria-label="Previous photo">‹</button><button class="lbn lbf" aria-label="Next photo">›</button>':"")+'<div class="lbc"></div>';
+  document.body.appendChild(o);const im=o.querySelector("img"),cnt=o.querySelector(".lbc");
+  const set=()=>{im.style.transform=`translate(${tx}px,${ty}px) scale(${z})`};
+  const go=n=>{i=(i+n+imgs.length)%imgs.length;z=1;tx=ty=0;im.src=imgs[i];cnt.textContent=imgs.length>1?(i+1)+" / "+imgs.length:"";set()};
+  const key=e=>{if(e.key==="Escape")close();else if(imgs.length>1&&e.key==="ArrowLeft")go(-1);else if(imgs.length>1&&e.key==="ArrowRight")go(1)};
+  const close=()=>{o.remove();removeEventListener("keydown",key)};
+  addEventListener("keydown",key);go(0);
+  const P=new Map();let d0=0,z0=1,sx=0,moved=false,lastT=0;
+  im.addEventListener("pointerdown",e=>{try{im.setPointerCapture(e.pointerId)}catch(_){}P.set(e.pointerId,{x:e.clientX,y:e.clientY});sx=e.clientX;moved=false;if(P.size===2){const[a,b]=[...P.values()];d0=Math.hypot(a.x-b.x,a.y-b.y)||1;z0=z}});
+  im.addEventListener("pointermove",e=>{const p=P.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+    if(P.size===2){const[a,b]=[...P.values()];z=Math.max(1,Math.min(6,z0*Math.hypot(a.x-b.x,a.y-b.y)/d0));if(z===1)tx=ty=0;moved=true;set()}
+    else if(z>1){tx+=dx;ty+=dy;moved=true;set()}
+    else{if(Math.abs(e.clientX-sx)>8)moved=true;if(imgs.length>1)im.style.transform=`translateX(${e.clientX-sx}px)`}});
+  const end=e=>{if(!P.has(e.pointerId))return;P.delete(e.pointerId);if(P.size)return;const dx=e.clientX-sx,t=Date.now();
+    if(z===1){set();if(imgs.length>1&&Math.abs(dx)>60)go(dx<0?1:-1);else if(!moved){if(t-lastT<320){z=2.5;set()}lastT=t}}
+    else if(!moved){if(t-lastT<320){z=1;tx=ty=0;set()}lastT=t}};
+  im.addEventListener("pointerup",end);im.addEventListener("pointercancel",end);
+  o.addEventListener("wheel",e=>{e.preventDefault();z=Math.max(1,Math.min(6,z*(e.deltaY<0?1.15:.87)));if(z===1)tx=ty=0;set()},{passive:false});
+  o.addEventListener("click",e=>{const c=e.target.classList;if(e.target===o||c.contains("lbx"))close();else if(c.contains("lbp"))go(-1);else if(c.contains("lbf"))go(1)});
 }
 function shrink(f,mx=800,q=.65){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,mx/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",q))};i.src=r.result};r.readAsDataURL(f)})}
 const up=async d=>{try{const b=await (await fetch(d)).blob(),r=await F("api/photo",{method:"POST",headers:{"Content-Type":b.type||"image/jpeg"},body:b});if(r.ok){const j=await r.json();if(j&&j.url)return j.url}}catch(e){}return d};
@@ -544,10 +652,11 @@ function addPart(){
 }
 function vehForm(edit){
   const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
-  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><button type="button" id="cfb" style="width:100%;margin-top:8px">Choose photo…</button><input type="file" id="cf" accept="image/*" hidden><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><div id="v_dts"></div><button type="button" id="v_adt" style="margin-top:10px;width:100%">+ Add another date (inspection, emissions…)</button><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="av" style="margin-top:12px;width:100%">Archive this equipment</button><button id="dv" style="margin-top:8px;width:100%">Delete this equipment</button>':""}${btns}`);
+  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><button type="button" id="cfb" style="width:100%;margin-top:8px">Choose photo…</button><input type="file" id="cf" accept="image/*" hidden><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Color</label><div class="cs" id="v_cl"><button type="button" data-c="" title="Automatic" aria-label="Automatic color" class="${v.color?"":"on"}" style="background:var(--field);color:var(--mu)">A</button>${CLRS.map(c=>`<button type="button" data-c="${c}" aria-label="Color ${c}" class="${v.color===c?"on":""}" style="background:${c}"></button>`).join("")}</div><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><label>VIN / serial # (optional)</label><input id="v_vin" value="${esc(v.vin||"")}"><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><div id="v_dts"></div><button type="button" id="v_adt" style="margin-top:10px;width:100%">+ Add another date (inspection, emissions…)</button><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="av" style="margin-top:12px;width:100%">Archive this equipment</button><button id="dv" style="margin-top:8px;width:100%">Delete this equipment</button>':""}${btns}`);
   let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${pu(cover)}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
   $("cfb").onclick=()=>$("cf").click();$("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
   const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none";$("v_rg").style.display=k==="mower"?"none":""};tp();
+  let color=v.color||"";$("v_cl").onclick=e=>{const b=e.target.closest("button");if(!b)return;color=b.dataset.c;$("v_cl").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b))};
   let dts=(v.dts||[]).map(x=>({...x}));
   const syD2=()=>{dts=[...$("v_dts").querySelectorAll(".dtr0")].map(r=>({id:r.dataset.id,l:r.querySelector(".dtl").value.trim(),date:r.querySelector(".dtd").value,rep:+r.querySelector(".dtr").value||24}))};
   const ddraw=()=>{$("v_dts").innerHTML=dts.map((x,i)=>`<div class="dtr0" data-id="${x.id}" style="margin-top:12px"><div class="row"><input class="dtl" value="${esc(x.l)}" placeholder="Name, e.g. Inspection / emissions"><button type="button" data-dtx="${i}" style="flex:none">✕</button></div><div class="row" style="margin-top:6px"><input type="date" class="dtd" value="${x.date||""}"><select class="dtr">${vrep(x.rep??24)}</select></div></div>`).join("")};ddraw();
@@ -556,7 +665,7 @@ function vehForm(edit){
   const sp=()=>{const t=$("v_t").value;$("v_sm").style.display=t==="time"?"none":"";$("v_sm").placeholder=t==="hrs"?"10 hrs":"500 "+(S.units==="imperial"?"mi":"km")};sp();$("v_t").addEventListener("change",sp);
   $("v_k").onchange=()=>{tp();if(!edit)$("v_t").value={mower:"hrs",trailer:"time"}[$("v_k").value]||"dist";sp()};
   $("ok").onclick=()=>{const n=$("v_n").value.trim()||$("v_m").value.trim();if(!n)return;
-    const f={name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,ohvRep:+$("v_ohr").value||24,reg:$("v_rgd").value,regRep:+$("v_rgr").value||24,kind:$("v_k").value,meter:$("v_t").value,cover,soonDays:+$("v_sd").value||0,soonDist:+$("v_sm").value||0,dts:(syD2(),dts.filter(x=>x.l||x.date))};
+    const f={name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,ohvRep:+$("v_ohr").value||24,reg:$("v_rgd").value,regRep:+$("v_rgr").value||24,kind:$("v_k").value,meter:$("v_t").value,color,cover,soonDays:+$("v_sd").value||0,soonDist:+$("v_sm").value||0,dts:(syD2(),dts.filter(x=>x.l||x.date))};
     if(edit)Object.assign(v,f);else{const nv=Object.assign({id:uid(),specs:{}},f);fixV(nv);S.vehicles.push(nv)}
     save();$("dlg").close();render()};
   if(edit)$("av").onclick=()=>{if(!confirm("Archive "+v.name+"? It leaves your garage but keeps its history. You can restore it from Settings & data."))return;v.arch=true;S.cur=null;view="garage";save();$("dlg").close();render()};
@@ -623,10 +732,12 @@ async function connectServer(u,pw){
 function dataForm(){
   const al=S.alert||{},arch=S.vehicles.filter(v=>v.arch);
   show(`<h3 style="margin:0">Settings &amp; data</h3>
+  <button class="mrow" id="hlp" style="margin-top:12px">❓ Help &amp; tips</button>
   <label>Appearance</label><select id="th"><option value="auto">Match my device</option><option value="dark">Dark</option><option value="light">Light</option></select>
   <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
   <label>Quick-pick services</label><div class="row"><select id="qk">${KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select><button id="qke" style="flex:none">Edit list</button></div>
   ${APP?`<label>Server (optional)</label><div class="m" style="margin-top:4px">${BASE?"Syncing with "+esc(BASE):"Not connected. Everything is saved on this phone only. Add your Garage Log server to sync, back up photos and documents, and get alerts."}</div><input id="sv_u" type="url" inputmode="url" placeholder="http://192.168.1.50:30080" value="${esc(BASE)}" style="margin-top:6px"><input id="sv_p" type="password" placeholder="Server password (if you set one)" value="${esc(SRV.pw||"")}" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="p" id="sv_go" style="flex:1">${BASE?"Save":"Connect"}</button>${BASE?'<button id="sv_off" style="flex:1">Disconnect</button>':""}</div><div class="m" id="sv_m" style="margin-top:6px"></div>`:""}
+  ${APP?`<label>App lock</label><select id="lk_s"><option value="0">Off</option><option value="1">Fingerprint, face or screen lock</option></select><div class="m" id="lk_m" style="margin-top:4px">Ask for it when the app opens or comes back after a while.</div>`:""}
   ${APP?`<label>App updates</label><div class="m" id="up_m" style="margin-top:4px">Checking\u2026</div>`:""}
   ${SYNC?`<label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
   <div class="row" style="margin-top:6px"><select id="al_f"><option value="text" ${al.fmt!=="json"?"selected":""}>ntfy / text</option><option value="json" ${al.fmt==="json"?"selected":""}>JSON webhook</option></select><select id="al_h">${[...Array(18).keys()].map(i=>i+5).map(h=>`<option value="${h}" ${(+al.hour||8)===h?"selected":""}>${h%12||12}:00 ${h<12?"AM":"PM"}</option>`).join("")}</select></div>
@@ -639,8 +750,15 @@ function dataForm(){
   
   <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}${APP?" \u00b7 Android app":""}</div>
   <div class="row" style="margin-top:10px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
+  $("hlp").onclick=()=>helpForm();
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
+  if($("lk_s")){$("lk_s").value=lockOn()?"1":"0";$("lk_s").onchange=async()=>{const m=$("lk_m");
+    if($("lk_s").value==="0"){try{localStorage.removeItem("garagelog-lock")}catch(e){}m.textContent="App lock is off.";return}
+    const B=BIO();let ok=false;try{ok=!!B&&(await B.checkBiometry()).isAvailable}catch(e){}
+    if(!ok){$("lk_s").value="0";m.textContent="This phone has no fingerprint, face or screen lock set up, or this app version can't use it.";return}
+    try{await B.authenticate({reason:"Turn on app lock",cancelTitle:"Cancel",allowDeviceCredential:true,androidTitle:"Garage Log"});try{localStorage.setItem("garagelog-lock","1")}catch(e){}m.textContent="App lock is on."}
+    catch(e){$("lk_s").value="0";m.textContent="App lock was not turned on."}}}
   $("qke").onclick=()=>presetForm($("qk").value);
   const sa=()=>{const u=$("al_u").value.trim();if(u)S.alert={url:u,fmt:$("al_f").value,hour:+$("al_h").value,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};else delete S.alert;save()};
   if(SYNC)["al_u","al_f","al_h"].forEach(i=>$(i).onchange=sa);
@@ -666,6 +784,7 @@ $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(t==="more")retu
 $("bn").onclick=e=>{const v=e.target.dataset.v;if(v){view=v;render()}};
 $("fab").onclick=()=>view==="vehicle"?(tab==="dash"?addChooser():tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
 $("fabE").onclick=()=>{em=!em;render()};
+$("list").addEventListener("input",e=>{if(e.target.id==="rs"){rq=e.target.value;const r=$("rl");if(r)r.innerHTML=recRows(veh())}});
 $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");
   if(d.vedit2){S.cur=d.vedit2;vehForm(true)}
   else if(d.vedit)vehForm(true);
@@ -674,7 +793,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.mv)mvVeh(d.mv);
   else if(op){S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
   else if(d.edit)openForm(d.edit);
-  else if(d.done){const r=S.records.find(x=>x.id===d.done);r.done=true;save();render();logFrom(r)}
+  else if(d.done)doneRem(d.done)
   else if(d.renew)renewDlg(d.renew);
   else if(d.rcok){const v=veh();v.rcOk=[...(v.rcOk||[]),d.rcok];save();render()}
   else if(d.srch)searchForm(veh());
@@ -683,7 +802,14 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.again){const r=S.records.find(x=>x.id===d.again);if(r)openForm(null,{type:r.type,date:today(),desc:r.desc||"",dl:(r.dl||[]).slice(),pl:[...(r.parts?[r.parts]:[]),...(r.pl||[])],iu:(r.iu||[]).filter(x=>S.inv.some(i=>i.id===x.id)).map(x=>({...x})),next:r.next||0,odo:"",notes:"",ph:[],rc:[],banner:"Copied from "+(r.date||"an earlier entry")+". Set the date and "+(isH(S.cur)?"hours":"odometer")+", then save."})}
   else if(d.specs)specForm();
   else if(d.go){tab=d.go;render()}
-  else if(d.ph){const[id,i,g]=d.ph.split(":");show(`<img src="${pu(S.records.find(r=>r.id===id)[g||"ph"][+i])}" style="width:100%;border-radius:8px"><div class="row" style="margin-top:10px"><button id="cancel" style="flex:1">Close</button></div>`)}
+  else if(d.rch){rch=d.rch;render()}
+  else if(d.help)helpForm()
+  else if(d.addrec)openForm()
+  else if(d.addv)vehForm(false)
+  else if(d.addi)invForm()
+  else if(d.addrem)openForm(null,{type:"reminder"})
+  else if(d.cover)lightbox([veh().cover],0)
+  else if(d.ph){const[id,i,g]=d.ph.split(":"),r=S.records.find(r=>r.id===id);if(r)lightbox(r[g||"ph"]||[],+i)}
   else if(d.idel){const k=S.inv.findIndex(i=>i.id===d.idel);if(k>=0){const it=S.inv[k];S.inv.splice(k,1);save();render();toast("Item removed",()=>{S.inv.splice(Math.min(k,S.inv.length),0,it);save();render()})}}
   else if(d.iedit)invForm(d.iedit);
   else if(d.q){const[id,n]=d.q.split(":"),it=S.inv.find(i=>i.id===id);it.qty=Math.max(0,+(it.qty+ +n).toFixed(2));save();render()}};
@@ -758,6 +884,38 @@ addEventListener("online",()=>pull());addEventListener("offline",()=>setSync("of
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 pull();loadRc();
 if(APP)checkUpd();
+
+// ---- swipe on reminders
+(function(){let s=null,sw=false;const L=$("list");
+  L.addEventListener("pointerdown",e=>{const c=e.target.closest("[data-sw]");if(!c||e.target.closest("button,a,input,select,textarea"))return;s={c,x:e.clientX,y:e.clientY,dx:0,on:false,id:e.pointerId}});
+  addEventListener("pointermove",e=>{if(!s||e.pointerId!==s.id)return;const dx=e.clientX-s.x,dy=e.clientY-s.y;
+    if(!s.on){if(Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)){s=null;return}if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.5){s.on=true;try{s.c.setPointerCapture(e.pointerId)}catch(_){}}}
+    if(s&&s.on){s.dx=dx;s.c.style.transform="translateX("+Math.max(-140,Math.min(140,dx))*.8+"px)";s.c.classList.toggle("swr",dx>90);s.c.classList.toggle("swl",dx<-90)}});
+  const end=()=>{if(!s)return;const{c,dx,on}=s;s=null;if(!on)return;sw=true;setTimeout(()=>sw=false,60);c.style.transform="";c.classList.remove("swr","swl");const id=c.dataset.sw;if(dx>90)doneRem(id);else if(dx<-90)snoozeDlg(id)};
+  addEventListener("pointerup",end);addEventListener("pointercancel",end);
+  L.addEventListener("click",e=>{if(sw){e.stopPropagation();e.preventDefault()}},true);
+})();
+// ---- pull to refresh
+(function(){let y0=null,x0=0,pd=0;const el=document.createElement("div");el.id="ptr";document.body.appendChild(el);
+  const rst=()=>{el.style.transition="transform .2s,opacity .2s";el.style.opacity=0;el.style.transform="translate(-50%,-60px)";pd=0};
+  addEventListener("touchstart",e=>{y0=(scrollY<=0&&!$("dlg").open&&!$("lb")&&e.touches.length===1)?e.touches[0].clientY:null;x0=e.touches[0].clientX;el.style.transition="none"},{passive:true});
+  addEventListener("touchmove",e=>{if(y0==null)return;const t=e.touches[0],d=t.clientY-y0;if(d<=8||Math.abs(t.clientX-x0)>d){if(d<=0)rst();return}pd=Math.min(d,110);el.style.opacity=Math.min(1,pd/60);el.style.transform=`translate(-50%,${pd-56}px)`;el.textContent=pd>70?"Release to refresh":"Pull to refresh"},{passive:true});
+  addEventListener("touchend",async()=>{if(y0==null)return;const go=pd>70;y0=null;if(!go){rst();return}el.textContent="Refreshing…";el.style.transition="transform .2s";el.style.transform="translate(-50%,16px)";
+    try{if(SYNC)await pull(true);else render()}catch(e){}el.textContent=SYNC?"Up to date":"Refreshed";setTimeout(rst,700)});
+})();
+// ---- app lock (Android app)
+const BIO=()=>APP&&window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.BiometricAuth;
+const lockOn=()=>{try{return localStorage.getItem("garagelog-lock")==="1"}catch(e){return false}};
+let lockAt=Date.now();
+async function unlock(){const B=BIO(),o=$("lock");
+  if(!B){o.hidden=true;return}
+  try{const c=await B.checkBiometry();if(!c||!c.isAvailable){o.hidden=true;return}}catch(e){o.hidden=true;return}
+  try{await B.authenticate({reason:"Unlock Garage Log",cancelTitle:"Cancel",allowDeviceCredential:true,androidTitle:"Garage Log"});o.hidden=true}catch(e){}
+}
+function showLock(){if(!lockOn()||!BIO())return;$("lock").hidden=false;unlock()}
+$("lkb").onclick=unlock;
+document.addEventListener("visibilitychange",()=>{if(document.hidden)lockAt=Date.now();else if(Date.now()-lockAt>30e3)showLock()});
+showLock();
 (function(){let a="";try{a=new URLSearchParams(location.search).get("a")||""}catch(e){}
   if(!a)return;try{history.replaceState(null,"",location.pathname)}catch(e){}
   if(a==="inventory"){view="inventory";render()}
