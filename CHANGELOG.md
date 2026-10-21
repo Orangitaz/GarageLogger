@@ -2,6 +2,10 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.9.1 - 2026-10-21
+- Reminder text no longer shows double brackets.
+- Inventory: the small ✕ on each tile is gone; use Delete inside the item's edit form (with Undo).
+
 ## 1.9.0 - 2026-10-21
 - **Timeline** of services, repairs and upgrades (More > Timeline) with filters and search.
 - **Done by** on records; **templates** (Save as a template) and a remembered next-service interval per job.
