@@ -2,6 +2,10 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.10.1 - 2026-10-21
+- Android app: App updates moved to the bottom of Settings & data, just above the version number.
+- The APK is now really signed with one fixed key, so new versions install over the old one.
+
 ## 1.10.0 - 2026-10-21
 - **Progress bar on each garage card** for the next service ("2,100 of 5,000 mi until oil change"), for reminders created from a logged service.
 - **One scrolling tab row with icons** inside equipment (Dashboard through Notes, then More), centered on the tab you're on.
