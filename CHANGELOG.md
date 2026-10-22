@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.12.0 - 2026-10-22
+- **Details** (plate, VIN, registration and other dates) moved from the Parts tab to the bottom of the equipment's Dashboard. It shows the plate and VIN, with Show all for the dates and Edit. Parts now holds just the parts list.
+
 ## 1.11.2 - 2026-10-22
 - **Log again** now shows only on services, not on repairs or upgrades.
 
