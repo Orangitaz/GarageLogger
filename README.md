@@ -18,7 +18,7 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 - **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges. Both can list several part numbers or brands per entry.
 - **Alerts** to your phone through ntfy, Home Assistant or Gotify, and a status feed for Home Assistant dashboards.
 - **Fast logging:** **Log again** copies an earlier service, **quick jobs** remember parts and intervals, tap the odometer on a garage card to update it, and **Snooze** pushes a reminder back.
-- **Recall check** by VIN against the US government's NHTSA database.
+- **Recalls:** a dashboard card with a Copy VIN button and a link to nhtsa.gov/recalls, where open recalls can be checked by VIN.
 - **Documents** (PDFs and photos), **printable service history**, **CSV export**, **"when did I last" search**, **archive** for sold equipment, and **Undo** for deletes.
 - Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes. Optional password.
 
@@ -63,7 +63,7 @@ user 568: on the dataset's **Permissions** screen set the owner to `apps` (568) 
 ## What's in the data folder
 - `db.json` holds your records. `db.json.bak` is the version before the last save.
 - `backups/` keeps one copy of `db.json` per day for the last 14 days. To roll back, stop the app, copy a file over `db.json`, and start it again.
-- `docs/` holds attached documents (PDFs and photos). `recalls.json` holds the last recall lookups.
+- `docs/` holds attached documents (PDFs and photos).
 - `photos/` holds every cover photo, record photo and receipt as its own file. Existing photos are moved here automatically the first time the new version starts, and a copy of the old `db.json` is kept in `backups/db-before-photo-move.json`.
 - Two phones or tablets can edit at once. If one is out of date when it saves, the app merges the changes by item instead of overwriting the other device.
 
@@ -90,7 +90,7 @@ Press **Send test message** to check it. The server then sends a message once a 
 ## Extra dates, documents and archive
 - Under an equipment's registration date, **+ Add another date** adds your own named dates (inspection, emissions, insurance). They stay hidden until you add one, repeat like registration, show on the dashboard with Renew, and go out in the alerts. Dates that fall on the same day (Oregon registration with inspection and emissions, say) show as one reminder, and Renew then asks for each new date.
 - **More > Documents** attaches PDFs and photos (manuals, title copies, insurance cards) to a piece of equipment. The files live in the `docs/` folder of your data folder, so a dataset snapshot covers them. The backup file from Settings only lists them; it does not contain the files themselves.
-- **Archive this equipment** (in the equipment's edit screen) takes it out of the garage, the alerts and the recall checks but keeps its history. Archived equipment is listed under **⋯ > Settings & data > Archived equipment**, where you can print its history or restore it.
+- **Archive this equipment** (in the equipment's edit screen) takes it out of the garage, the alerts but keeps its history. Archived equipment is listed under **⋯ > Settings & data > Archived equipment**, where you can print its history or restore it.
 
 ## Calendar, backups and shortcuts
 - **Calendar link:** **⋯ > Settings & data > Get calendar link** gives an address to subscribe to in Apple Calendar or an Android app such as ICSx⁵. It lists reminders and expiration dates that have a date. If you set a password, the link carries its own private key, so keep it to yourself. Google Calendar can't reach an address on your home network.
@@ -115,9 +115,6 @@ rest:
         value_template: "{{ (value_json.vehicles | selectattr('name','eq','Daily Driver') | map(attribute='status') | list)[0] | default('unknown') }}"
 ```
 
-## Recalls (optional, needs internet on the server)
-Put the VIN on a car or truck and Garage Log asks the US government's NHTSA recall database about it once a week. It looks up the year, make and model from the VIN and lists the recalls NHTSA has for that model year, so the list can include recalls already fixed on your vehicle. Confirm with your VIN at nhtsa.gov/recalls, then tap **Mark handled** on any that are done. New recalls also go to your reminder alert address if you set one. **More > Check for recalls (VIN)** checks right away.
-
 ## Password (optional)
 Set an environment variable `GARAGE_PASSWORD` on the app (TrueNAS: Edit > Environment Variables). The browser then asks for a password (any user name) before showing the app, your data or photos. Without it the app is open to anyone who can reach the port. The password is sent in a form that is only protected when you use the app through HTTPS (a reverse proxy) or a VPN, so it keeps casual visitors out on a home network but is not a substitute for those.
 
@@ -138,4 +135,4 @@ Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > gara
 
 Optional. The web app also installs from Chrome (⋮ > Install app). For a real Android app, see the separate repo [GarageLogger-Android](https://github.com/Orangitaz/garagelogger-android). It builds the same app into an APK that **works on its own, with no server**: your data stays on the phone. If you also run Garage Log on a server, enter its address in **Settings & data > Server** and the phone syncs with it (and with your other devices).
 
-Without a server the phone can't send reminder alerts, check recalls, store documents or offer a calendar link, because those run on the server.
+Without a server the phone can't send reminder alerts, store documents or offer a calendar link, because those run on the server.

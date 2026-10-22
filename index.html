@@ -130,6 +130,7 @@ details summary{cursor:pointer;padding:4px 0}
 .attn.bad{background:color-mix(in srgb,var(--bad) 13%,var(--field));border-color:color-mix(in srgb,var(--bad) 38%,transparent)}
 .attn .ac{margin-left:auto;white-space:nowrap;flex:none;color:var(--mu);font-weight:600}
 .nudge{border-color:color-mix(in srgb,var(--ac) 40%,transparent)}
+a.abtn{flex:1;display:block;text-align:center;padding:12px 14px;border-radius:14px;background:var(--field);border:1px solid var(--bd);color:var(--tx);font-weight:700;text-decoration:none}
 label.ck{display:flex;align-items:center;gap:12px;padding:12px 2px;margin:0;border-bottom:1px solid var(--bd);font-size:16px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--tx)}
 label.ck input{width:24px;height:24px;flex:none;margin:0}
 .buy{color:var(--ac);font-weight:700;font-size:13px;text-decoration:none}
@@ -271,7 +272,7 @@ const KIC={car:"car",offroad:"mtn",trailer:"trailer",mower:"mower"},TIC={dash:"g
 const kIc=k=>ico(KIC[k]||"wrench");
 const veh=()=>S.vehicles.find(v=>v.id===S.cur);
 const lastOdo=id=>Math.max(0,...S.records.filter(r=>r.vid===id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
-let RC={};
+
 const REP=[[0,"Doesn't repeat"],[6,"Every 6 months"],[12,"Every year"],[24,"Every 2 years"],[36,"Every 3 years"]];
 const vrep=n=>REP.filter(x=>x[0]).map(([m,l])=>`<option value="${m}" ${m===+n?"selected":""}>${l}</option>`).join("");
 const repTxt=n=>n%12===0?(n===12?"year":n/12+" years"):n+" months";
@@ -339,7 +340,7 @@ function printView(v,full){
   if(APP){$("pv_p").textContent="Share as file";$("pv_p").onclick=()=>{const c=$("pv").cloneNode(true),b=c.querySelector(".bar");if(b)b.remove();saveBlob((full?"full-history-":"service-history-")+v.name.replace(/[^\w-]+/g,"-")+".html",new Blob(['<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Service history</title><style>body{font:14px system-ui,sans-serif;padding:18px;color:#111}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:#555}.pvm{color:#555;font-size:13px}</style>'+c.innerHTML],{type:"text/html"}))}}$("pv_x").onclick=()=>{$("pv").hidden=true};
 }
 let tt=null;
-function toast(msg,undo){const t=$("toast");t.innerHTML=`<span>${esc(msg)}</span><button id="tu">Undo</button>`;t.hidden=false;clearTimeout(tt);const hide=()=>{t.hidden=true};tt=setTimeout(hide,8000);$("tu").onclick=()=>{clearTimeout(tt);hide();undo()}}
+function toast(msg,undo){const t=$("toast");t.innerHTML=`<span>${esc(msg)}</span>${undo?'<button id="tu">Undo</button>':""}`;t.hidden=false;clearTimeout(tt);const hide=()=>{t.hidden=true};tt=setTimeout(hide,undo?8000:3000);if(undo)$("tu").onclick=()=>{clearTimeout(tt);hide();undo()}}
 function addChooser(){
   const v=veh(),L=[["service","Service"],["repair","Repair"],["upgrade","Upgrade"],["reminder","Reminder"],["note","Note"]];
   show(`<h3 style="margin:0">Add to ${esc(v.name)}</h3>`+L.map(([k,l])=>`<button class="mrow" data-add="${k}">${l}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');
@@ -445,24 +446,10 @@ function searchForm(v){
   };
   $("sq").oninput=go;setTimeout(()=>$("sq").focus(),50);
 }
-function rclCard(v){
-  const e=RC[v.id];if(!e||e.vin!==(v.vin||"").trim().toUpperCase())return"";
-  const ok=v.rcOk||[],L=(e.items||[]).filter(x=>!ok.includes(x.id));if(!L.length)return"";
-  return `<div class="sec">Recalls to check</div><div class="m" style="margin:0 2px 10px">Issued for ${esc([e.year,e.make,e.model].join(" "))}. Confirm yours is still open at nhtsa.gov/recalls with your VIN. If it's already fixed, tap Mark handled.</div>`+L.slice(0,8).map(x=>`<div class="c sc st2"><h3 class="dt">${esc(x.comp||"Recall")}<span class="tag bad">Recall</span></h3><div class="m">${esc(x.id)}${x.date?" · "+esc(x.date):""}</div>${x.park?'<div class="m" style="color:var(--bad)">NHTSA advises not driving it until repaired.</div>':""}<div class="m" style="margin-top:6px;color:var(--tx)">${esc(x.sum.length>260?x.sum.slice(0,260)+"…":x.sum)}</div><button style="margin-top:8px" data-rcok="${esc(x.id)}">Mark handled</button></div>`).join("")+(L.length>8?`<div class="m" style="margin:0 2px">+ ${L.length-8} more</div>`:"");
-}
-const loadRc=()=>!SYNC?Promise.resolve():F("api/recalls",{cache:"no-store"}).then(r=>r.ok?r.json():{}).then(j=>{RC=j&&typeof j==="object"?j:{};redraw()}).catch(()=>{});
-async function recallNow(v){
-  const vin=(v.vin||"").trim().toUpperCase();
-  $("dlg").close();
-  show(`<h3 style="margin:0">Recall check</h3><div class="m" id="rcm" style="margin-top:10px">Checking NHTSA…</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>`);
-  $("dlg").addEventListener("close",()=>{loadRc();render()},{once:true});
-  let msg;
-  try{
-    const r=await F("api/recalls/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({vid:v.id,vin})}),j=await r.json().catch(()=>({}));
-    if(r.ok){const n=(j.items||[]).filter(x=>!(v.rcOk||[]).includes(x.id)).length;msg=`${j.year} ${j.make} ${j.model}: `+(n?`${n} recall${n===1?"":"s"} on file. See Recalls on the dashboard. The list covers the whole model year, so confirm yours is still open at nhtsa.gov/recalls.`:"no unhandled recalls on file.")}
-    else msg=j.error==="decode"?"NHTSA couldn't read that VIN. Check it for typos.":j.error==="vin"?"That VIN isn't 17 valid characters.":"Couldn't reach NHTSA. The Garage Log server needs internet access."
-  }catch(e){msg="Couldn't reach the Garage Log server."}
-  if($("rcm"))$("rcm").textContent=msg;
+function recallCard(v){
+  const vin=(v.vin||"").trim();if(!vin||RO)return"";
+  const days=v.rcChk?Math.round((Date.parse(today()+"T00:00:00Z")-Date.parse(v.rcChk+"T00:00:00Z"))/864e5):null;
+  return`<div class="sec">Recalls</div><div class="c"><div class="m">Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website. Copy the VIN, open the site and paste it in. ${days==null?"Not checked yet.":"Last checked "+(days<=0?"today":ago2(days)+" ago")+"."}</div><div class="row" style="margin-top:10px"><a class="abtn" href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener noreferrer">Open nhtsa.gov/recalls</a><button data-rccp="1">Copy VIN</button></div><button style="margin-top:8px;width:100%" data-rcchk="1">I checked, mark today</button></div>`;
 }
 function docsForm(v){
   const cur=()=>vOf(v.id)||v;
@@ -578,8 +565,8 @@ function fullExtra(v){
 }
 function moreMenu(){
   const v=veh();
-  show(`<h3 style="margin:0">More</h3><label>Tools</label>`+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+(SYNC&&/^[A-HJ-NPR-Z0-9]{17}$/i.test((v.vin||"").trim())?'<button class="mrow" data-rcnow="1">Check for recalls (VIN)</button>':"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
-  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.pvf){$("dlg").close();printView(v,true)}else if(e.target.dataset.cl){$("dlg").close();clList()}else if(e.target.dataset.tires){$("dlg").close();tireList()}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}else if(e.target.dataset.rcnow){recallNow(v)}};
+  show(`<h3 style="margin:0">More</h3><label>Tools</label>`+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.pvf){$("dlg").close();printView(v,true)}else if(e.target.dataset.cl){$("dlg").close();clList()}else if(e.target.dataset.tires){$("dlg").close();tireList()}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}};
 }
 function render(){
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
@@ -607,7 +594,7 @@ function dashView(v){
   const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
     return `<div class="c ce sc st${r.type==="repair"?1:0}"><button class="ed" data-edit="${r.id}" title="Edit">\u270e</button><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div>${r.type==="service"?`<button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
   const ns=odoStale(v),nH=ns?`<div class="c nudge"><b>Update the ${isH(v.id)?"hours":"odometer"}</b><div class="m" style="margin:4px 0 10px">Last updated ${ago2(ns.days)} ago (${lo.toLocaleString()} ${dU(v.id)}). A fresh reading keeps the due dates accurate.</div><div class="row"><button class="p" data-qodo="1">Update now</button><button data-nsnz="1">Later</button></div></div>`:"";
-  return nH+`<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">${ico("search")} Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+rclCard(v)+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH+infoCard(v);
+  return nH+`<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">${ico("search")} Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH+infoCard(v)+recallCard(v);
 }
 function garageView(){
   if(!act().length)return`<div class="empty"><div class="ei">${ico("flag")}</div>Your garage is empty.<br>Add a vehicle, ATV, dirt bike, mower or other equipment.<br><button class="p" data-addv="1">\uff0b Add equipment</button><br><button data-help="1" style="margin-top:10px">How does this work?</button></div>`;
@@ -709,6 +696,7 @@ const HELP=[
 ["Tires","<p>Open <b>More &gt; Tires</b> to keep each set (brand, size, bought date), see which set is mounted and how far it has gone, and log tread depth in 32nds. Use <b>Mount this set</b> when you swap.</p>"],
 ["Where to buy links","<p>Inventory items and parts-list categories have optional <b>Where to buy</b> fields: a store name and a link. The link shows on the tile so reordering is one tap. No prices are stored.</p>"],
 ["Full history report","<p><b>More &gt; Full history report</b> makes a printable page with the equipment's parts, dates, tires, documents and every service, repair and upgrade with its photos and receipts. On the web use Print / Save as PDF. In the Android app it is shared as a file you can open in a browser and print to PDF.</p>"],
+["Recalls","<p>If a vehicle has a VIN, its dashboard has a <b>Recalls</b> card. Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website, so tap <b>Copy VIN</b>, then <b>Open nhtsa.gov/recalls</b> and paste it in. Tap <b>I checked</b> to remember the date.</p>"],
 ["Syncing with your server","<p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
 ["Backups and moving to a new phone","<p>Settings &amp; data has <b>Download backup</b> and <b>Restore from file</b>. With a server, a copy is also saved there every day and the last 14 are kept. To move the Android app to a new phone, take a backup first and restore it on the new one.</p>"],
 ["Reminder alerts and calendar","<p>With a server, <b>Settings &amp; data &gt; Reminder alerts</b> sends a notification when something becomes due. Enter an ntfy address (such as https://ntfy.sh/your-topic) or a JSON webhook for Home Assistant or Gotify, then press <b>Send test message</b>.</p><p><b>Get calendar link</b> gives you an address to subscribe to in a calendar app so due dates show up there.</p>"],
@@ -1011,7 +999,8 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.edit)openForm(d.edit);
   else if(d.done)doneRem(d.done)
   else if(d.renew)renewDlg(d.renew);
-  else if(d.rcok){const v=veh();v.rcOk=[...(v.rcOk||[]),d.rcok];save();render()}
+  else if(d.rccp){const v=veh(),vin=(v.vin||"").trim();try{navigator.clipboard.writeText(vin).then(()=>toast("VIN copied")).catch(()=>toast("Couldn't copy. Select the VIN in Details"))}catch(e){toast("Couldn't copy. Select the VIN in Details")}}
+  else if(d.rcchk){const v=veh(),was=v.rcChk;v.rcChk=today();save();render();toast("Marked as checked today",()=>{if(was)v.rcChk=was;else delete v.rcChk;save();render()})}
   else if(d.srch)searchForm(veh());
   else if(d.qodo)qOdo(S.cur);
   else if(d.snz)snoozeDlg(d.snz);
@@ -1098,7 +1087,7 @@ const pull=f=>{
 };
 addEventListener("online",()=>pull());addEventListener("offline",()=>setSync("off","offline (saved on this device only)"));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
-if(!RO){pull();loadRc()}else pull();
+pull();
 if(APP)checkUpd();
 
 // ---- swipe on reminders
