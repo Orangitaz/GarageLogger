@@ -2,6 +2,15 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.10.0 - 2026-10-21
+- **Progress bar on each garage card** for the next service ("2,100 of 5,000 mi until oil change"), for reminders created from a logged service.
+- **One scrolling tab row with icons** inside equipment (Dashboard through Notes, then More), centered on the tab you're on.
+- **One consistent icon set** (line icons) instead of mixed emoji, including the pencils, empty screens and camera button.
+- **Cover photo placeholder** is a clean icon with "Tap to add a photo".
+- **Reminders grouped** as Overdue, Due soon, Later and Done.
+- After saving a record you stay where you were in the list, and a **Saved toast with Undo** appears.
+- New record forms open with today's date and a blank odometer (on a computer the cursor starts in Description).
+
 ## 1.9.1 - 2026-10-21
 - Reminder text no longer shows double brackets.
 - Inventory: the small ✕ on each tile is gone; use Delete inside the item's edit form (with Undo).
