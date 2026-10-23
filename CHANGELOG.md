@@ -2,6 +2,12 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.15.0 - 2026-10-22
+- **Needs attention** list: each item now has **Done** (or Renew) and **Snooze** buttons, so you can clear it without opening the equipment.
+- **When did I last…** on My Garage searches every piece of equipment at once and shows when each last had that job or part. Tap a result to open that timeline.
+- **Checklists:** optional suggested starters (Spring start-up, Winterize, Before towing and others for each kind of equipment). They are added as copies you can edit.
+- **Backup:** Settings shows the date of your last downloaded backup file.
+
 ## 1.14.0 - 2026-10-22
 - **Full app review:** no errors found. Tidied what turned up.
 - The photo banner now shows only on the Dashboard instead of repeating on every tab.
