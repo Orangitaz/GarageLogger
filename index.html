@@ -94,7 +94,7 @@ dialog input,dialog textarea,dialog select{width:100%;margin-top:6px}
 .sec{display:flex;justify-content:flex-start;align-items:center;margin:20px 2px 10px;font-size:12px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mu)}
 .sec::before{content:"";flex:none;width:18px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--ac),var(--ac2));margin-right:10px}
 .sec:first-child{margin-top:4px}
-.sec{gap:0}.sec a{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ac);cursor:pointer}
+.sec{gap:0}.sec a{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ac);cursor:pointer;padding:12px 8px;margin-top:-12px;margin-bottom:-12px;margin-right:-8px}
 .q{display:flex;gap:14px;align-items:center;margin-top:12px}
 .q button{width:46px;height:46px;border-radius:50%;padding:0;font-size:22px;background:var(--field)}
 .q b{font-size:30px;font-weight:800;min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
@@ -133,7 +133,7 @@ details summary{cursor:pointer;padding:4px 0}
 a.abtn{flex:1;display:block;text-align:center;padding:12px 14px;border-radius:14px;background:var(--field);border:1px solid var(--bd);color:var(--tx);font-weight:700;text-decoration:none}
 label.ck{display:flex;align-items:center;gap:12px;padding:12px 2px;margin:0;border-bottom:1px solid var(--bd);font-size:16px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--tx)}
 label.ck input{width:24px;height:24px;flex:none;margin:0}
-.buy{color:var(--ac);font-weight:700;font-size:13px;text-decoration:none}
+.m:empty{display:none}#adddc::after{content:"";position:absolute;inset:-9px}.buy{color:var(--ac);font-weight:700;font-size:13px;text-decoration:none;display:inline-block;padding:12px 6px;margin:-12px -6px}
 #pv h2{font-size:16px;margin:18px 0 6px}
 #pv .pvph{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 #pv .pvph img{height:72px;width:auto;border-radius:6px}
@@ -144,7 +144,7 @@ label.ck input{width:24px;height:24px;flex:none;margin:0}
 .tli{position:relative;margin-bottom:12px}
 .tld{position:absolute;left:-32px;top:-2px;width:26px;height:26px;border-radius:50%;background:var(--pop);border:2px solid var(--ac);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:12px}
 .tlh{font-size:12px;font-weight:700;color:var(--mu);margin:2px 0 6px}
-html[data-ts="1"]{zoom:1.12}html[data-ts="2"]{zoom:1.26}
+html[data-ts="1"]{zoom:1.12}html[data-ts="2"]{zoom:1.26}html[data-ts="1"] #bn{width:min(82vw,380px)}html[data-ts="2"] #bn{width:min(72vw,380px)}html[data-ts] .rsb{max-width:100%;box-sizing:border-box}
 @media(pointer:coarse){.ed::after,.ed2::after{content:"";position:absolute;inset:-6px}.ed2{position:relative}.chs button,.qps button{min-height:40px}}
 .ed,.ed2,#ev{font-size:0!important;display:inline-flex!important;align-items:center;justify-content:center}
 .ed::before,.ed2::before,#ev::before{content:"";width:17px;height:17px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z'/%3E%3Cpath d='M14.5 6.5l3 3'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z'/%3E%3Cpath d='M14.5 6.5l3 3'/%3E%3C/svg%3E") center/contain no-repeat}
@@ -581,7 +581,7 @@ function render(){
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
   $("fab").style.display="";$("fabE").style.display=view==="garage"&&act().length>1?"":"none";$("fabE").textContent=em?"✓":"⇅";
   const L=$("list");L.className=ch?"fresh":"";
-  if(inV)L.innerHTML=`<div class="hero${v.cover?"":" nc"}" style="--k:${vcol(v)}">${v.cover?`<img src="${pu(v.cover)}" alt="" data-cover="1" style="cursor:zoom-in;z-index:1">`:`<span class="vc-ic" data-addcover="1">${kIc(v.kind)}<small>Tap to add a photo</small></span>`}</div>`+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
+  if(inV)L.innerHTML=(tab==="dash"?`<div class="hero${v.cover?"":" nc"}" style="--k:${vcol(v)}">${v.cover?`<img src="${pu(v.cover)}" alt="" data-cover="1" style="cursor:zoom-in;z-index:1">`:`<span class="vc-ic" data-addcover="1">${kIc(v.kind)}<small>Tap to add a photo</small></span>`}</div>`:"")+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
   else if(view==="inventory")L.innerHTML=invView();
   else L.innerHTML=garageView();
 }
@@ -611,7 +611,7 @@ function tlRows(v){
   let y="",o='<div class="tl">';
   for(const r of rows){const yr=(r.date||"").slice(0,4)||"Undated";if(yr!==y){y=yr;o+=`<div class="tly">${yr}</div>`}
     const dt=r.date?new Date(r.date+"T00:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}):"";
-    o+=`<div class="tli"><i class="tld" aria-hidden="true">${TLI[r.type]}</i><div class="tlh">${dt}${r.odo!==""&&r.odo!=null?(dt?" \u00b7 ":"")+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${card(r)}</div>`}
+    o+=`<div class="tli"><i class="tld" aria-hidden="true">${TLI[r.type]}</i><div class="tlh">${dt}${r.odo!==""&&r.odo!=null?(dt?" \u00b7 ":"")+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${card(r,true)}</div>`}
   return o+"</div>";
 }
 function recRows(v){
@@ -646,9 +646,9 @@ function recView(v){
   if(chips.length&&(all.length>3||tab==="timeline"&&all.length>1))out+='<div class="chs">'+chips.map(([k,l])=>`<button class="${k===rch?"on":""}" data-rch="${k}">${l}</button>`).join("")+"</div>";
   return out+'<div id="rl">'+recRows(v)+"</div>";
 }
-function card(r){
+function card(r,tl){tl=tl===true;
   const odo=r.odo!==""&&r.odo!=null?`${(+r.odo).toLocaleString()} ${dU(r.vid)}`:"";
-  let title=esc(r.desc||TYPES.find(t=>t[0]===r.type)[1]),meta=[r.date,odo,r.by?"by "+esc(r.by):""].filter(Boolean).join(" · "),extra="";
+  let title=esc(r.desc||TYPES.find(t=>t[0]===r.type)[1]),meta=[tl?"":r.date,tl?"":odo,r.by?"by "+esc(r.by):""].filter(Boolean).join(" · "),extra="";
   if(r.type==="odometer")title=isH(r.vid)?"Hours reading":"Odometer reading";
   if(r.type==="reminder"){const i=rinfo(r,lastOdo(r.vid));extra=r.done?'<span class="tag">Done</span>':tag(i.st);meta=["Due",r.date,odo].filter(Boolean).join(" · ")+(r.done?"":` (${i.txt.replace(/ \(est\. ([^)]*)\)/g,", est. $1")})`)+(r.rep>0?" · repeats every "+repTxt(r.rep):"")}
   const rc=(r.rc||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}">`).join("");
@@ -746,7 +746,7 @@ function openForm(id,pre){
   show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":(({repair:"repair",upgrade:"upgrade",reminder:"reminder",note:"note"})[t]||TYPES.find(x=>x[0]===t)[1].toLowerCase())}</h3>${e.banner?`<div class="m" style="margin-top:6px;color:var(--ac)">${esc(e.banner)}</div>`:""}
   <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${rem?`<label>Repeats</label><select id="f_rep">${REP.map(([n,l])=>`<option value="${n}" ${+e.rep===n||(!e.rep&&n===0)?"selected":""}>${l}</option>`).join("")}<option value="c" ${repC?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_repc" value="${repC?e.rep:""}" placeholder="Months" style="margin-top:6px;display:${repC?"":"none"}">`:""}
   ${isT(S.cur)?"":`<label>${rem?"Due at "+dU()+" (optional)":(isH(S.cur)?"Hours":"Odometer ("+(S.units==="imperial"?"mi":"km")+")")}</label><input type="number" inputmode="numeric" id="f_odo" value="${e.odo}" placeholder="${lastOdo(S.cur)||""}">`}
-  ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}${(x.pl||[]).length||(x.iu||[]).length?" \u25cf":""}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
+  ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}${(x.pl||[]).length||(x.iu||[]).length?" \u25cf":""}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1;position:relative" >+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
   ${sr?'<label>Parts used</label><div class="row" style="margin-top:6px"><button type="button" class="p" id="addpt" style="flex:1">+ Bought for this job</button>'+(S.inv.length?'<button type="button" id="addiv" style="flex:1">\u2212 Take from inventory</button>':"")+'</div><div id="pls"></div>'+(S.inv.length?'<select id="ivs" style="display:none"></select><div id="ius"></div>':""):""}
   ${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
     ${sr?`<label>Warranty ends (optional)</label><div class="row"><input type="date" id="f_wd" value="${e.wd||""}">${isT(S.cur)?"":`<input type="number" inputmode="numeric" id="f_wo" value="${e.wo??""}" placeholder="at ${dU()}">`}</div>`:""}
