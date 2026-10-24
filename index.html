@@ -211,7 +211,7 @@ let RO="";try{RO=new URLSearchParams(location.search).get("ro")||""}catch(e){}
 if(RO){const _g=Storage.prototype.getItem,_s=Storage.prototype.setItem;
   Storage.prototype.getItem=function(k){return/^garagelog(-base)?$/.test(k)?null:_g.call(this,k)};
   Storage.prototype.setItem=function(k,v){if(/^garagelog(-base)?$/.test(k))return;return _s.call(this,k,v)}}
-if(RO){document.body.classList.add("ro");const _n=()=>{};openForm=vehForm=invForm=addPart=specForm=partEdit=delRec=doneRem=snoozeDlg=qOdo=dataForm=addChooser=renewDlg=searchForm=docsForm=mvVeh=_n;
+if(RO){document.body.classList.add("ro");const _n=()=>{};openForm=vehForm=invForm=addPart=specForm=partEdit=delRec=doneRem=snoozeDlg=qOdo=dataForm=addChooser=renewDlg=searchForm=docsForm=mvVeh=starterDlg=_n;
   const b=document.createElement("div");b.id="rob";b.textContent="View only";document.body.appendChild(b)}
 const APP=!!(window.Capacitor&&(Capacitor.isNativePlatform?Capacitor.isNativePlatform():true));
 let SRV={};try{SRV=JSON.parse(localStorage.getItem("garagelog-server")||"{}")||{}}catch(e){}
@@ -328,16 +328,16 @@ const PRE0={
   other:[["Oil change",0,50,12],["General service",0,0,12]]};
 const PR=k=>(S.presets&&S.presets[k])||(PRE0[k]||PRE0.other).map(([n,d,h,m])=>({n,d,h,m}));
 const vTabs=v=>TYPES.filter(t=>!(isT(v.id)&&t[0]==="odometer")).map(([k,l])=>[k,k==="odometer"&&isH(v.id)?"Hours":l]);
-function printView(v,full){
+function printView(v,full,only){
   const L={service:"Service",repair:"Repair",upgrade:"Upgrade"},tm=isT(v.id);
-  const rows=S.records.filter(r=>r.vid===v.id&&L[r.type]).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));
+  const rows=S.records.filter(r=>r.vid===v.id&&L[r.type]&&(!only||r.id===only)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));
   const meta=[v.model,v.vin&&"VIN "+v.vin,["car","trailer"].includes(v.kind)&&v.plate&&"Plate "+v.plate].filter(Boolean).join(" · ");
   const row=r=>{const work=[r.desc,...(r.dl||[])].filter(Boolean).join("; ")||L[r.type],pt=partsOf(r).filter(Boolean);
     return `<tr><td>${esc(r.date||"")}</td>${tm?"":`<td>${r.odo!==""&&r.odo!=null?(+r.odo).toLocaleString()+" "+dU(v.id):""}</td>`}<td>${L[r.type]}</td><td>${esc(work)}${pt.length?`<div class="pvm">Parts: ${pt.map(x=>esc(x)).join(", ")}</div>`:""}${r.notes?`<div class="pvm">${esc(r.notes)}</div>`:""}${full&&(r.ph||[]).concat(r.rc||[]).length?`<div class="pvph">${(r.ph||[]).concat(r.rc||[]).map(p=>`<img src="${esc(pu(p))}" alt="">`).join("")}</div>`:""}</td></tr>`};
-  $("pv").innerHTML=`<div class="bar"><button class="p" id="pv_p">Print / Save as PDF</button><button id="pv_x">Close</button></div><h1>${esc(v.name)}</h1>${meta?`<div class="pvm">${esc(meta)}</div>`:""}<div class="pvm" style="margin-bottom:16px">${full?"Full history":"Service history"} · ${today()}${tm?"":" · "+lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>${full?fullExtra(v):""}<table><tr><th>Date</th>${tm?"":`<th>${isH(v.id)?"Hours":"Odometer"}</th>`}<th>Type</th><th>Work done</th></tr>${rows.map(row).join("")||'<tr><td colspan="4">No records yet.</td></tr>'}</table>`;
+  $("pv").innerHTML=`<div class="bar"><button class="p" id="pv_p">Print / Save as PDF</button><button id="pv_x">Close</button></div><h1>${esc(v.name)}</h1>${meta?`<div class="pvm">${esc(meta)}</div>`:""}<div class="pvm" style="margin-bottom:16px">${only?"Service record":full?"Full history":"Service history"} · ${today()}${tm?"":" · "+lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>${full&&!only?fullExtra(v):""}<table><tr><th>Date</th>${tm?"":`<th>${isH(v.id)?"Hours":"Odometer"}</th>`}<th>Type</th><th>Work done</th></tr>${rows.map(row).join("")||'<tr><td colspan="4">No records yet.</td></tr>'}</table>`;
   $("pv").hidden=false;$("pv").scrollTop=0;
   $("pv_p").onclick=()=>{try{window.print()}catch(e){}};
-  if(APP){$("pv_p").textContent="Share as file";$("pv_p").onclick=()=>{const c=$("pv").cloneNode(true),b=c.querySelector(".bar");if(b)b.remove();saveBlob((full?"full-history-":"service-history-")+v.name.replace(/[^\w-]+/g,"-")+".html",new Blob(['<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Service history</title><style>body{font:14px system-ui,sans-serif;padding:18px;color:#111}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:#555}.pvm{color:#555;font-size:13px}</style>'+c.innerHTML],{type:"text/html"}))}}$("pv_x").onclick=()=>{$("pv").hidden=true};
+  if(APP){$("pv_p").textContent="Share as file";$("pv_p").onclick=()=>{const c=$("pv").cloneNode(true),b=c.querySelector(".bar");if(b)b.remove();saveBlob((only?"record-":full?"full-history-":"service-history-")+v.name.replace(/[^\w-]+/g,"-")+".html",new Blob(['<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Service history</title><style>body{font:14px system-ui,sans-serif;padding:18px;color:#111}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:#555}.pvm{color:#555;font-size:13px}</style>'+c.innerHTML],{type:"text/html"}))}}$("pv_x").onclick=()=>{$("pv").hidden=true};
 }
 let tt=null;
 function toast(msg,undo){const t=$("toast");t.innerHTML=`<span>${esc(msg)}</span>${undo?'<button id="tu">Undo</button>':""}`;t.hidden=false;clearTimeout(tt);const hide=()=>{t.hidden=true};tt=setTimeout(hide,undo?8000:3000);if(undo)$("tu").onclick=()=>{clearTimeout(tt);hide();undo()}}
@@ -506,6 +506,25 @@ function attnSheet(){
   show('<h3 style="margin:0">Needs attention</h3>'+(a.over.length?'<label>Overdue</label>'+a.over.map(it).join(""):"")+(a.soon.length?'<label>Due soon</label>'+a.soon.map(it).join(""):"")+(a.miles.length?'<label>Update mileage</label>'+a.miles.map(x=>`<button class="mrow" data-qm="${x.v.id}"><b>${esc(x.v.name)}</b><span class="m" style="display:block">${ago2(x.n.days)} since the last reading</span></button>`).join(""):"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
   $("dbody").onclick=e=>{const k=e.target.closest("button[data-ak]");if(k){S.cur=k.dataset.av2;const d=k.dataset;if(d.ak==="done")doneRem(d.id);else if(d.ak==="renew")renewDlg(d.id);else snoozeDlg(d.id);return}const b=e.target.closest("button[data-av],button[data-qm]");if(!b)return;if(b.dataset.av){S.cur=b.dataset.av;view="vehicle";tab="reminder";$("dlg").close();render()}else{$("dlg").close();qOdo(b.dataset.qm)}};
 }
+// ---- starter reminders
+const STR={
+ car:[["Engine oil and filter",6,5000,0],["Tire rotation",6,6000,0],["Brake inspection",12,12000,0],["Engine air filter",12,15000,0],["Cabin air filter",12,15000,0],["Wiper blades",12,0,0],["Coolant",36,30000,0]],
+ offroad:[["Engine oil and filter",6,1000,50],["Air filter clean or replace",6,500,25],["Drive belt inspection",12,1500,75],["Differential and gear oil",12,1500,75],["Grease fittings",6,500,25],["Brake fluid",24,0,0],["Coolant",24,0,0]],
+ trailer:[["Wheel bearings repack",12,0,0],["Tire pressure and lug nuts",6,0,0],["Brakes and lights check",6,0,0]],
+ mower:[["Engine oil",12,0,50],["Sharpen or replace blade",12,0,25],["Air filter",12,0,25],["Spark plug",12,0,100]],
+ other:[["Oil change",12,0,50],["General inspection",12,0,0]]};
+function starterDlg(vid){
+  const v=vOf(vid);if(!v)return;const tm=isT(vid),hs=isH(vid),imp=S.units==="imperial",lo=lastOdo(vid),du=dU(vid);
+  const have=S.records.filter(r=>r.vid===vid&&r.type==="reminder"&&!r.done).map(r=>(r.desc||"").toLowerCase());
+  const L=(STR[v.kind]||STR.other).filter(x=>!have.includes(x[0].toLowerCase())),dist=n=>Math.round(n*(imp?1:1.6)/100)*100;
+  const q=x=>hs?x[3]:dist(x[2]),txt=x=>"every "+(x[1]%12===0?(x[1]===12?"year":x[1]/12+" years"):x[1]+" months")+(!tm&&q(x)?" or "+q(x).toLocaleString()+" "+du:"");
+  if(!L.length){toast("You already have all the suggested reminders");return}
+  show(`<h3 style="margin:0">Common reminders for ${esc(v.name)}</h3><div class="m" style="margin-top:6px">Tick the ones you want. They become normal reminders you can edit or delete. Distances count from your latest reading${lo?"":" (once you add one)"}.</div><div id="stl" style="margin-top:6px">${L.map((x,i)=>`<label class="ck"><input type="checkbox" data-i="${i}"><span>${esc(x[0])} <span class="m">${txt(x)}</span></span></label>`).join("")}</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Skip</button><button id="sta" style="flex:1">Select all</button><button class="p" id="ok" style="flex:1">Add</button></div>`);
+  $("sta").onclick=()=>$("stl").querySelectorAll("input").forEach(i=>i.checked=true);
+  $("ok").onclick=()=>{const a=[...$("stl").querySelectorAll("input:checked")].map(i=>L[+i.dataset.i]);if(!a.length){$("dlg").close();return}
+    a.forEach(x=>{const d=q(x);S.records.push({id:uid(),vid,type:"reminder",date:addM(today(),x[1]),odo:!tm&&d&&lo>0?lo+d:"",desc:x[0],parts:"",pl:[],dl:[],notes:"",ph:[],rc:[],done:false,nrid:"",next:0,iu:[],rep:x[1]})});
+    save();$("dlg").close();render();toast(a.length+" reminder"+(a.length===1?"":"s")+" added")};
+}
 // ---- checklists
 const CLS={
  offroad:[["Spring start-up",["Check tire pressure and condition","Check oil and coolant levels","Inspect brake pads and fluid","Charge or test the battery","Check belt and CVT","Grease fittings and check bolts","Test lights and controls"]],["Winterize",["Change oil","Add fuel stabilizer and run the engine","Clean the vehicle","Disconnect or trickle-charge the battery","Cover and store off the ground"]]],
@@ -661,7 +680,7 @@ function recView(v){
   const chips=tab==="timeline"?[["all","All"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"]]:tab==="reminder"?[["all","All"],["over","Overdue"],["up","Upcoming"],["done","Done"]]:yrs.length>1?[["all","All"],...yrs.map(y=>[y,y])]:[];
   if(all.length>3||rq)out+=`<input id="rs" class="rsb" type="search" placeholder="Search notes, parts, dates…" value="${esc(rq)}" aria-label="Search">`;
   if(chips.length&&(all.length>3||tab==="timeline"&&all.length>1))out+='<div class="chs">'+chips.map(([k,l])=>`<button class="${k===rch?"on":""}" data-rch="${k}">${l}</button>`).join("")+"</div>";
-  return out+'<div id="rl">'+recRows(v)+"</div>";
+  return out+'<div id="rl">'+recRows(v)+"</div>"+(tab==="reminder"&&!RO?'<button class="qa" data-strt="1" style="margin:12px 0 0;width:100%">Add common reminders':"")+(tab==="reminder"&&!RO?"</button>":"");
 }
 function card(r,tl){tl=tl===true;
   const odo=r.odo!==""&&r.odo!=null?`${(+r.odo).toLocaleString()} ${dU(r.vid)}`:"";
@@ -709,12 +728,14 @@ const HELP=[
 ["Text size and appearance","<p>Settings &amp; data has <b>Text size</b> (Normal, Large, Extra large) and <b>Appearance</b> (match your device, dark or light).</p>"],
 ["Needs-attention banner and mileage nudge","<p>On My Garage, a banner shows how many things are overdue, due soon, or need a fresh odometer reading. Tap it for the list. Inside equipment, the dashboard asks you to update the odometer or hours when the last reading is a month old, so the estimated due dates stay accurate. Tap <b>Later</b> to hide it for a week.</p>"],
 ["Warranty dates","<p>Add <b>Warranty ends</b> to equipment (Edit equipment) or to any service, repair or upgrade, as a date, an odometer reading, or both. It becomes a reminder, so it shows in alerts and the calendar like any other.</p>"],
+["Common reminders","<p>After you add equipment, the app offers a list of usual reminders for that kind, such as oil, filters and belts. Tick the ones you want. You can open the same list later from the <b>Reminders</b> tab with <b>Add common reminders</b>. They are ordinary reminders you can edit or delete.</p><p>When you add a reminder yourself, <b>Or pick a month</b> sets it to the 1st of that month and repeats it every year, handy for things like spring mower prep.</p>"],
+["Share one record","<p>Open any service, repair or upgrade with its pencil and tap <b>Share or print this record</b>. It makes a page for just that job, with parts, notes, photos and receipts. On the web use Print / Save as PDF. In the Android app it is shared as a file.</p>"],
 ["Checklists","<p>Open <b>More &gt; Checklists</b> to make your own lists, such as <i>Before a ride</i>. Tap <b>Start</b>, tick the items, then <b>Finish</b>. The list remembers when you last did it.</p><p>Under <b>Suggested starters</b> you can add a ready-made list, such as <i>Spring start-up</i> or <i>Winterize</i>, then edit it to suit.</p>"],
 ["Tires","<p>Open <b>More &gt; Tires</b> to keep each set (brand, size, bought date), see which set is mounted and how far it has gone, and log tread depth in 32nds. Use <b>Mount this set</b> when you swap.</p>"],
 ["Where to buy links","<p>Inventory items and parts-list categories have optional <b>Where to buy</b> fields: a store name and a link. The link shows on the tile so reordering is one tap. No prices are stored.</p>"],
 ["Full history report","<p><b>More &gt; Full history report</b> makes a printable page with the equipment's parts, dates, tires, documents and every service, repair and upgrade with its photos and receipts. On the web use Print / Save as PDF. In the Android app it is shared as a file you can open in a browser and print to PDF.</p>"],
 ["Recalls","<p>If a vehicle has a VIN, its dashboard has a <b>Recalls</b> card. Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website, so tap <b>Copy VIN</b>, then <b>Open nhtsa.gov/recalls</b> and paste it in. Tap <b>I checked</b> to remember the date.</p>"],
-["Syncing with your server","<p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
+["Syncing with your server","<p>If syncing stops, open <b>Settings &amp; data &gt; Connection log</b>. It shows the server address, a <b>Test connection</b> button, and the last sync events and errors.</p><p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
 ["Backups and moving to a new phone","<p>Settings &amp; data has <b>Download backup</b> and <b>Restore from file</b>. With a server, a copy is also saved there every day and the last 14 are kept. To move the Android app to a new phone, take a backup first and restore it on the new one.</p>"],
 ["Reminder alerts and calendar","<p>With a server, <b>Settings &amp; data &gt; Reminder alerts</b> sends a notification when something becomes due. Enter an ntfy address (such as https://ntfy.sh/your-topic) or a JSON webhook for Home Assistant or Gotify, then press <b>Send test message</b>.</p><p><b>Get calendar link</b> gives you an address to subscribe to in a calendar app so due dates show up there.</p>"],
 ["Android app: updates","<p>A green dot on the ⋯ button means a newer version of the app is available. Open <b>Settings &amp; data &gt; App updates</b> and tap the link to download it, then install it over the old one. Your data is kept.</p>"],
@@ -761,7 +782,7 @@ function openForm(id,pre){
   const pr=sr&&!id&&vOf(S.cur)?PR(vOf(S.cur).kind):[];
   let ph=(e.ph||[]).slice(),rc=(e.rc||[]).slice();
   show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":(({repair:"repair",upgrade:"upgrade",reminder:"reminder",note:"note"})[t]||TYPES.find(x=>x[0]===t)[1].toLowerCase())}</h3>${e.banner?`<div class="m" style="margin-top:6px;color:var(--ac)">${esc(e.banner)}</div>`:""}
-  <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${rem?`<label>Repeats</label><select id="f_rep">${REP.map(([n,l])=>`<option value="${n}" ${+e.rep===n||(!e.rep&&n===0)?"selected":""}>${l}</option>`).join("")}<option value="c" ${repC?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_repc" value="${repC?e.rep:""}" placeholder="Months" style="margin-top:6px;display:${repC?"":"none"}">`:""}
+  <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${rem?`<select id="f_mon" style="margin-top:6px"><option value="">Or pick a month (repeats every year)</option>${["January","February","March","April","May","June","July","August","September","October","November","December"].map((m,i)=>`<option value="${i}">Every ${m}</option>`).join("")}</select><label>Repeats</label><select id="f_rep">${REP.map(([n,l])=>`<option value="${n}" ${+e.rep===n||(!e.rep&&n===0)?"selected":""}>${l}</option>`).join("")}<option value="c" ${repC?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_repc" value="${repC?e.rep:""}" placeholder="Months" style="margin-top:6px;display:${repC?"":"none"}">`:""}
   ${isT(S.cur)?"":`<label>${rem?"Due at "+dU()+" (optional)":(isH(S.cur)?"Hours":"Odometer ("+(S.units==="imperial"?"mi":"km")+")")}</label><input type="number" inputmode="numeric" id="f_odo" value="${e.odo}" placeholder="${lastOdo(S.cur)||""}">`}
   ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}${(x.pl||[]).length||(x.iu||[]).length?" \u25cf":""}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:28px;height:28px;padding:0;border-radius:50%;font-size:20px;line-height:1;position:relative" >+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
   ${sr?'<label>Parts used</label><div class="row" style="margin-top:6px"><button type="button" class="p" id="addpt" style="flex:1">+ Bought for this job</button>'+(S.inv.length?'<button type="button" id="addiv" style="flex:1">\u2212 Take from inventory</button>':"")+'</div><div id="pls"></div>'+(S.inv.length?'<select id="ivs" style="display:none"></select><div id="ius"></div>':""):""}
@@ -769,7 +790,9 @@ function openForm(id,pre){
     ${sr?`<label>Warranty ends (optional)</label><div class="row"><input type="date" id="f_wd" value="${e.wd||""}">${isT(S.cur)?"":`<input type="number" inputmode="numeric" id="f_wo" value="${e.wo??""}" placeholder="at ${dU()}">`}</div>`:""}
     <label>Notes</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
   ${sr?`<label>Done by (optional)</label><input id="f_by" list="bys" value="${esc(e.by||"")}" placeholder="Me, a family member, a shop…" autocomplete="off"><datalist id="bys">${[...new Set(S.records.map(r=>r.by).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join("")}</datalist>`:""}
-  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${sr&&!id?'<label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--tx)"><input type="checkbox" id="f_job" style="width:auto;margin:0"> Save as a template (remembers parts and interval)</label>':""}${btns}${id?'<button type="button" id="f_del" style="margin-top:8px;width:100%;color:var(--bad)">Delete this entry</button>':""}`);
+  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${sr&&!id?'<label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--tx)"><input type="checkbox" id="f_job" style="width:auto;margin:0"> Save as a template (remembers parts and interval)</label>':""}${btns}${id&&PH.includes(t)?'<button type="button" id="f_shr" style="margin-top:8px;width:100%">Share or print this record</button>':""}${id?'<button type="button" id="f_del" style="margin-top:8px;width:100%;color:var(--bad)">Delete this entry</button>':""}`);
+  if($("f_mon"))$("f_mon").onchange=()=>{const m=$("f_mon").value;if(m==="")return;const y=new Date().getFullYear(),pad=n=>String(n).padStart(2,"0");let d=y+"-"+pad(+m+1)+"-01";if(d<=today())d=(y+1)+"-"+pad(+m+1)+"-01";$("f_date").value=d;$("f_rep").value="12";$("f_repc").style.display="none"};
+  if($("f_shr"))$("f_shr").onclick=()=>{$("dlg").close();printView(veh(),true,id)};
   if($("f_del"))$("f_del").onclick=()=>{$("dlg").close();delRec(id)};
   const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${pu(p)}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
   grp("ph","pf",ph,800,.65);grp("rc","rf",rc,1600,.7);
@@ -887,7 +910,7 @@ function vehForm(edit){
     const f={wd:$("v_wd").value,wo:$("v_wo").value===""?"":+$("v_wo").value,name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,ohvRep:+$("v_ohr").value||24,reg:$("v_rgd").value,regRep:+$("v_rgr").value||24,kind:$("v_k").value,meter:$("v_t").value,color,cover,soonDays:+$("v_sd").value||0,soonDist:+$("v_sm").value||0,dts:(syD2(),dts.filter(x=>x.l||x.date))};
     if(edit)Object.assign(v,f);else{const nv=Object.assign({id:uid(),specs:{}},f);fixV(nv);S.vehicles.push(nv)}
     {const tv=edit?v:S.vehicles[S.vehicles.length-1];syncWty(tv,tv.id,tv.name,f.wd,f.wo)}
-    save();$("dlg").close();render()};
+    save();$("dlg").close();render();if(!edit)starterDlg(S.vehicles[S.vehicles.length-1].id)};
   if(edit)$("av").onclick=()=>{if(!confirm("Archive "+v.name+"? It leaves your garage but keeps its history. You can restore it from Settings & data."))return;v.arch=true;S.cur=null;view="garage";save();$("dlg").close();render()};
   if(edit)$("dv").onclick=()=>{if(!confirm("Delete "+v.name+" and all its records?"))return;S.records=S.records.filter(r=>r.vid!==v.id);S.vehicles=S.vehicles.filter(x=>x.id!==v.id);S.cur=null;view="garage";save();$("dlg").close();render()};
 }
@@ -965,6 +988,7 @@ function dataForm(){
   <div class="m" style="margin-top:12px">${SYNC?"Server sync: ":"Storage: "}<span id="ss">${SYNC?syncMsg:"saved on this phone only"}</span></div>
   <label>Backup</label><div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="m" id="lbd" style="margin-top:6px">${(()=>{try{const d=localStorage.getItem("garagelog-lb");return d?"Last backup file: "+d:"No backup file downloaded from this device yet."}catch(e){return""}})()}</div><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>
   ${SYNC?`<details style="margin-top:12px"><summary class="m">Server backups</summary><div class="m" id="bkl" style="margin-top:8px">Loading…</div></details>
+  ${SYNC?`<details style="margin-top:12px"><summary class="m">Connection log</summary><div class="m" style="margin-top:8px">Server: ${esc(BASE||location.origin)}</div><div class="row" style="margin-top:8px"><button id="tcb" style="flex:1">Test connection</button></div><div class="m" id="tcm" style="margin-top:6px"></div><div class="m" style="margin-top:8px">${SLG.length?SLG.slice().reverse().slice(0,20).map(x=>esc(new Date(x.t).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}))+" \u00b7 "+esc(x.m)+(x.n>1?" (\u00d7"+x.n+")":"")).join("<br>"):"Nothing logged yet."}</div></details>`:""}
   <label>Calendar</label><div class="row"><button id="cal_b" style="flex:1">Get calendar link</button></div><div class="m" id="cal_m" style="margin-top:6px">Shows reminders and expiration dates that have a date. Subscribe to the link in Apple Calendar or an Android app like ICSx\u2075. Google Calendar can't reach an address on your home network.</div>`:""}${SYNC?`<label>Share (view only)</label><div class="row"><button id="ro_b" style="flex:1">Get view-only link</button></div><div class="m" id="ro_m" style="margin-top:6px">A link family can open to look at your garage and history. They can't change anything. It needs a password on the server.</div>`:""}${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
   
   ${APP?`<label>App updates</label><div class="m" id="up_m" style="margin-top:4px">Checking\u2026</div>`:""}
@@ -980,6 +1004,7 @@ function dataForm(){
   if($("al_t"))$("al_t").onclick=async()=>{const u=$("al_u").value.trim(),m=$("al_m");if(!/^https?:\/\//.test(u)){m.textContent="Enter the address first.";return}sa();m.textContent="Sending…";
     try{const r=await F("api/alert/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u,fmt:$("al_f").value})});m.textContent=r.ok?"Sent. Check your phone.":"The server could not reach that address."}catch(e){m.textContent="Could not reach the Garage Log server."}};
   $("ok").onclick=()=>$("dlg").close();
+  if($("tcb"))$("tcb").onclick=async()=>{const m=$("tcm");m.textContent="Testing\u2026";const t0=Date.now();try{const r=await F("api/state",{cache:"no-store"});const ms=Date.now()-t0;m.textContent=r.ok?"Reached the server in "+ms+" ms. All good.":r.status===401?"The server answered, but it wants a password (or the one saved is wrong).":"The server answered with error "+r.status+".";slog("Test: "+m.textContent,r.ok?"ok":"err")}catch(e){m.textContent="Couldn't reach the server."+(APP?" Check the address and port in Server settings (for example :30500), and that the server is running.":" Check that the server is running.");slog("Test: couldn't reach the server","err")}};
   $("dlb").onclick=async()=>{const b=$("dlb");b.textContent="Preparing…";const c=await inlined();b.textContent="Download backup";try{localStorage.setItem("garagelog-lb",today())}catch(e){}$("lbd")&&($("lbd").textContent="Last backup file: "+today());saveBlob("garage-log-"+today()+".json",new Blob([JSON.stringify(c)],{type:"application/json"}))};
   $("rfb").onclick=()=>$("rf").click();
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
@@ -1019,6 +1044,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.rccp){const v=veh(),vin=(v.vin||"").trim();try{navigator.clipboard.writeText(vin).then(()=>toast("VIN copied")).catch(()=>toast("Couldn't copy. Select the VIN in Details"))}catch(e){toast("Couldn't copy. Select the VIN in Details")}}
   else if(d.rcchk){const v=veh(),was=v.rcChk;v.rcChk=today();save();render();toast("Marked as checked today",()=>{if(was)v.rcChk=was;else delete v.rcChk;save();render()})}
   else if(d.gsrch)gSearch();
+  else if(d.strt)starterDlg(S.cur);
   else if(d.srch)searchForm(veh());
   else if(d.qodo)qOdo(S.cur);
   else if(d.snz)snoozeDlg(d.snz);
@@ -1040,7 +1066,9 @@ const fixV=v=>{v.specs=v.specs||{};if(!v.plist){const sp=v.specs;v.plist=SPECS.f
 render();
 let syncMsg="not connected yet",pt=null,busy=false,again=false,base=null;
 document.body.dataset.sync=SYNC?"busy":"local";
-const setSync=(st,msg)=>{syncMsg=msg;document.body.dataset.sync=st;const e=$("ss");if(e)e.textContent=msg};
+const SLG=(()=>{try{const a=JSON.parse(localStorage.getItem("garagelog-sl")||"[]");return Array.isArray(a)?a:[]}catch(e){return[]}})();
+const slog=(m,s)=>{const l=SLG[SLG.length-1],now=Date.now();if(l&&l.m===m){l.t2=now;l.n=(l.n||1)+1}else SLG.push({t:now,s:s||"",m});while(SLG.length>40)SLG.shift();try{localStorage.setItem("garagelog-sl",JSON.stringify(SLG))}catch(e){}};
+const setSync=(st,msg)=>{if(msg!==syncMsg)slog(msg,st);syncMsg=msg;document.body.dataset.sync=st;const e=$("ss");if(e)e.textContent=msg};
 const api=()=>"api/state"+(RO?"?t="+encodeURIComponent(RO):""),AK=["vehicles","records","inv"],SK=["units","presets","alert","lastNext"];
 const clone=o=>JSON.parse(JSON.stringify(o));
 const norm=o=>{o.records=(o.records||[]).filter(r=>r.type!=="fuel");o.vehicles=o.vehicles||[];o.vehicles.forEach(fixV);return o};
@@ -1082,11 +1110,11 @@ async function send(){
         if(base){mergeIn(T);merged=true;redraw();continue}
         adopt(T);setBase(T);setSync("ok","loaded changes from another device");redraw();break;
       }
-      if(!r.ok)throw 0;
+      if(!r.ok)throw new Error("the server answered "+r.status+(r.status===401?" (password needed or wrong)":""));
       const j=await r.json();S.rev=j.rev;const b=JSON.parse(sent);b.rev=j.rev;setBase(b);stash();
       setSync("ok",merged?"saved to server (merged with changes from another device)":"saved to server");if(sent.includes('"data:image'))more=true;break;
     }
-  }catch(e){setSync("off","offline (saved on this device only)")}
+  }catch(e){slog("Save failed: "+((e&&e.message)||"can't reach the server"),"err");setSync("off","offline (saved on this device only)")}
   if(document.body.dataset.sync==="busy")setSync("off","couldn't save yet, will retry");
   busy=false;
   if(again){again=false;send()}else if(more)pull(true);
@@ -1101,7 +1129,7 @@ const pull=f=>{
       if(o&&Object.keys(o).length){mergeIn(d);redraw();push()}
       else{if(cmp(norm(clone(d)))===cmp(S)){if(d.rev!==undefined)S.rev=d.rev}else{adopt(d);redraw()}setBase(d)}
     }else if(S.vehicles.length)push();
-  }).catch(()=>{setSync("off","offline (saved on this device only)")});
+  }).catch(e=>{slog("Load failed: "+((e&&e.message)||"can't reach the server"),"err");setSync("off","offline (saved on this device only)")});
 };
 addEventListener("online",()=>pull());addEventListener("offline",()=>setSync("off","offline (saved on this device only)"));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});

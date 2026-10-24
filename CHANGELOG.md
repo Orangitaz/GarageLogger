@@ -2,6 +2,12 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.16.0 - 2026-10-23
+- **Common reminders:** after adding equipment the app offers usual reminders for that kind (oil, filters, belts and so on). Tick the ones you want. Also available from the Reminders tab.
+- **Share or print one record:** the edit form of a service, repair or upgrade has a button that makes a page for just that job, with photos and receipts.
+- **Every month:** when adding a reminder, pick a month and it is set to repeat every year.
+- **Connection log:** Settings & data now has a Connection log with the server address, a Test connection button, and recent sync events and errors.
+
 ## 1.15.0 - 2026-10-22
 - **Needs attention** list: each item now has **Done** (or Renew) and **Snooze** buttons, so you can clear it without opening the equipment.
 - **When did I last…** on My Garage searches every piece of equipment at once and shows when each last had that job or part. Tap a result to open that timeline.
