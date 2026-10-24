@@ -16,7 +16,7 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 *Screenshots show sample data.*
 
 ## What it does
-- **Garage and dashboards:** every piece of equipment gets a card with a status and a dashboard with upcoming reminders and recent services and repairs. A **Needs attention** list shows what is overdue, due soon or needs a fresh odometer reading, with **Done** and **Snooze** right there.
+- **Garage and dashboards:** My Garage shows each piece of equipment as a colored tile with a status, with quick tiles for adding a service, an odometer reading or a checklist. Each one has a dashboard with upcoming reminders and recent services and repairs. A **Needs attention** list shows what is overdue, due soon or needs a fresh odometer reading, with **Done** and **Snooze** right there.
 - **Service, repair and upgrade records** with notes, photos, receipts, quick-pick services, who did the work, and parts used. Parts are either **bought for this job** or **taken from inventory** (which deducts the stock). A **Timeline** tab shows all three together.
 - **Reminders** by date, miles or hours, with repeats (every 6 months, 1, 2 or 3 years, custom, or "every April"). Mileage reminders show an estimated date. Registration, the OHV sticker, warranty dates and your own dates (inspection, emissions, insurance) renew with one tap. After you add equipment, pick from a list of **common reminders** for that kind.
 - **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges and optional **where to buy** links. Several part numbers or brands per entry, with a camera button to scan barcodes and VINs.
@@ -25,7 +25,7 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 - **Finding things:** **When did I last…** searches every piece of equipment for a job or part, and each timeline has its own search and filters.
 - **Reports and records:** documents (PDFs and photos), a printable **service history**, a **full history report** with photos, a one-record share page for a sale or a shop, **CSV export**, a link to **nhtsa.gov/recalls** with your VIN copied, **archive** for sold equipment, and **Undo** for deletes.
 - **Alerts** to your phone through ntfy, Home Assistant or Gotify, a calendar feed, a status feed for Home Assistant dashboards, and a **view-only link** to share your garage.
-- Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes, three text sizes, built-in **Help**, and a **connection log** for troubleshooting sync. Optional password.
+- Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes, three text sizes, swipe-back navigation, built-in **Help**, and a **connection log** for troubleshooting sync. Optional password.
 
 One image, one port, one data folder. No YAML needed.
 

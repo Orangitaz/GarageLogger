@@ -8,6 +8,14 @@ Each release has a number: **major.minor.patch**. A new feature raises the minor
 - **Every month:** when adding a reminder, pick a month and it is set to repeat every year.
 - **Connection log:** Settings & data now has a Connection log with the server address, a Test connection button, and recent sync events and errors.
 
+## 1.16.0 - 2026-10-24
+- **Back gesture:** swipe back or the phone's back button now closes a sheet or photo first, then goes from equipment back to My Garage, instead of leaving the app.
+- **New look:** colorful emoji icons on tabs and menus, a full-width bottom bar with a label under each icon, and My Garage shown as two-column tiles with a color stripe, big icon and status.
+- **Quick tiles** on My Garage: Add service, Odometer and Checklists (it asks which equipment).
+- **Done and Snooze** are now right on each reminder row.
+- **Update tile:** appears at the top of My Garage and in Settings only when a newer app version exists. The "you have the latest version" line is gone.
+- Fixed: tapping exactly on an icon inside a button (such as the magnifier in "Last done…") did nothing.
+
 ## 1.15.1 - 2026-10-23
 - Help: the Getting started topic lists every tab and the tools in the ⋯ menu, and the Needs-attention topic explains the Done and Snooze buttons.
 - The + button next to Description in the service form is bigger and easier to tap.

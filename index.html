@@ -144,7 +144,7 @@ label.ck input{width:24px;height:24px;flex:none;margin:0}
 .tli{position:relative;margin-bottom:12px}
 .tld{position:absolute;left:-32px;top:-2px;width:26px;height:26px;border-radius:50%;background:var(--pop);border:2px solid var(--ac);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:12px}
 .tlh{font-size:12px;font-weight:700;color:var(--mu);margin:2px 0 6px}
-html[data-ts="1"]{zoom:1.12}html[data-ts="2"]{zoom:1.26}html[data-ts="1"] #bn{width:min(82vw,380px)}html[data-ts="2"] #bn{width:min(72vw,380px)}html[data-ts] .rsb{max-width:100%;box-sizing:border-box}
+html[data-ts="1"]{zoom:1.12}html[data-ts="2"]{zoom:1.26}html[data-ts] .rsb{max-width:100%;box-sizing:border-box}
 @media(pointer:coarse){.ed::after,.ed2::after{content:"";position:absolute;inset:-6px}.ed2{position:relative}.chs button,.qps button{min-height:40px}}
 .ed,.ed2,#ev{font-size:0!important;display:inline-flex!important;align-items:center;justify-content:center}
 .ed::before,.ed2::before,#ev::before{content:"";width:17px;height:17px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z'/%3E%3Cpath d='M14.5 6.5l3 3'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z'/%3E%3Cpath d='M14.5 6.5l3 3'/%3E%3C/svg%3E") center/contain no-repeat}
@@ -191,6 +191,45 @@ body{overscroll-behavior-y:contain}
 .hp{border-bottom:1px solid var(--bd)}.hp .hb{padding:0 4px 14px;color:var(--mu);font-size:14px;line-height:1.55}.hp .hb p{margin:0 0 8px}
 .c[data-open]:active,.fab:active,.tabs button:active,#bn button:active,.mrow:active,.qa:active,button.p:active{transform:scale(.97)}
 .c[data-open],.fab,.tabs button,#bn button,.mrow,.qa,button.p{transition:transform .12s,border-color .2s,box-shadow .2s}
+
+/* ---- 1.16 refresh: emoji icons, docked bar, tiles */
+button .ic,a .ic,.tabs .ic{pointer-events:none}
+.ic.em{width:auto;height:auto;font-style:normal;font-size:1.1em;line-height:1;vertical-align:-.12em;stroke:none;fill:none}
+.tabs button .ic.em{width:auto;height:auto;font-size:15px;margin-right:6px;vertical-align:-1px}
+#bn{left:0;right:0;bottom:0;transform:none;width:auto;gap:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid var(--bd);border-radius:0;box-shadow:none;background:var(--hbg)}
+#bn button{flex-direction:column;gap:1px;padding:6px 4px 4px;border-radius:12px;font-size:11px;font-weight:600;position:relative}
+#bn button .ic.em{font-size:22px;margin:0}
+#bn button.on{background:none;box-shadow:none;color:var(--ac)}
+#bn button.on::before{content:"";position:absolute;top:-7px;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--ac)}
+body{padding-bottom:96px}
+.fab{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+#toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+#rob{bottom:calc(66px + env(safe-area-inset-bottom,0px))}
+.vg{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px}
+.vt{position:relative;overflow:hidden;min-height:150px;display:flex;flex-direction:column;gap:3px;padding:14px 12px 12px 16px;margin:0;cursor:pointer}
+.vt .bar{position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--k)}
+.vt .cv{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.3}
+.vt>*{position:relative}.vt>.bar,.vt>.cv{position:absolute}
+.vt .vi{line-height:1;margin-bottom:auto;padding-bottom:8px}
+.vt .vi .ic.em{font-size:34px}
+.vt h3{font-size:17px;font-weight:800;letter-spacing:-.01em;margin:0;overflow-wrap:anywhere}
+.vt .m{font-size:12.5px}
+.vt .vs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:4px;font-size:12.5px}
+.vt .vs .tag{margin:0}
+.vt .ed{position:absolute;top:8px;right:8px;width:34px;height:34px}
+.vt .mv{display:flex;gap:6px;margin-top:6px}.vt .mv button{flex:1;padding:6px}
+.vt .pb{margin-top:6px}
+.qt{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 12px}
+.qt button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 4px;font-size:13px;font-weight:600;border-radius:14px}
+.qt .ic.em{font-size:24px}
+.updt{display:block;text-decoration:none;color:var(--tx);margin:0 0 12px;padding:13px 14px;border-radius:16px;background:color-mix(in srgb,var(--ac) 12%,var(--field));border:1px solid color-mix(in srgb,var(--ac) 40%,transparent)}
+.updt b{display:block}.updt span{font-size:13px;color:var(--mu)}.updt u{color:var(--ac);font-weight:700}
+.rmr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
+.rmr>.m{flex:1;min-width:0;overflow-wrap:anywhere}
+.rb{display:flex;gap:6px;flex:none;margin:0;align-items:center}
+.rb button{flex:none;padding:9px 16px;border-radius:99px;font-weight:700}
+.rb button.dn{background:var(--ac);color:var(--on);border-color:transparent}
+.rb button.sz{padding:9px 11px}
 </style>
 </head>
 <body>
@@ -199,7 +238,7 @@ body{overscroll-behavior-y:contain}
 <main id="list"></main>
 <button class="fab p" id="fab">+</button>
 <button class="fab fabl p" id="fabE" title="Reorder equipment" style="display:none">⇅</button>
-<div id="bn"><button data-v="garage"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/></svg>Garage</button><button data-v="inventory"><svg viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>Inventory</button></div>
+<div id="bn"><button data-v="garage"><span class="ic em" aria-hidden="true">🏠</span><span class="bl">Garage</span></button><button data-v="inventory"><span class="ic em" aria-hidden="true">📦</span><span class="bl">Inventory</span></button></div>
 <div id="toast" hidden></div>
 <dialog id="dlg"><div id="dbody"></div></dialog>
 <div id="pv" hidden></div>
@@ -267,7 +306,8 @@ search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5"/>',
 cam:'<path d="M4 8.5h3.7l1.8-2.5h5l1.8 2.5H20V19H4z"/><circle cx="12" cy="13.5" r="3.3"/>',
 help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 1 1 3.6 2.4c-.7.4-1.1.9-1.1 1.7M12 17h.01"/>',
 oil:'<path d="M12 3.5s6 6.2 6 10.3a6 6 0 0 1-12 0c0-4.100 6-10.300 6-10.300z"/>'};
-const ico=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IP[n]||""}</svg>`;
+const EM={car:"🚗",mtn:"🏍️",trailer:"🚚",mower:"🚜",wrench:"🔧",hammer:"🛠️",up:"⬆️",grid:"📊",timeline:"📜",cube:"⚙️",bell:"⏰",gauge:"⏱️",note:"📝",dots:"⋯",flag:"🚩",cal:"📅",search:"🔍",cam:"📷",help:"❓",oil:"🛢️"};
+const ico=n=>EM[n]?`<span class="ic em" aria-hidden="true">${EM[n]}</span>`:`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IP[n]||""}</svg>`;
 const KIC={car:"car",offroad:"mtn",trailer:"trailer",mower:"mower"},TIC={dash:"grid",service:"wrench",repair:"hammer",upgrade:"up",timeline:"timeline",parts:"cube",reminder:"bell",odometer:"gauge",note:"note",more:"dots"};
 const kIc=k=>ico(KIC[k]||"wrench");
 const veh=()=>S.vehicles.find(v=>v.id===S.cur);
@@ -282,7 +322,7 @@ const act=()=>S.vehicles.filter(v=>!v.arch);
 const pseudo=v=>{const g=new Map();for(const x of vDates(v))g.set(x.date,[...(g.get(x.date)||[]),x]);
   return [...g.values()].map(a=>a.length===1?{desc:a[0].l,date:a[0].date,odo:"",vid:v.id,pk:a[0].k,rep:a[0].rep}:{desc:a.map(x=>x.l.replace(/ expires$/,"")).join(" + ")+" expire",date:a[0].date,odo:"",vid:v.id,pk:a.map(x=>x.k).join(","),rep:a.every(x=>x.rep===a[0].rep)?a[0].rep:0})};
 const partsOf=r=>(r.parts?[r.parts]:[]).concat(r.pl||[]).concat((r.iu||[]).map(x=>x.n+" ×"+x.q+(x.u?" "+x.u:"")));
-const rbtn=r=>r.pk?`<div class="row" style="margin-top:8px"><button data-renew="${r.pk}">Renew</button></div>`:r.id?`<div class="row" style="margin-top:8px">${r.rep>0?`<button data-renew="${r.id}">Renew</button>`:`<button data-done="${r.id}">Mark done</button>`}<button data-snz="${r.id}">Snooze</button></div>`:"";
+const rbtn=r=>r.pk?`<div class="rb"><button class="dn" data-renew="${r.pk}">Renew</button></div>`:r.id?`<div class="rb">${r.rep>0?`<button class="dn" data-renew="${r.id}">Renew</button>`:`<button class="dn" data-done="${r.id}">Done</button>`}<button class="sz" data-snz="${r.id}" aria-label="Snooze" title="Snooze">💤</button></div>`:"";
 const fmtD=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const addD=(s,n)=>{const d=new Date(s+"T00:00:00");d.setDate(d.getDate()+n);return fmtD(d)};
 // Rough date a distance/hours reminder will come due, from how fast the readings have been climbing.
@@ -593,7 +633,28 @@ function moreMenu(){
   show(`<h3 style="margin:0">More</h3><label>Tools</label>`+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
   $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.pvf){$("dlg").close();printView(v,true)}else if(e.target.dataset.cl){$("dlg").close();clList()}else if(e.target.dataset.tires){$("dlg").close();tireList()}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}};
 }
+// ---- back gesture: sheets, photo viewer, report and equipment each take one history step
+const HS=[],HQ=[];let hskip=0,LV="garage",hbusy=false,hto=0;
+// History steps run one at a time so a close followed by an open can't race.
+function hnext(){clearTimeout(hto);const f=HQ.shift();if(!f){hbusy=false;return}hbusy=true;f()}
+function hq(f){HQ.push(f);if(!hbusy)hnext()}
+function hpush(t){HS.push(t);hq(()=>{try{history.pushState({gl:1},"")}catch(e){}hnext()})}
+function hdrop(t){const i=HS.lastIndexOf(t);if(i<0)return;const top=i===HS.length-1;HS.splice(i,1);if(top)hq(()=>{hskip++;hto=setTimeout(()=>{if(hskip>0)hskip--;hnext()},600);try{history.back()}catch(e){hskip--;hnext()}})}
+addEventListener("popstate",()=>{
+  if(hskip>0){hskip--;hnext();return}
+  const t=HS.pop();if(!t)return;
+  if(t==="lb"){const x=document.querySelector("#lb .lbx");if(x)x.click()}
+  else if(t==="pv"){const x=$("pv_x");if(x)x.click();else $("pv").hidden=true}
+  else if(t==="dlg"){try{$("dlg").close()}catch(e){}}
+  else if(t==="veh"){view=LV==="inventory"?"inventory":"garage";render()}
+});
+setTimeout(()=>{try{
+  new MutationObserver(()=>{const o=$("dlg").open;if(o&&!HS.includes("dlg"))hpush("dlg");else if(!o)hdrop("dlg")}).observe($("dlg"),{attributes:true,attributeFilter:["open"]});
+  new MutationObserver(()=>{const o=!$("pv").hidden;if(o&&!HS.includes("pv"))hpush("pv");else if(!o)hdrop("pv")}).observe($("pv"),{attributes:true,attributeFilter:["hidden"]});
+  new MutationObserver(()=>{const o=!!document.getElementById("lb");if(o&&!HS.includes("lb"))hpush("lb");else if(!o)hdrop("lb")}).observe(document.body,{childList:true});
+}catch(e){}},0);
 function render(){
+  {const nv=view==="vehicle"&&veh();if(view!=="vehicle")LV=view;if(nv&&!HS.includes("veh"))hpush("veh");else if(!nv&&HS.includes("veh"))hdrop("veh")}
   const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
   {const b=document.body.style,c=view==="vehicle"&&v0&&v0.color;if(c){b.setProperty("--ac",c);b.setProperty("--ac2",`color-mix(in srgb,${c} 62%,#18b7ff)`)}else{b.removeProperty("--ac");b.removeProperty("--ac2")}}
   const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key;rq="";rch="all"}
@@ -615,7 +676,7 @@ function dashView(v){
   pseudo(v).forEach(r=>up.push({r,i:rinfo(r,lo)}));
   up.sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
   const rec=S.records.filter(r=>r.vid===v.id&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,6);
-  const upH=up.length?up.map(({r,i})=>`<div class="c ce sc st${i.st}"${r.id?` data-sw="${r.id}"`:""}>${r.id?`<button class="ed" data-edit="${r.id}" title="Edit">\u270e</button>`:r.pk?`<button class="ed" data-vedit="1" title="Edit dates">\u270e</button>`:""}<h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders. <a data-addrem="1" style="color:var(--ac);font-weight:600;cursor:pointer">Add one</a></div>';
+  const upH=up.length?up.map(({r,i})=>`<div class="c ce sc st${i.st}"${r.id?` data-sw="${r.id}"`:""}>${r.id?`<button class="ed" data-edit="${r.id}" title="Edit">\u270e</button>`:r.pk?`<button class="ed" data-vedit="1" title="Edit dates">\u270e</button>`:""}<h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="rmr"><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div></div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders. <a data-addrem="1" style="color:var(--ac);font-weight:600;cursor:pointer">Add one</a></div>';
   const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
     return `<div class="c ce sc st${r.type==="repair"?1:0}"><button class="ed" data-edit="${r.id}" title="Edit">\u270e</button><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div>${r.type==="service"?`<button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
   const ns=odoStale(v),nH=ns?`<div class="c nudge"><b>Update the ${isH(v.id)?"hours":"odometer"}</b><div class="m" style="margin:4px 0 10px">Last updated ${ago2(ns.days)} ago (${lo.toLocaleString()} ${dU(v.id)}). A fresh reading keeps the due dates accurate.</div><div class="row"><button class="p" data-qodo="1">Update now</button><button data-nsnz="1">Later</button></div></div>`:"";
@@ -632,10 +693,23 @@ function gSearch(){
     bx.innerHTML=o.map(({v,f,n})=>`<button class="mrow" data-gv="${v.id}"><b>${esc(v.name)}</b><span class="m" style="display:block">${f.date?esc(f.date)+" · "+ago(f.date):"no date"}${!isT(v.id)&&f.odo!==""&&f.odo!=null?" · "+(+f.odo).toLocaleString()+" "+dU(v.id):""}${n>1?" · "+n+" times":""}</span><span class="m" style="display:block;color:var(--tx)">${esc([f.desc,...(f.dl||[])].filter(Boolean).join(", "))}</span></button>`).join("")};
   $("sq").oninput=go;$("sres").onclick=e=>{const b=e.target.closest("[data-gv]");if(!b)return;S.cur=b.dataset.gv;view="vehicle";tab="timeline";const q=$("sq").value.trim();$("dlg").close();render();rq=q;rch="all";render()};setTimeout(()=>$("sq").focus(),50);
 }
+function updTile(){return APP&&UPD?`<a class="updt" href="${esc(UPD.url)}"><b>Version ${esc(UPD.v)} is available</b><span>You have ${esc(APP_V)}. <u>Download the update</u>, open it, and Android installs it over the app. Your data stays.</span></a>`:""}
+function pickVeh(title,cb){
+  const L=act();if(!L.length)return;if(L.length===1)return cb(L[0].id);
+  show(`<h3 style="margin:0">${esc(title)}</h3><div style="margin-top:8px">${L.map(v=>`<button class="mrow" data-pv="${v.id}">${kIc(v.kind)} <b>${esc(v.name)}</b></button>`).join("")}</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>`);
+  $("dbody").onclick=e=>{const b=e.target.closest("[data-pv]");if(!b)return;const id=b.dataset.pv;$("dlg").close();cb(id)};
+}
+function quickGo(k){
+  const go=(id,t)=>{S.cur=id;view="vehicle";tab=t;save();render()};
+  if(k==="svc")pickVeh("Add a service to…",id=>{go(id,"service");openForm(null,{type:"service",date:today()})});
+  else if(k==="odo")pickVeh("Update the reading for…",id=>{if(isT(id)){toast("That one has no odometer");return}qOdo(id)});
+  else if(k==="cl")pickVeh("Checklists for…",id=>{go(id,"dash");clList()});
+}
 function garageView(){
   if(!act().length)return`<div class="empty"><div class="ei">${ico("flag")}</div>Your garage is empty.<br>Add a vehicle, ATV, dirt bike, mower or other equipment.<br><button class="p" data-addv="1">\uff0b Add equipment</button><br><button data-help="1" style="margin-top:10px">How does this work?</button></div>`;
-  return (RO?"":attnBanner())+(S.records.some(r=>PH.includes(r.type))&&!em?'<button class="qa" data-gsrch="1" style="margin:0 0 10px;width:100%">'+ico("search")+' When did I last…</button>':"")+(em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),chips=(v.plist||[]).filter(x=>x.v).slice(0,3).map(x=>`<span class="chip"><b>${esc(x.l)}</b> ${esc(String(x.v).split("\n")[0])}${String(x.v).split("\n").length>1?" +"+(String(x.v).split("\n").length-1):""}</span>`).join(""),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:6px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join(" · ");
-    return `<div class="c vc" data-open="${v.id}" style="--k:${vcol(v)};--sc:${SC[s.st]||SC[0]}"><div class="vc-img">${v.cover?`<img src="${pu(v.cover)}" alt="">`:`<span class="vc-ic">${kIc(v.kind)}</span>`}${tag(s.st)}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div><div class="vc-b"><button class="ed" data-vedit2="${v.id}" title="Edit">\u270e</button><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vc-nx"><i></i><span>${esc(s.txt)}</span></div>${s.bar?`<div class="pb" role="progressbar" aria-valuenow="${s.bar.p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${s.bar.p}%"></i></div><div class="m pbl">${esc(s.bar.lbl)}</div>`:""}${chips}</div></div>`}).join("");
+  const qt=RO||em?"":`<div class="qt"><button data-qk="svc">${ico("wrench")}Add service</button><button data-qk="odo">${ico("gauge")}Odometer</button><button data-qk="cl">${ico("note")}Checklists</button></div>`;
+  return updTile()+(RO?"":attnBanner())+qt+(S.records.some(r=>PH.includes(r.type))&&!em?'<button class="qa" data-gsrch="1" style="margin:0 0 12px;width:100%">'+ico("search")+' When did I last…</button>':"")+(em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+'<div class="vg">'+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:4px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join("<br>");
+    return `<div class="c vt" data-open="${v.id}" style="--k:${vcol(v)};--sc:${SC[s.st]||SC[0]}"><div class="bar"></div>${v.cover?`<div class="cv" style="background-image:url(${pu(v.cover)})"></div>`:""}<button class="ed" data-vedit2="${v.id}" title="Edit">\u270e</button><div class="vi">${kIc(v.kind)}</div><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vs">${tag(s.st)}<span class="m">${esc(s.txt)}</span></div>${s.bar?`<div class="pb" role="progressbar" aria-valuenow="${s.bar.p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${s.bar.p}%"></i></div>`:""}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div>`}).join("")+'</div>';
 }
 let rq="",rch="all";
 const TLT=["service","repair","upgrade"],TLI={service:ico("wrench"),repair:ico("hammer"),upgrade:ico("up")};
@@ -689,7 +763,7 @@ function card(r,tl){tl=tl===true;
   if(r.type==="reminder"){const i=rinfo(r,lastOdo(r.vid));extra=r.done?'<span class="tag">Done</span>':tag(i.st);meta=["Due",r.date,odo].filter(Boolean).join(" · ")+(r.done?"":` (${i.txt.replace(/ \(est\. ([^)]*)\)/g,", est. $1")})`)+(r.rep>0?" · repeats every "+repTxt(r.rep):"")}
   const rc=(r.rc||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}">`).join("");
   const sk=r.type==="reminder"?"st"+(r.done?"n":rinfo(r,lastOdo(r.vid)).st):({service:"st0",repair:"st1",upgrade:"stu"})[r.type]||"";
-  return `<div class="c ce${sk?" sc "+sk:""}"${r.type==="reminder"&&!r.done?` data-sw="${r.id}"`:""}><button class="ed" data-edit="${r.id}" title="Edit">✎</button><h3>${title}${extra}</h3><div class="m">${meta}</div>${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="reminder"&&!r.done?rbtn(r):""}${r.type==="service"?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`;
+  return `<div class="c ce${sk?" sc "+sk:""}"${r.type==="reminder"&&!r.done?` data-sw="${r.id}"`:""}><button class="ed" data-edit="${r.id}" title="Edit">✎</button><h3>${title}${extra}</h3>${r.type==="reminder"&&!r.done?`<div class="rmr"><div class="m">${meta}</div>${rbtn(r)}</div>`:`<div class="m">${meta}</div>`}${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="service"?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`;
 }
 let infoOpen=false;
 function infoCard(v){
@@ -709,9 +783,9 @@ function invView(){
 
 
 const HELP=[
-["Getting started","<p>Tap <b>＋</b> on My Garage to add a vehicle, ATV, dirt bike, trailer, mower or other equipment. Tap it to open it.</p><p>Inside, the <b>Dashboard</b> shows upcoming reminders and your recent services and repairs. The tabs along the top hold Service, Repairs, Upgrades, Timeline, Parts, Reminders, Odometer / Hours and Notes. The <b>⋯</b> button holds tools such as Documents, Checklists, Tires and reports. The green <b>＋</b> adds to whichever tab you are on.</p>"],
+["Getting started","<p>The quick tiles on My Garage (<b>Add service</b>, <b>Odometer</b>, <b>Checklists</b>) jump straight to those for the equipment you pick.</p><p>Tap <b>＋</b> on My Garage to add a vehicle, ATV, dirt bike, trailer, mower or other equipment. Tap it to open it.</p><p>Inside, the <b>Dashboard</b> shows upcoming reminders and your recent services and repairs. The tabs along the top hold Service, Repairs, Upgrades, Timeline, Parts, Reminders, Odometer / Hours and Notes. The <b>⋯</b> button holds tools such as Documents, Checklists, Tires and reports. The green <b>＋</b> adds to whichever tab you are on.</p>"],
 ["Log a service or repair","<p>Open the equipment, go to the Service tab and tap ＋. Enter the date and odometer or hours, describe the work, and add parts, notes, photos and receipts.</p><p>Under <b>Parts used</b>, <b>Bought for this job</b> types a part in, and <b>Take from inventory</b> uses what you have on hand and lowers the count. Set <b>Next service due</b> to create a reminder automatically.</p><p>Done a job before? Tap <b>Log again</b> on any tile to copy it with today's date.</p>"],
-["Reminders: done, renew, snooze","<p>Reminders turn orange when due soon and red when overdue. On a reminder tile you can <b>swipe right</b> to mark it done (or renew it if it repeats) and <b>swipe left</b> to snooze it. The buttons on the tile do the same thing.</p><p>Marking a reminder done offers to log the service. Repeating reminders (every 1 or 2 years, for example) move to the next date when renewed.</p>"],
+["Reminders: done, renew, snooze","<p>Reminders turn orange when due soon and red when overdue. On a reminder tile the green <b>Done</b> button (or <b>Renew</b>) and the 💤 snooze button are right on the row. You can also <b>swipe right</b> to mark it done (or renew it if it repeats) and <b>swipe left</b> to snooze it. The buttons on the tile do the same thing.</p><p>Marking a reminder done offers to log the service. Repeating reminders (every 1 or 2 years, for example) move to the next date when renewed.</p>"],
 ["Search and filters","<p>On My Garage, <b>When did I last…</b> searches every piece of equipment at once and shows when each last had that job done.</p><p>Lists with more than a few records show a search box and filter chips. Search looks through descriptions, notes, parts, dates and odometer values. Service, Repair and Upgrade lists can be filtered by year, and Reminders by Overdue, Upcoming or Done.</p><p>On the dashboard, <b>Last done…</b> finds the most recent time you did something, such as an oil change.</p>"],
 ["Odometer / Hours and the usage chart","<p>Tap <b>＋ Odometer</b> on the dashboard or garage card to record a reading quickly. The Odometer / Hours tab lists the readings and, once there are two or more, draws a chart of how it changed and the average use per year.</p><p>Time-tracked equipment (such as a trailer) has no odometer and uses dates only.</p>"],
 ["Details (plate, VIN, dates)","<p>At the bottom of the equipment's <b>Dashboard</b> a <b>Details</b> card shows the plate and VIN. Tap <b>Show all</b> for registration, sticker and other dates, and <b>Edit</b> to change them.</p>"],
@@ -720,6 +794,7 @@ const HELP=[
 ["Photos and receipts","<p>Add photos and receipt pictures on any record. Tap a photo to view it full screen: swipe for the next one, pinch or double-tap to zoom, and tap ✕ to close. The equipment's cover photo opens the same way.</p><p>Photos are shrunk before they are saved, which keeps the app fast and your storage small.</p>"],
 ["Colors and layout","<p>Edit a piece of equipment (the pencil on its card) to give it a color. The color tints that equipment's screen. <b>Settings &amp; data</b> sets light or dark appearance and miles or kilometers.</p><p>Use the ⇅ button on My Garage to reorder equipment. Pull down at the top of a screen to refresh.</p>"],
 ["Editing and deleting","<p>Every tile has its own pencil that opens just that item. <b>Delete</b> is inside the edit form, and an <b>Undo</b> appears for a few seconds afterwards. Equipment can also be archived instead of deleted, and restored from Settings &amp; data.</p>"],
+["Going back","<p>Swipe from the edge of the screen, or use your phone\u0027s back button, to go back one step: it closes an open sheet or photo first, then goes from a piece of equipment back to My Garage. Back on My Garage leaves the app.</p>"],
 ["Timeline","<p>Open the <b>Timeline</b> tab inside equipment to see every service, repair and upgrade in one list, newest first. Use the chips to show just one kind, or the search box to find a part, note or person.</p>"],
 ["Templates and remembered intervals","<p>When you log a service, tick <b>Save as a template</b>. Next time, tap it under <b>Quick pick</b> and the description, parts and next-service interval fill in. The app also remembers the next-service interval you chose for each job on each piece of equipment and offers it again when you type the same description.</p>"],
 ["Done by","<p>Each service, repair or upgrade has an optional <b>Done by</b> box (Me, a family member, a shop). It shows on the tile and is searchable.</p>"],
@@ -738,7 +813,7 @@ const HELP=[
 ["Syncing with your server","<p>If syncing stops, open <b>Settings &amp; data &gt; Connection log</b>. It shows the server address, a <b>Test connection</b> button, and the last sync events and errors.</p><p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
 ["Backups and moving to a new phone","<p>Settings &amp; data has <b>Download backup</b> and <b>Restore from file</b>. With a server, a copy is also saved there every day and the last 14 are kept. To move the Android app to a new phone, take a backup first and restore it on the new one.</p>"],
 ["Reminder alerts and calendar","<p>With a server, <b>Settings &amp; data &gt; Reminder alerts</b> sends a notification when something becomes due. Enter an ntfy address (such as https://ntfy.sh/your-topic) or a JSON webhook for Home Assistant or Gotify, then press <b>Send test message</b>.</p><p><b>Get calendar link</b> gives you an address to subscribe to in a calendar app so due dates show up there.</p>"],
-["Android app: updates","<p>A green dot on the ⋯ button means a newer version of the app is available. Open <b>Settings &amp; data &gt; App updates</b> and tap the link to download it, then install it over the old one. Your data is kept.</p>"],
+["Android app: updates","<p>When a newer version of the app is out, an <b>update tile</b> appears at the top of My Garage (and in Settings &amp; data), and the ⋯ button gets a green dot. Tap the tile to download it, then install it over the old one. Your data is kept. With no update, nothing is shown.</p>"],
 ["Something is not working","<p><b>Can't connect to the server:</b> check the address and port, that the phone is on the same network, and open the same address in the phone's browser.</p><p><b>A change did not appear on another device:</b> pull down to refresh, or check the header dot. Changes made on two devices are merged.</p><p><b>An old version is showing on the NAS:</b> set the image tag to the newest version number instead of <b>latest</b>.</p>"]
 ];
 function helpForm(){
@@ -991,7 +1066,7 @@ function dataForm(){
   ${SYNC?`<details style="margin-top:12px"><summary class="m">Connection log</summary><div class="m" style="margin-top:8px">Server: ${esc(BASE||location.origin)}</div><div class="row" style="margin-top:8px"><button id="tcb" style="flex:1">Test connection</button></div><div class="m" id="tcm" style="margin-top:6px"></div><div class="m" style="margin-top:8px">${SLG.length?SLG.slice().reverse().slice(0,20).map(x=>esc(new Date(x.t).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}))+" \u00b7 "+esc(x.m)+(x.n>1?" (\u00d7"+x.n+")":"")).join("<br>"):"Nothing logged yet."}</div></details>`:""}
   <label>Calendar</label><div class="row"><button id="cal_b" style="flex:1">Get calendar link</button></div><div class="m" id="cal_m" style="margin-top:6px">Shows reminders and expiration dates that have a date. Subscribe to the link in Apple Calendar or an Android app like ICSx\u2075. Google Calendar can't reach an address on your home network.</div>`:""}${SYNC?`<label>Share (view only)</label><div class="row"><button id="ro_b" style="flex:1">Get view-only link</button></div><div class="m" id="ro_m" style="margin-top:6px">A link family can open to look at your garage and history. They can't change anything. It needs a password on the server.</div>`:""}${arch.length?'<label>Archived equipment</label>'+arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join(""):""}
   
-  ${APP?`<label>App updates</label><div class="m" id="up_m" style="margin-top:4px">Checking\u2026</div>`:""}
+  ${APP?`<div id="up_m">${updTile()}</div>`:""}
   <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}${APP?" \u00b7 Android app":""}</div>
   <div class="row" style="margin-top:10px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
   $("hlp").onclick=()=>helpForm();
@@ -1009,7 +1084,7 @@ function dataForm(){
   $("rfb").onclick=()=>$("rf").click();
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
   $("csvb").onclick=()=>csvExport();
-  if(APP)checkUpd(true).then(()=>{const m=$("up_m");if(!m)return;m.innerHTML=UPD?`Version ${esc(UPD.v)} is available (you have ${esc(APP_V)}). <a href="${esc(UPD.url)}" style="color:var(--ac);font-weight:700">Download the update</a>, open it, and Android will update the app. Your data stays.`:"You have the latest version ("+esc(APP_V)+")."});
+  if(APP)checkUpd(true).then(()=>{const m=$("up_m");if(m)m.innerHTML=updTile();if(view==="garage"&&!$("dlg").open)render()});
   if($("sv_go")){$("sv_go").onclick=()=>connectServer($("sv_u").value,$("sv_p").value);
     if($("sv_off"))$("sv_off").onclick=()=>{if(!confirm("Disconnect from the server? Your data stays on this phone and on the server."))return;try{localStorage.removeItem("garagelog-server");localStorage.removeItem("garagelog-base")}catch(e){}location.reload()}}
   if(SYNC)F("api/backups",{cache:"no-store"}).then(r=>r.json()).then(L=>{const b=$("bkl");if(!b)return;b.innerHTML=L.length?`A copy is saved before the first change each day, and up to 14 are kept on your server. Tap one to download it, then use Restore from file.`+L.map(x=>`<div class="sp"><a href="backups/${esc(x.name)}" download style="color:var(--ac)">${esc(x.date)}</a><span class="m">${Math.max(1,Math.round(x.size/1024))} KB</span></div>`).join(""):"No copies yet. The first one appears after your next change."}).catch(()=>{if($("bkl"))$("bkl").textContent="Couldn't load the list."});
@@ -1027,7 +1102,7 @@ function dataForm(){
 }
 $("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more"||i==="sd")dataForm();else if(i==="ev")vehForm(true)};
 $("tabs").onclick=e=>{const b=e.target.closest("[data-t]"),t=b&&b.dataset.t;if(!t)return;if(t==="more")return moreMenu();if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
-$("bn").onclick=e=>{const v=e.target.dataset.v;if(v){view=v;render()}};
+$("bn").onclick=e=>{const b=e.target.closest("[data-v]"),v=b&&b.dataset.v;if(v){view=v;render()}};
 $("fab").onclick=()=>view==="vehicle"?(tab==="dash"||tab==="timeline"?addChooser():tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
 $("fabE").onclick=()=>{em=!em;render()};
 $("list").addEventListener("input",e=>{if(e.target.id==="rs"){rq=e.target.value;const r=$("rl");if(r)r.innerHTML=recRows(veh())}});
@@ -1043,6 +1118,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.renew)renewDlg(d.renew);
   else if(d.rccp){const v=veh(),vin=(v.vin||"").trim();try{navigator.clipboard.writeText(vin).then(()=>toast("VIN copied")).catch(()=>toast("Couldn't copy. Select the VIN in Details"))}catch(e){toast("Couldn't copy. Select the VIN in Details")}}
   else if(d.rcchk){const v=veh(),was=v.rcChk;v.rcChk=today();save();render();toast("Marked as checked today",()=>{if(was)v.rcChk=was;else delete v.rcChk;save();render()})}
+  else if(e.target.closest("[data-qk]"))quickGo(e.target.closest("[data-qk]").dataset.qk);
   else if(d.gsrch)gSearch();
   else if(d.strt)starterDlg(S.cur);
   else if(d.srch)searchForm(veh());
