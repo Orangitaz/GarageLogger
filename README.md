@@ -1,26 +1,31 @@
 # Garage Log
 
-A self-hosted maintenance log for the things in your garage: cars and trucks, UTVs, ATVs and dirt bikes, trailers, mowers and anything else with an engine. It runs as one small container on your own server (built for TrueNAS), keeps everything in one data folder, and has no cost tracking or accounts to manage.
+A self-hosted maintenance log for the things in your garage: cars and trucks, UTVs, ATVs and dirt bikes, trailers, mowers and anything else with an engine. It runs as one small container on your own server (built for TrueNAS), keeps everything in one data folder, and has no cost tracking or accounts to manage. There is also an [Android app](https://github.com/Orangitaz/GarageLogger-Android) that works on its own or syncs with your server.
 
 <p>
-<img src="screenshots/garage.png" width="23%" alt="My Garage">
-<img src="screenshots/dashboard.png" width="23%" alt="Equipment dashboard">
-<img src="screenshots/service-form.png" width="23%" alt="Logging a service">
-<img src="screenshots/dashboard-light.png" width="23%" alt="Light theme">
+<img src="screenshots/garage.png" width="31%" alt="My Garage">
+<img src="screenshots/dashboard.png" width="31%" alt="Equipment dashboard">
+<img src="screenshots/timeline.png" width="31%" alt="Timeline of services, repairs and upgrades">
+</p>
+<p>
+<img src="screenshots/attention.png" width="31%" alt="Needs attention list with Done and Snooze">
+<img src="screenshots/service-form.png" width="31%" alt="Logging a service">
+<img src="screenshots/dashboard-light.png" width="31%" alt="Light theme">
 </p>
 
 *Screenshots show sample data.*
 
 ## What it does
-- **Garage and dashboards:** every piece of equipment gets a card with a status, and a dashboard with upcoming reminders and recent services and repairs.
-- **Service, repair and upgrade records** with notes, photos, receipts, quick-pick services and parts used. Parts used are either **bought for this job** or **taken from inventory** (which deducts the stock automatically).
-- **Reminders** by date, miles or hours, with repeats (every 6 months, 1, 2 or 3 years). Mileage reminders show an estimated date. Registration, the OHV sticker and your own dates (inspection, emissions, insurance) renew with one tap.
-- **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges. Both can list several part numbers or brands per entry.
-- **Alerts** to your phone through ntfy, Home Assistant or Gotify, and a status feed for Home Assistant dashboards.
-- **Fast logging:** **Log again** copies an earlier service, **quick jobs** remember parts and intervals, tap the odometer on a garage card to update it, and **Snooze** pushes a reminder back.
-- **Recalls:** a dashboard card with a Copy VIN button and a link to nhtsa.gov/recalls, where open recalls can be checked by VIN.
-- **Documents** (PDFs and photos), **printable service history**, **CSV export**, **"when did I last" search**, **archive** for sold equipment, and **Undo** for deletes.
-- Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes. Optional password.
+- **Garage and dashboards:** every piece of equipment gets a card with a status and a dashboard with upcoming reminders and recent services and repairs. A **Needs attention** list shows what is overdue, due soon or needs a fresh odometer reading, with **Done** and **Snooze** right there.
+- **Service, repair and upgrade records** with notes, photos, receipts, quick-pick services, who did the work, and parts used. Parts are either **bought for this job** or **taken from inventory** (which deducts the stock). A **Timeline** tab shows all three together.
+- **Reminders** by date, miles or hours, with repeats (every 6 months, 1, 2 or 3 years, custom, or "every April"). Mileage reminders show an estimated date. Registration, the OHV sticker, warranty dates and your own dates (inspection, emissions, insurance) renew with one tap. After you add equipment, pick from a list of **common reminders** for that kind.
+- **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges and optional **where to buy** links. Several part numbers or brands per entry, with a camera button to scan barcodes and VINs.
+- **Checklists** (before a ride, spring start-up, winterize) and **tire sets** with tread depth.
+- **Fast logging:** **Log again** copies an earlier service, **quick jobs** remember parts and intervals, tap the odometer on a garage card to update it, swipe a reminder to finish or snooze it.
+- **Finding things:** **When did I last…** searches every piece of equipment for a job or part, and each timeline has its own search and filters.
+- **Reports and records:** documents (PDFs and photos), a printable **service history**, a **full history report** with photos, a one-record share page for a sale or a shop, **CSV export**, a link to **nhtsa.gov/recalls** with your VIN copied, **archive** for sold equipment, and **Undo** for deletes.
+- **Alerts** to your phone through ntfy, Home Assistant or Gotify, a calendar feed, a status feed for Home Assistant dashboards, and a **view-only link** to share your garage.
+- Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes, three text sizes, built-in **Help**, and a **connection log** for troubleshooting sync. Optional password.
 
 One image, one port, one data folder. No YAML needed.
 
