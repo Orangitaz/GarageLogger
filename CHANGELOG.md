@@ -8,6 +8,10 @@ Each release has a number: **major.minor.patch**. A new feature raises the minor
 - **Every month:** when adding a reminder, pick a month and it is set to repeat every year.
 - **Connection log:** Settings & data now has a Connection log with the server address, a Test connection button, and recent sync events and errors.
 
+## 1.15.1 - 2026-10-23
+- Help: the Getting started topic lists every tab and the tools in the ⋯ menu, and the Needs-attention topic explains the Done and Snooze buttons.
+- The + button next to Description in the service form is bigger and easier to tap.
+
 ## 1.15.0 - 2026-10-22
 - **Needs attention** list: each item now has **Done** (or Renew) and **Snooze** buttons, so you can clear it without opening the equipment.
 - **When did I last…** on My Garage searches every piece of equipment at once and shows when each last had that job or part. Tap a result to open that timeline.
