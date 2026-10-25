@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.16.2 - 2026-10-25
+- The Settings button in the top corner is now a gear (⚙️) instead of three dots. It still opens Settings & data and shows the green dot when an update is available.
+
 ## 1.16.1 - 2026-10-24
 - **Android back swipe:** the phone's back swipe or button now steps back inside the app (closes a sheet, then goes from equipment to My Garage) instead of leaving it. It leaves the app only from My Garage.
 - Trailers now have a drawn trailer icon instead of a truck.

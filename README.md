@@ -73,7 +73,7 @@ user 568: on the dataset's **Permissions** screen set the owner to `apps` (568) 
 - Two phones or tablets can edit at once. If one is out of date when it saves, the app merges the changes by item instead of overwriting the other device.
 
 ## Reminder alerts (optional)
-In the app go to **⋯ > Settings & data > Reminder alerts** and paste a web address the server can send to:
+In the app go to **⚙️ > Settings & data > Reminder alerts** and paste a web address the server can send to:
 - ntfy: `https://ntfy.sh/your-private-topic` (choose "ntfy / text"), then subscribe to that topic in the ntfy app.
 - Home Assistant: a webhook URL (choose "JSON webhook"). The message arrives as `title` and `message`.
 - Gotify: `https://your-gotify/message?token=APP_TOKEN` (choose "JSON webhook").
@@ -90,15 +90,15 @@ Press **Send test message** to check it. The server then sends a message once a 
 - **Last done** on the dashboard searches descriptions, parts and notes and shows when and at what reading it was last done.
 - Deleting an entry or an inventory item shows **Undo** for a few seconds. Logging a reading lower than the last one asks you to confirm.
 - On the garage screen the pencil lets you reorder your equipment with arrows. The **+** on an equipment's dashboard asks what to add.
-- **Export records (CSV)** is under **⋯ > Settings & data** (all equipment) and in each equipment's **More** menu (that one only).
+- **Export records (CSV)** is under **⚙️ > Settings & data** (all equipment) and in each equipment's **More** menu (that one only).
 
 ## Extra dates, documents and archive
 - Under an equipment's registration date, **+ Add another date** adds your own named dates (inspection, emissions, insurance). They stay hidden until you add one, repeat like registration, show on the dashboard with Renew, and go out in the alerts. Dates that fall on the same day (Oregon registration with inspection and emissions, say) show as one reminder, and Renew then asks for each new date.
 - **More > Documents** attaches PDFs and photos (manuals, title copies, insurance cards) to a piece of equipment. The files live in the `docs/` folder of your data folder, so a dataset snapshot covers them. The backup file from Settings only lists them; it does not contain the files themselves.
-- **Archive this equipment** (in the equipment's edit screen) takes it out of the garage, the alerts but keeps its history. Archived equipment is listed under **⋯ > Settings & data > Archived equipment**, where you can print its history or restore it.
+- **Archive this equipment** (in the equipment's edit screen) takes it out of the garage, the alerts but keeps its history. Archived equipment is listed under **⚙️ > Settings & data > Archived equipment**, where you can print its history or restore it.
 
 ## Calendar, backups and shortcuts
-- **Calendar link:** **⋯ > Settings & data > Get calendar link** gives an address to subscribe to in Apple Calendar or an Android app such as ICSx⁵. It lists reminders and expiration dates that have a date. If you set a password, the link carries its own private key, so keep it to yourself. Google Calendar can't reach an address on your home network.
+- **Calendar link:** **⚙️ > Settings & data > Get calendar link** gives an address to subscribe to in Apple Calendar or an Android app such as ICSx⁵. It lists reminders and expiration dates that have a date. If you set a password, the link carries its own private key, so keep it to yourself. Google Calendar can't reach an address on your home network.
 - **Server backups:** the server saves a copy of your data before the first change each day and keeps 14. They are listed under **Settings & data > Server backups**; download one and use **Restore from file**. Photos and documents stay in their folders and are not inside the copies.
 - **Home-screen shortcuts:** long-press the installed app icon for **Add service** and **Inventory**.
 - The dot in the title bar shows sync: green saved, orange saving, red offline (changes are kept on the phone and sent when it reconnects). Tap it for details.
@@ -124,7 +124,7 @@ rest:
 Set an environment variable `GARAGE_PASSWORD` on the app (TrueNAS: Edit > Environment Variables). The browser then asks for a password (any user name) before showing the app, your data or photos. Without it the app is open to anyone who can reach the port. The password is sent in a form that is only protected when you use the app through HTTPS (a reverse proxy) or a VPN, so it keeps casual visitors out on a home network but is not a substitute for those.
 
 ## Versions
-Every release has a number (see `CHANGELOG.md` for what changed in each). The running version is shown at the bottom of **⋯ > Settings & data** and at `/api/version`. The Docker image is tagged with it as well as `latest`, for example `ghcr.io/orangitaz/garagelogger:1.0.0`. To go back to an older version on TrueNAS, change the image tag from `latest` to that number and save. Your data stays as it is. To release a new version, raise the number in the `VERSION` file, add a line to `CHANGELOG.md`, and push to `main`.
+Every release has a number (see `CHANGELOG.md` for what changed in each). The running version is shown at the bottom of **⚙️ > Settings & data** and at `/api/version`. The Docker image is tagged with it as well as `latest`, for example `ghcr.io/orangitaz/garagelogger:1.0.0`. To go back to an older version on TrueNAS, change the image tag from `latest` to that number and save. Your data stays as it is. To release a new version, raise the number in the `VERSION` file, add a line to `CHANGELOG.md`, and push to `main`.
 
 ## Updating
 Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > garage-log > **Edit**, re-save
