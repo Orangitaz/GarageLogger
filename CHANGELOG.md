@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.17.0 - 2026-10-25
+- **Pick an icon for each piece of equipment** (Edit equipment > Icon): car, pickup, SUV, van; ATV, UTV, dirt bike, Jeep; riding mower, push mower; camp trailer, utility trailer, car hauler; and tractor, boat or generator under Other. The icon takes the equipment's color. Existing equipment keeps a sensible default for its type.
+
 ## 1.16.2 - 2026-10-25
 - The Settings button in the top corner is now a gear (⚙️) instead of three dots. It still opens Settings & data and shows the green dot when an update is available.
 
