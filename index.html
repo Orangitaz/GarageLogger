@@ -194,6 +194,7 @@ body{overscroll-behavior-y:contain}
 
 /* ---- 1.16 refresh: emoji icons, docked bar, tiles */
 button .ic,a .ic,.tabs .ic{pointer-events:none}
+.ic.em svg{width:1em;height:1em;display:block;stroke:none}.ic.em:has(svg){display:inline-block;width:1em;height:1em;vertical-align:-.15em}
 .ic.em{width:auto;height:auto;font-style:normal;font-size:1.1em;line-height:1;vertical-align:-.12em;stroke:none;fill:none}
 .tabs button .ic.em{width:auto;height:auto;font-size:15px;margin-right:6px;vertical-align:-1px}
 #bn{left:0;right:0;bottom:0;transform:none;width:auto;gap:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid var(--bd);border-radius:0;box-shadow:none;background:var(--hbg)}
@@ -307,7 +308,8 @@ cam:'<path d="M4 8.5h3.7l1.8-2.5h5l1.8 2.5H20V19H4z"/><circle cx="12" cy="13.5" 
 help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 1 1 3.6 2.4c-.7.4-1.1.9-1.1 1.7M12 17h.01"/>',
 oil:'<path d="M12 3.5s6 6.2 6 10.3a6 6 0 0 1-12 0c0-4.100 6-10.300 6-10.300z"/>'};
 const EM={car:"🚗",mtn:"🏍️",trailer:"🚚",mower:"🚜",wrench:"🔧",hammer:"🛠️",up:"⬆️",grid:"📊",timeline:"📜",cube:"⚙️",bell:"⏰",gauge:"⏱️",note:"📝",dots:"⋯",flag:"🚩",cal:"📅",search:"🔍",cam:"📷",help:"❓",oil:"🛢️"};
-const ico=n=>EM[n]?`<span class="ic em" aria-hidden="true">${EM[n]}</span>`:`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IP[n]||""}</svg>`;
+const EMS={trailer:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="16" height="9.5" rx="1.6" fill="#d5dde8"/><rect x="5" y="6" width="16" height="2.4" rx="1.2" fill="#9fb0c3"/><path d="M5 13.2H2.2L.8 15" stroke="#8a97a8" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="17" r="3.2" fill="#2b3340"/><circle cx="13" cy="17" r="1.2" fill="#d5dde8"/></svg>'};
+const ico=n=>EM[n]?`<span class="ic em" aria-hidden="true">${EMS[n]||EM[n]}</span>`:`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IP[n]||""}</svg>`;
 const KIC={car:"car",offroad:"mtn",trailer:"trailer",mower:"mower"},TIC={dash:"grid",service:"wrench",repair:"hammer",upgrade:"up",timeline:"timeline",parts:"cube",reminder:"bell",odometer:"gauge",note:"note",more:"dots"};
 const kIc=k=>ico(KIC[k]||"wrench");
 const veh=()=>S.vehicles.find(v=>v.id===S.cur);
@@ -648,7 +650,19 @@ addEventListener("popstate",()=>{
   else if(t==="dlg"){try{$("dlg").close()}catch(e){}}
   else if(t==="veh"){view=LV==="inventory"?"inventory":"garage";render()}
 });
+function backNav(){
+  const lb=document.querySelector("#lb .lbx");if(lb){lb.click();return true}
+  if(!$("pv").hidden){const x=$("pv_x");if(x)x.click();else $("pv").hidden=true;return true}
+  if($("dlg").open){$("dlg").close();return true}
+  if(view==="vehicle"&&veh()){view=LV==="inventory"?"inventory":"garage";render();return true}
+  if(view==="inventory"){view="garage";render();return true}
+  return false;
+}
 setTimeout(()=>{try{
+  if(APP){const AP=(window.Capacitor.Plugins&&window.Capacitor.Plugins.App)||(window.Capacitor.registerPlugin&&window.Capacitor.registerPlugin("App"));
+    if(AP&&AP.addListener)AP.addListener("backButton",()=>{if(!backNav()){try{AP.exitApp()}catch(e){}}})}
+}catch(e){}
+try{
   new MutationObserver(()=>{const o=$("dlg").open;if(o&&!HS.includes("dlg"))hpush("dlg");else if(!o)hdrop("dlg")}).observe($("dlg"),{attributes:true,attributeFilter:["open"]});
   new MutationObserver(()=>{const o=!$("pv").hidden;if(o&&!HS.includes("pv"))hpush("pv");else if(!o)hdrop("pv")}).observe($("pv"),{attributes:true,attributeFilter:["hidden"]});
   new MutationObserver(()=>{const o=!!document.getElementById("lb");if(o&&!HS.includes("lb"))hpush("lb");else if(!o)hdrop("lb")}).observe(document.body,{childList:true});

@@ -2,6 +2,10 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.16.1 - 2026-10-24
+- **Android back swipe:** the phone's back swipe or button now steps back inside the app (closes a sheet, then goes from equipment to My Garage) instead of leaving it. It leaves the app only from My Garage.
+- Trailers now have a drawn trailer icon instead of a truck.
+
 ## 1.16.0 - 2026-10-23
 - **Common reminders:** after adding equipment the app offers usual reminders for that kind (oil, filters, belts and so on). Tick the ones you want. Also available from the Reminders tab.
 - **Share or print one record:** the edit form of a service, repair or upgrade has a button that makes a page for just that job, with photos and receipts.
