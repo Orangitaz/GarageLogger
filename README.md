@@ -143,4 +143,4 @@ Optional. The web app also installs from Chrome (⋮ > Install app). For a real 
 Without a server the phone can't send reminder alerts, store documents or offer a calendar link, because those run on the server.
 
 ## Credits
-Equipment icons are from [Material Design Icons](https://pictogrammers.com/library/mdi/) by Pictogrammers (Apache 2.0 license).
+Equipment icons come from open icon sets: [Material Design Icons](https://pictogrammers.com/library/mdi/) by Pictogrammers (Apache 2.0), [Font Awesome Free](https://fontawesome.com) (the motorcycle and utility trailer icons; CC BY 4.0), and the Jeep icon by [Delapouite](https://delapouite.com) from [game-icons.net](https://game-icons.net) (CC BY 3.0). The car hauler is a car icon placed on a trailer.
