@@ -2,6 +2,10 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.17.3 - 2026-10-26
+- Fixed Copy VIN on the Recalls card. It now works in the Android app and on plain http addresses, and if copying is blocked it shows the VIN in a box you can select.
+- Removed the "I checked, mark today" button and the last-checked text from the Recalls card.
+
 ## 1.17.2 - 2026-10-25
 - Better matching equipment icons: a real Jeep, a utility trailer, a dirt bike, a car on a trailer for the car hauler, and a quad-style icon for the ATV. They come from Material Design Icons, Font Awesome Free and game-icons.net (credits are in the README).
 

@@ -181,7 +181,7 @@ body{overscroll-behavior-y:contain}
 .cs{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
 .cs button{width:34px;height:34px;padding:0;border-radius:50%;border:2px solid transparent;font-size:12px}
 .cs button.on{border-color:var(--tx);box-shadow:0 0 0 2px var(--bg)}
-.ro #fab,.ro #fabE,.ro .ed,.ro .ed2,.ro [data-addrec],.ro #more,.ro #ev,.ro .qa,.ro .sec a,.ro [data-renew],.ro [data-done],.ro [data-snz],.ro [data-again],.ro [data-rcok],.ro [data-srch]{display:none!important}
+.ro #fab,.ro #fabE,.ro .ed,.ro .ed2,.ro [data-addrec],.ro #more,.ro #ev,.ro .qa,.ro .sec a,.ro [data-renew],.ro [data-done],.ro [data-snz],.ro [data-again],.ro [data-srch]{display:none!important}
 #rob{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:20;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:var(--pop);border:1px solid var(--bd);color:var(--mu);box-shadow:var(--sh);pointer-events:none}
 .uc svg{display:block;width:100%;height:auto}
 .uc .big{font-size:22px;font-weight:800;letter-spacing:-.02em}
@@ -518,10 +518,16 @@ function searchForm(v){
   };
   $("sq").oninput=go;setTimeout(()=>$("sq").focus(),50);
 }
+function copyText(t,msg){
+  const done=()=>toast(msg||"Copied");
+  const fb=()=>{let ok=false;try{const a=document.createElement("textarea");a.value=t;a.setAttribute("readonly","");a.style.cssText="position:fixed;left:0;top:0;opacity:0;font-size:16px";document.body.appendChild(a);a.focus();a.select();a.setSelectionRange(0,t.length);ok=document.execCommand("copy");a.remove()}catch(e){}
+    if(ok)done();else{show(`<h3 style="margin:0">Copy this</h3><input readonly id="cp_t" value="${esc(t)}" style="margin-top:10px"><div class="m" style="margin-top:6px">Press and hold the text, choose Select all, then Copy.</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>`);setTimeout(()=>{const i=$("cp_t");if(i){i.focus();i.select()}},50)}};
+  try{if(window.isSecureContext&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fb);return}}catch(e){}
+  fb();
+}
 function recallCard(v){
   const vin=(v.vin||"").trim();if(!vin||RO)return"";
-  const days=v.rcChk?Math.round((Date.parse(today()+"T00:00:00Z")-Date.parse(v.rcChk+"T00:00:00Z"))/864e5):null;
-  return`<div class="sec">Recalls</div><div class="c"><div class="m">Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website. Copy the VIN, open the site and paste it in. ${days==null?"Not checked yet.":"Last checked "+(days<=0?"today":ago2(days)+" ago")+"."}</div><div class="row" style="margin-top:10px"><a class="abtn" href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener noreferrer">Open nhtsa.gov/recalls</a><button data-rccp="1">Copy VIN</button></div><button style="margin-top:8px;width:100%" data-rcchk="1">I checked, mark today</button></div>`;
+  return`<div class="sec">Recalls</div><div class="c"><div class="m">Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website. Copy the VIN, open the site and paste it in.</div><div class="row" style="margin-top:10px"><a class="abtn" href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener noreferrer">Open nhtsa.gov/recalls</a><button data-rccp="1">Copy VIN</button></div></div>`;
 }
 function docsForm(v){
   const cur=()=>vOf(v.id)||v;
@@ -854,7 +860,7 @@ const HELP=[
 ["Tires","<p>Open <b>More &gt; Tires</b> to keep each set (brand, size, bought date), see which set is mounted and how far it has gone, and log tread depth in 32nds. Use <b>Mount this set</b> when you swap.</p>"],
 ["Where to buy links","<p>Inventory items and parts-list categories have optional <b>Where to buy</b> fields: a store name and a link. The link shows on the tile so reordering is one tap. No prices are stored.</p>"],
 ["Full history report","<p><b>More &gt; Full history report</b> makes a printable page with the equipment's parts, dates, tires, documents and every service, repair and upgrade with its photos and receipts. On the web use Print / Save as PDF. In the Android app it is shared as a file you can open in a browser and print to PDF.</p>"],
-["Recalls","<p>If a vehicle has a VIN, its dashboard has a <b>Recalls</b> card. Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website, so tap <b>Copy VIN</b>, then <b>Open nhtsa.gov/recalls</b> and paste it in. Tap <b>I checked</b> to remember the date.</p>"],
+["Recalls","<p>If a vehicle has a VIN, its dashboard has a <b>Recalls</b> card. Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website, so tap <b>Copy VIN</b>, then <b>Open nhtsa.gov/recalls</b> and paste it in.</p>"],
 ["Syncing with your server","<p>If syncing stops, open <b>Settings &amp; data &gt; Connection log</b>. It shows the server address, a <b>Test connection</b> button, and the last sync events and errors.</p><p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
 ["Backups and moving to a new phone","<p>Settings &amp; data has <b>Download backup</b> and <b>Restore from file</b>. With a server, a copy is also saved there every day and the last 14 are kept. To move the Android app to a new phone, take a backup first and restore it on the new one.</p>"],
 ["Reminder alerts and calendar","<p>With a server, <b>Settings &amp; data &gt; Reminder alerts</b> sends a notification when something becomes due. Enter an ntfy address (such as https://ntfy.sh/your-topic) or a JSON webhook for Home Assistant or Gotify, then press <b>Send test message</b>.</p><p><b>Get calendar link</b> gives you an address to subscribe to in a calendar app so due dates show up there.</p>"],
@@ -1164,8 +1170,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.edit)openForm(d.edit);
   else if(d.done)doneRem(d.done)
   else if(d.renew)renewDlg(d.renew);
-  else if(d.rccp){const v=veh(),vin=(v.vin||"").trim();try{navigator.clipboard.writeText(vin).then(()=>toast("VIN copied")).catch(()=>toast("Couldn't copy. Select the VIN in Details"))}catch(e){toast("Couldn't copy. Select the VIN in Details")}}
-  else if(d.rcchk){const v=veh(),was=v.rcChk;v.rcChk=today();save();render();toast("Marked as checked today",()=>{if(was)v.rcChk=was;else delete v.rcChk;save();render()})}
+  else if(d.rccp)copyText((veh().vin||"").trim(),"VIN copied");
   else if(e.target.closest("[data-qk]"))quickGo(e.target.closest("[data-qk]").dataset.qk);
   else if(d.gsrch)gSearch();
   else if(d.strt)starterDlg(S.cur);
