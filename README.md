@@ -141,3 +141,6 @@ Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > gara
 Optional. The web app also installs from Chrome (⋮ > Install app). For a real Android app, see the separate repo [GarageLogger-Android](https://github.com/Orangitaz/garagelogger-android). It builds the same app into an APK that **works on its own, with no server**: your data stays on the phone. If you also run Garage Log on a server, enter its address in **Settings & data > Server** and the phone syncs with it (and with your other devices).
 
 Without a server the phone can't send reminder alerts, store documents or offer a calendar link, because those run on the server.
+
+## Credits
+Equipment icons are from [Material Design Icons](https://pictogrammers.com/library/mdi/) by Pictogrammers (Apache 2.0 license).
