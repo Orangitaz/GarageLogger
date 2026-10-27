@@ -9,30 +9,68 @@ const EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":
 const JSON_H={"Content-Type":"application/json","Cache-Control":"no-store"};
 
 // ---------- data file ----------
-const read=()=>{try{return JSON.parse(fs.readFileSync(FILE,"utf8"))}catch(e){return{}}};
+// One data context per person. Without accounts there is just one (LEG); with accounts each user gets DIR/users/<name>/.
+const LEG={FILE,BACKUPS,ALERT_STATE};
+const read=(c=LEG)=>{try{return JSON.parse(fs.readFileSync(c.FILE,"utf8"))}catch(e){return{}}};
 const ymd=(tz,d=new Date())=>{try{return new Intl.DateTimeFormat("en-CA",{timeZone:tz||undefined}).format(d)}catch(e){return d.toISOString().slice(0,10)}};
 
 // One copy of db.json per day (taken before the first change of that day), newest 14 kept.
-function snapshot(){
+function snapshot(c=LEG){
   try{
-    if(!fs.existsSync(FILE))return;
-    fs.mkdirSync(BACKUPS,{recursive:true});
-    const f=path.join(BACKUPS,"db-"+ymd()+".json");
+    if(!fs.existsSync(c.FILE))return;
+    fs.mkdirSync(c.BACKUPS,{recursive:true});
+    const f=path.join(c.BACKUPS,"db-"+ymd()+".json");
     if(fs.existsSync(f))return;
-    fs.copyFileSync(FILE,f);
-    const all=fs.readdirSync(BACKUPS).filter(x=>/^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort();
-    while(all.length>14)fs.unlinkSync(path.join(BACKUPS,all.shift()));
+    fs.copyFileSync(c.FILE,f);
+    const all=fs.readdirSync(c.BACKUPS).filter(x=>/^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort();
+    while(all.length>14)fs.unlinkSync(path.join(c.BACKUPS,all.shift()));
   }catch(e){console.error("backup failed:",e.message)}
 }
-function write(d){
-  snapshot();
-  try{fs.copyFileSync(FILE,FILE+".bak")}catch(e){}
-  fs.writeFileSync(FILE+".tmp",JSON.stringify(d));fs.renameSync(FILE+".tmp",FILE);
+function write(d,c=LEG){
+  fs.mkdirSync(path.dirname(c.FILE),{recursive:true});
+  snapshot(c);
+  try{fs.copyFileSync(c.FILE,c.FILE+".bak")}catch(e){}
+  fs.writeFileSync(c.FILE+".tmp",JSON.stringify(d));fs.renameSync(c.FILE+".tmp",c.FILE);
 }
+
+// ---------- accounts (optional; turned on from Settings) ----------
+const USERS=path.join(DIR,"users.json"),UDIR=path.join(DIR,"users"),DAYMS=864e5;
+let ACC=null;
+const loadAcc=()=>{try{const a=JSON.parse(fs.readFileSync(USERS,"utf8"));ACC=a&&a.users&&a.secret?a:null}catch(e){ACC=null}};
+const saveAcc=()=>{fs.writeFileSync(USERS+".tmp",JSON.stringify(ACC));fs.renameSync(USERS+".tmp",USERS)};
+loadAcc();
+const uctx=n=>({FILE:path.join(UDIR,n,"db.json"),BACKUPS:path.join(UDIR,n,"backups"),ALERT_STATE:path.join(UDIR,n,"alert-state.json")});
+const UNAME=/^[a-z0-9][a-z0-9._-]{1,31}$/;
+const hmac=(k,x)=>crypto.createHmac("sha256",k).update(x).digest("hex");
+const scrypt=(pw,salt)=>new Promise((ok,no)=>crypto.scrypt(String(pw),salt,32,{N:16384,r:8,p:1},(e,k)=>e?no(e):ok(k)));
+async function mkPw(pw){const salt=crypto.randomBytes(16);return{s:salt.toString("hex"),h:(await scrypt(pw,salt)).toString("hex")}}
+async function checkPw(u,pw){if(!u)return false;const k=await scrypt(pw,Buffer.from(u.s,"hex"));return crypto.timingSafeEqual(k,Buffer.from(u.h,"hex"))}
+const pv=u=>crypto.createHash("sha256").update(u.h).digest("hex").slice(0,8);
+const b64u=x=>Buffer.from(x).toString("base64url");
+const mkTok=n=>{const p=b64u(JSON.stringify({u:n,e:Date.now()+90*DAYMS,v:pv(ACC.users[n])}));return p+"."+hmac(ACC.secret,"s:"+p)};
+function userOf(req){
+  if(!ACC)return null;
+  const m=/^Bearer (.+)$/i.exec(req.headers.authorization||"");if(!m)return null;
+  const[p,sig]=m[1].split(".");if(!p||!sig)return null;
+  const want=hmac(ACC.secret,"s:"+p);if(sig.length!==want.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(want)))return null;
+  try{const j=JSON.parse(Buffer.from(p,"base64url").toString()),u=ACC.users[j.u];if(u&&j.e>Date.now()&&j.v===pv(u))return j.u}catch(e){}
+  return null;
+}
+// Links that can't send a password (calendar feed, view-only link) carry user.signature instead.
+const linkTok=(n,kind)=>n+"."+hmac(ACC.secret,kind+":"+n).slice(0,32);
+function linkUser(req,kind){
+  if(!ACC)return null;
+  const q=new URLSearchParams(req.url.split("?")[1]||""),t=q.get("t")||q.get("ro")||"",i=t.lastIndexOf(".");if(i<1)return null;
+  const n=t.slice(0,i);if(!ACC.users[n])return null;
+  const want=linkTok(n,kind);return t.length===want.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(want))?n:null;
+}
+const fails=new Map();
+const throttled=k=>{const f=fails.get(k);return !!f&&f.n>=8&&Date.now()<f.until};
+const failed=k=>{const f=fails.get(k)||{n:0};if(Date.now()>=(f.until||0))f.n=0;f.n++;f.until=Date.now()+15*60e3;fails.set(k,f)};
 
 // ---------- photos are stored as files, not inside db.json ----------
 function saveFile(dir,buf,ext){
-  const name=crypto.createHash("sha1").update(buf).digest("hex").slice(0,16)+"."+ext,f=path.join(dir,name);
+  const name=crypto.createHash("sha1").update(ACC?Buffer.concat([buf,Buffer.from(ACC.secret)]):buf).digest("hex").slice(0,16)+"."+ext,f=path.join(dir,name);
   if(!fs.existsSync(f))fs.writeFileSync(f,buf);
   return name;
 }
@@ -93,13 +131,16 @@ async function sendAlert(a,title,message,urgent){
 let alertRunning=false;
 async function runAlerts(){
   if(alertRunning)return;alertRunning=true;
+  try{for(const c of ACC?Object.keys(ACC.users).map(uctx):[LEG])await runAlertsFor(c)}finally{alertRunning=false}
+}
+async function runAlertsFor(c){
   try{
-    const S=read(),a=S.alert;
+    const S=read(c),a=S.alert;
     if(!a||!/^https?:\/\//.test(a.url||""))return;
     const tz=a.tz||undefined,hour=+new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"numeric",hourCycle:"h23"}).format(new Date());
     if(hour<(+a.hour||8))return;
     const items=dueItems(S,tz),today=ymd(tz);
-    let st={};try{st=JSON.parse(fs.readFileSync(ALERT_STATE,"utf8"))}catch(e){}
+    let st={};try{st=JSON.parse(fs.readFileSync(c.ALERT_STATE,"utf8"))}catch(e){}
     const sent=st.sent||{};
     // Tell me when something first becomes due soon, again when it goes overdue, then weekly while it stays overdue.
     const fresh=items.filter(i=>{const s=sent[i.id];return !s||s.st<i.st||(i.st===2&&(Date.parse(today)-Date.parse(s.at))/DAY>=7)});
@@ -110,9 +151,8 @@ async function runAlerts(){
       await sendAlert(a,title,items.map(i=>`${i.name}: ${i.what} (${i.txt})`).join("\n"),over>0);
       for(const i of items)next[i.id]={st:i.st,at:today};
     }else for(const i of items)if(sent[i.id])next[i.id]=sent[i.id];
-    fs.writeFileSync(ALERT_STATE,JSON.stringify({sent:next}));
+    fs.writeFileSync(c.ALERT_STATE,JSON.stringify({sent:next}));
   }catch(e){console.error("alert failed:",e.message)}
-  finally{alertRunning=false}
 }
 setTimeout(runAlerts,20000);setInterval(runAlerts,15*60e3);
 
@@ -167,25 +207,98 @@ http.createServer((req,res)=>{
     res.setHeader("Access-Control-Allow-Headers","Authorization, Content-Type");res.setHeader("Access-Control-Allow-Methods","GET, PUT, POST, OPTIONS");res.setHeader("Access-Control-Max-Age","86400");
   }
   if(req.method==="OPTIONS"){res.writeHead(204).end();return}
+  // Accounts: everything except the app shell, photos and the login calls needs a signed-in user.
+  let c=LEG,U=null,linkOnly=false;
+  if(ACC){
+    U=userOf(req);
+    const pub=ST[u]||u==="/healthz"||u==="/api/me"||u==="/api/login"||u==="/api/version"||u.startsWith("/photos/")||u.startsWith("/docs/")||u==="/"||u==="/index.html";
+    if(!pub&&!U){
+      const kind=u==="/api/state"&&req.method==="GET"?"ro":(u==="/calendar.ics"||u==="/api/summary")&&req.method==="GET"?"cal":null,L=kind&&linkUser(req,kind);
+      if(L){U=L;linkOnly=true}
+      else{req.resume();res.writeHead(401,JSON_H);return res.end('{"login":true}')}
+    }
+    if(U)c=uctx(U);
+  }
+  if(u==="/api/me"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(ACC?{accounts:true,user:U,admin:!!(U&&ACC.users[U].admin)}:{accounts:false}))}
+  const jb=(limit,cb)=>body(req,limit,async buf=>{let j;try{j=JSON.parse(buf.toString())}catch(e){res.writeHead(400,JSON_H);return res.end('{"ok":false}')}
+    try{await cb(j||{})}catch(e){res.writeHead(500,JSON_H);res.end('{"ok":false}')}});
+  const out=(code,o)=>{res.writeHead(code,JSON_H);res.end(JSON.stringify(o))};
+  const ip=req.socket.remoteAddress||"";
+  if(u==="/api/login"&&req.method==="POST"){
+    if(!ACC){req.resume();return out(404,{ok:false})}
+    return jb(4e3,async j=>{
+      const n=String(j.user||"").trim().toLowerCase(),k=ip+"|"+n;
+      if(throttled(k))return out(429,{ok:false,msg:"Too many tries. Wait 15 minutes and try again."});
+      if(UNAME.test(n)&&ACC.users[n]&&await checkPw(ACC.users[n],j.pass||"")){fails.delete(k);return out(200,{ok:true,token:mkTok(n),user:n,admin:!!ACC.users[n].admin})}
+      failed(k);await new Promise(r=>setTimeout(r,400));out(401,{ok:false,msg:"Wrong username or password."});
+    });
+  }
+  // Turning accounts on: the first account is the admin and takes over the data that is already on the server.
+  if(u==="/api/accounts/setup"&&req.method==="POST"){
+    if(ACC){req.resume();return out(409,{ok:false,msg:"Accounts are already on."})}
+    return jb(4e3,async j=>{
+      const n=String(j.user||"").trim().toLowerCase(),pw=String(j.pass||"");
+      if(!UNAME.test(n))return out(400,{ok:false,msg:"Username: 2 to 32 letters, numbers, dot, dash or underscore."});
+      if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
+      const nc=uctx(n);fs.mkdirSync(path.dirname(nc.FILE),{recursive:true});
+      try{if(fs.existsSync(FILE))fs.copyFileSync(FILE,nc.FILE);if(fs.existsSync(ALERT_STATE))fs.copyFileSync(ALERT_STATE,nc.ALERT_STATE);
+        if(fs.existsSync(BACKUPS)){fs.mkdirSync(nc.BACKUPS,{recursive:true});for(const f of fs.readdirSync(BACKUPS))fs.copyFileSync(path.join(BACKUPS,f),path.join(nc.BACKUPS,f))}}
+      catch(e){return out(500,{ok:false,msg:"Couldn't copy your data. Nothing was changed."})}
+      ACC={secret:crypto.randomBytes(32).toString("hex"),users:{[n]:Object.assign(await mkPw(pw),{admin:true,created:Date.now()})}};
+      saveAcc();out(200,{ok:true,token:mkTok(n),user:n,admin:true});
+    });
+  }
+  if(ACC&&U&&!linkOnly&&u.startsWith("/api/")&&(u==="/api/account/password"||u==="/api/users"||u.startsWith("/api/users/"))){
+    const admin=!!ACC.users[U].admin;
+    if(u==="/api/account/password"&&req.method==="POST")return jb(4e3,async j=>{
+      const pw=String(j.new||"");
+      if(!await checkPw(ACC.users[U],j.old||""))return out(403,{ok:false,msg:"The current password is wrong."});
+      if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
+      Object.assign(ACC.users[U],await mkPw(pw));saveAcc();out(200,{ok:true,token:mkTok(U)});
+    });
+    if(!admin){req.resume();return out(403,{ok:false,msg:"Only the admin can do that."})}
+    if(u==="/api/users"&&req.method==="GET")return out(200,Object.keys(ACC.users).sort().map(n=>({name:n,admin:!!ACC.users[n].admin})));
+    if(u==="/api/users"&&req.method==="POST")return jb(4e3,async j=>{
+      const n=String(j.user||"").trim().toLowerCase(),pw=String(j.pass||"");
+      if(!UNAME.test(n))return out(400,{ok:false,msg:"Username: 2 to 32 letters, numbers, dot, dash or underscore."});
+      if(ACC.users[n])return out(409,{ok:false,msg:"That username is taken."});
+      if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
+      ACC.users[n]=Object.assign(await mkPw(pw),{admin:false,created:Date.now()});fs.mkdirSync(path.dirname(uctx(n).FILE),{recursive:true});saveAcc();out(200,{ok:true});
+    });
+    if(u==="/api/users/password"&&req.method==="POST")return jb(4e3,async j=>{
+      const n=String(j.user||""),pw=String(j.pass||"");
+      if(!ACC.users[n])return out(404,{ok:false,msg:"No such user."});
+      if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
+      Object.assign(ACC.users[n],await mkPw(pw));saveAcc();out(200,{ok:true});
+    });
+    if(u==="/api/users/remove"&&req.method==="POST")return jb(4e3,async j=>{
+      const n=String(j.user||"");
+      if(!ACC.users[n])return out(404,{ok:false,msg:"No such user."});
+      if(n===U)return out(400,{ok:false,msg:"You can't remove your own account."});
+      // Their files are moved aside, not deleted.
+      try{const to=path.join(DIR,"removed-users");fs.mkdirSync(to,{recursive:true});fs.renameSync(path.join(UDIR,n),path.join(to,n+"-"+Date.now()))}catch(e){}
+      delete ACC.users[n];saveAcc();out(200,{ok:true});
+    });
+  }
   // Optional password (GARAGE_PASSWORD). The icons, manifest and health check stay open so installing the app still works.
-  if(PASS&&!ST[u]&&u!=="/healthz"&&!((u==="/calendar.ics"||u.startsWith("/photos/")||u.startsWith("/docs/"))&&(calOk(req)||(u!=="/calendar.ics"&&roOk(req))))&&!((u==="/api/state"||u==="/"||u==="/index.html")&&req.method==="GET"&&roOk(req))&&!authed(req)){
+  if(!ACC&&PASS&&!ST[u]&&u!=="/healthz"&&!((u==="/calendar.ics"||u.startsWith("/photos/")||u.startsWith("/docs/"))&&(calOk(req)||(u!=="/calendar.ics"&&roOk(req))))&&!((u==="/api/state"||u==="/"||u==="/index.html")&&req.method==="GET"&&roOk(req))&&!authed(req)){
     req.resume();
     return setTimeout(()=>{res.writeHead(401,{"WWW-Authenticate":'Basic realm="Garage Log", charset="UTF-8"',"Content-Type":"text/plain"});res.end("Password required")},400);
   }
   if(u==="/api/state"){
     if(req.method==="GET"){
-      let d="{}";try{d=fs.readFileSync(FILE,"utf8")}catch(e){}
-      if(!authed(req)){try{const j=JSON.parse(d);delete j.alert;d=JSON.stringify(j)}catch(e){d="{}"}}
+      let d="{}";try{d=fs.readFileSync(c.FILE,"utf8")}catch(e){}
+      if(ACC?linkOnly:!authed(req)){try{const j=JSON.parse(d);delete j.alert;d=JSON.stringify(j)}catch(e){d="{}"}}
       res.writeHead(200,JSON_H);return res.end(d);
     }
     if(req.method==="PUT")return body(req,300e6,buf=>{
       try{
         const d=JSON.parse(buf.toString());
         if(!d||typeof d!=="object"||!Array.isArray(d.vehicles))throw 0;
-        const cur=read();
+        const cur=read(c);
         // Another device saved since this one last synced: hand back the latest so the app can merge.
         if((d.rev|0)!==(cur.rev|0)){res.writeHead(409,JSON_H);return res.end(JSON.stringify(cur))}
-        movePhotos(d);d.rev=(cur.rev|0)+1;write(d);
+        movePhotos(d);d.rev=(cur.rev|0)+1;write(d,c);
         res.writeHead(200,JSON_H);res.end(JSON.stringify({rev:d.rev}));
       }catch(e){res.writeHead(400).end()}
     });
@@ -214,7 +327,7 @@ http.createServer((req,res)=>{
   }
   // Read-only status for dashboards (Home Assistant etc.): what is overdue or due soon, per equipment.
   if(u==="/api/summary"&&req.method==="GET"){
-    const S=read(),items=dueItems(S,(S.alert||{}).tz||undefined);
+    const S=read(c),items=dueItems(S,(S.alert||{}).tz||undefined);
     const vehicles=(S.vehicles||[]).filter(v=>!v.arch).map(v=>{
       const it=items.filter(i=>i.vid===v.id),over=it.filter(i=>i.st===2).length;
       return{id:v.id,name:v.name,kind:v.kind,status:over?"overdue":it.length?"due_soon":"ok",overdue:over,due_soon:it.length-over,items:it.map(i=>({what:i.what,status:i.st===2?"overdue":"due_soon",detail:i.txt}))};
@@ -222,17 +335,17 @@ http.createServer((req,res)=>{
     const overdue=items.filter(i=>i.st===2).length;
     res.writeHead(200,JSON_H);return res.end(JSON.stringify({overdue,due_soon:items.length-overdue,total:items.length,vehicles}));
   }
-  if(u==="/calendar.ics"&&req.method==="GET"){res.writeHead(200,{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"no-store"});return res.end(calendar(read()))}
-  if(u==="/api/readonly"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({t:ROT}))}
-  if(u==="/api/calendar"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({path:"calendar.ics"+(CALT?"?t="+CALT:""),t:CALT}))}
+  if(u==="/calendar.ics"&&req.method==="GET"){res.writeHead(200,{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"no-store"});return res.end(calendar(read(c)))}
+  if(u==="/api/readonly"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({t:ACC?linkTok(U,"ro"):ROT}))}
+  if(u==="/api/calendar"&&req.method==="GET"){const ct=ACC?linkTok(U,"cal"):CALT;res.writeHead(200,JSON_H);return res.end(JSON.stringify({path:"calendar.ics"+(ct?"?t="+ct:""),t:ct}))}
   if(u==="/api/backups"&&req.method==="GET"){
-    let L=[];try{L=fs.readdirSync(BACKUPS).filter(x=>/^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().reverse().map(n=>({name:n,date:n.slice(3,13),size:fs.statSync(path.join(BACKUPS,n)).size}))}catch(e){}
+    let L=[];try{L=fs.readdirSync(c.BACKUPS).filter(x=>/^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().reverse().map(n=>({name:n,date:n.slice(3,13),size:fs.statSync(path.join(c.BACKUPS,n)).size}))}catch(e){}
     res.writeHead(200,JSON_H);return res.end(JSON.stringify(L));
   }
   if(u.startsWith("/backups/")&&req.method==="GET"){
     const n=u.slice(9);
     if(!/^db-\d{4}-\d{2}-\d{2}\.json$/.test(n)){res.writeHead(404).end();return}
-    try{const b=fs.readFileSync(path.join(BACKUPS,n));res.writeHead(200,{"Content-Type":"application/json","Content-Disposition":'attachment; filename="garage-log-'+n.slice(3)+'"',"Cache-Control":"no-store"});return res.end(b)}
+    try{const b=fs.readFileSync(path.join(c.BACKUPS,n));res.writeHead(200,{"Content-Type":"application/json","Content-Disposition":'attachment; filename="garage-log-'+n.slice(3)+'"',"Cache-Control":"no-store"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
   if(u.startsWith("/photos/")){

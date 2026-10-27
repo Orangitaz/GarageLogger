@@ -258,8 +258,11 @@ const APP=!!(window.Capacitor&&(Capacitor.isNativePlatform?Capacitor.isNativePla
 let SRV={};try{SRV=JSON.parse(localStorage.getItem("garagelog-server")||"{}")||{}}catch(e){}
 const BASE=APP&&SRV.u?SRV.u:"",SYNC=!APP||!!BASE;
 const b64=t=>btoa(unescape(encodeURIComponent(t)));
-const HDR=()=>SRV.pw?{Authorization:"Basic "+b64("u:"+SRV.pw)}:{};
-const F=(p,o={})=>APP&&!BASE?Promise.reject(new Error("no server")):fetch(BASE+p,Object.assign({},o,{headers:Object.assign({},o.headers,HDR())}));
+// Accounts (optional, turned on by the server admin): a sign-in token is sent instead of the shared password.
+let ME=null,TOK="";try{TOK=localStorage.getItem("garagelog-tok")||""}catch(e){}
+const tok=()=>APP?(SRV.tok||""):TOK;
+const HDR=()=>tok()?{Authorization:"Bearer "+tok()}:SRV.pw?{Authorization:"Basic "+b64("u:"+SRV.pw)}:{};
+const F=(p,o={})=>APP&&!BASE?Promise.reject(new Error("no server")):fetch(BASE+p,Object.assign({},o,{headers:Object.assign({},o.headers,HDR())})).then(r=>{if(r.status===401&&ME&&ME.accounts&&!RO)needLogin();return r});
 const pu=u=>RO&&u&&!/^(data:|blob:|https?:)/.test(u)?u+(u.includes("?")?"&":"?")+"t="+RO:!BASE||!u||/^(data:|blob:|https?:)/.test(u)?u:BASE+u+(SRV.t?"?t="+SRV.t:"");
 const TYPES=[["dash","Dashboard"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["timeline","Timeline"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
@@ -846,6 +849,7 @@ const HELP=[
 ["Editing and deleting","<p>Every tile has its own pencil that opens just that item. <b>Delete</b> is inside the edit form, and an <b>Undo</b> appears for a few seconds afterwards. Equipment can also be archived instead of deleted, and restored from Settings &amp; data.</p>"],
 ["Equipment icons","<p>Edit a piece of equipment and pick an <b>Icon</b> under Type: car, pickup, SUV or van; ATV, UTV, dirt bike or Jeep / 4x4; riding or push mower; camp trailer, utility trailer or car hauler; plus tractor, boat and generator under Other. The icon takes the color you gave the equipment.</p>"],
 ["Going back","<p>Swipe from the edge of the screen, or use your phone\u0027s back button, to go back one step: it closes an open sheet or photo first, then goes from a piece of equipment back to My Garage. Back on My Garage leaves the app.</p>"],
+["Accounts","<p>If more than one person uses your server, the admin can turn on <b>accounts</b> in Settings. Everyone then signs in with their own username and password and only sees their own equipment, photos, inventory and settings. The admin adds people under <b>Manage users</b> and gives them the starting password. Turning accounts on moves what is already on the server into the admin account. Everyone, including you, has to sign in afterwards. The Android app has a Username box in its server settings for this.</p>"],
 ["Timeline","<p>Open the <b>Timeline</b> tab inside equipment to see every service, repair and upgrade in one list, newest first. Use the chips to show just one kind, or the search box to find a part, note or person.</p>"],
 ["Templates and remembered intervals","<p>When you log a service, tick <b>Save as a template</b>. Next time, tap it under <b>Quick pick</b> and the description, parts and next-service interval fill in. The app also remembers the next-service interval you chose for each job on each piece of equipment and offers it again when you type the same description.</p>"],
 ["Done by","<p>Each service, repair or upgrade has an optional <b>Done by</b> box (Me, a family member, a shop). It shows on the tile and is searchable.</p>"],
@@ -1072,18 +1076,96 @@ async function checkUpd(force){
   }catch(e){}
   if(!force&&$("hd"))redraw();
 }
-async function connectServer(u,pw){
+const wipeLocal=()=>{["garagelog","garagelog-base","garagelog-sl","garagelog-lb","garagelog-upd"].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}})};
+const setTok=(t,u)=>{try{if(APP){SRV.tok=t;if(u)SRV.user=u;localStorage.setItem("garagelog-server",JSON.stringify(SRV))}else{TOK=t;localStorage.setItem("garagelog-tok",t)}if(u)localStorage.setItem("garagelog-user",u)}catch(e){}};
+const jpost=(p,b)=>F(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(async r=>({ok:r.ok,j:await r.json().catch(()=>({}))}));
+function needLogin(){
+  if($("lg"))return;
+  const d=document.createElement("div");d.id="lg";
+  d.style.cssText="position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto";
+  d.innerHTML=`<div style="width:100%;max-width:340px"><div class="t" style="text-align:center">Garage Log</div><div class="m" style="text-align:center;margin:6px 0 18px">Sign in to your account</div><input id="lg_u" placeholder="Username" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" style="width:100%"><input id="lg_p" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;margin-top:8px"><button class="p" id="lg_go" style="width:100%;margin-top:12px">Sign in</button><div class="m" id="lg_m" style="margin-top:10px;text-align:center;color:var(--bad)"></div></div>`;
+  document.body.appendChild(d);
+  const go=async()=>{
+    const user=$("lg_u").value.trim().toLowerCase(),pass=$("lg_p").value,m=$("lg_m");
+    if(!user||!pass){m.textContent="Enter your username and password.";return}
+    m.textContent="";$("lg_go").disabled=true;
+    try{
+      const r=await fetch(BASE+"api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user,pass})}),j=await r.json().catch(()=>({}));
+      if(!r.ok||!j.token){m.textContent=j.msg||"Wrong username or password.";$("lg_go").disabled=false;return}
+      let prev="";try{prev=localStorage.getItem("garagelog-user")||""}catch(e){}
+      // Never let one person's data on this device land in someone else's account.
+      if((prev&&prev!==j.user)||(!prev&&!j.admin))wipeLocal();
+      setTok(j.token,j.user);location.reload();
+    }catch(e){m.textContent="Couldn't reach the server.";$("lg_go").disabled=false}
+  };
+  $("lg_go").onclick=go;d.onkeydown=e=>{if(e.key==="Enter")go()};
+  setTimeout(()=>{const i=$("lg_u");i&&i.focus()},100);
+}
+function acctBlock(){
+  if(RO||!SYNC||!ME)return"";
+  if(ME.accounts&&ME.user)return`<label>Account</label><div class="m" style="margin-top:4px">Signed in as <b>${esc(ME.user)}</b>${ME.admin?" (admin)":""}. Your equipment, photos and settings are saved to your account only.</div><div class="row" style="margin-top:6px"><button id="ac_pw" style="flex:1">Change password</button><button id="ac_out" style="flex:1">Sign out</button></div>${ME.admin?'<button class="mrow" id="ac_us" style="margin-top:8px">\u{1F465} Manage users</button>':""}`;
+  if(!ME.accounts)return`<label>Accounts</label><div class="m" style="margin-top:4px">Let more than one person use this server, each with their own sign-in and their own data. Your current data becomes the admin account.</div><button id="ac_on" style="margin-top:6px;width:100%">Turn on accounts</button>`;
+  return"";
+}
+function acctWire(){
+  const on=(i,f)=>{const e=$(i);if(e)e.onclick=f};
+  on("ac_out",()=>{if(!confirm("Sign out? This device will forget your data until you sign in again."))return;wipeLocal();try{localStorage.removeItem("garagelog-user");if(APP){delete SRV.tok;localStorage.setItem("garagelog-server",JSON.stringify(SRV))}else localStorage.removeItem("garagelog-tok")}catch(e){}location.reload()});
+  on("ac_pw",()=>{
+    show(`<h3 style="margin:0">Change password</h3><input id="pw_o" type="password" placeholder="Current password" autocomplete="current-password" style="margin-top:10px"><input id="pw_n" type="password" placeholder="New password (8+ characters)" autocomplete="new-password" style="margin-top:6px"><input id="pw_n2" type="password" placeholder="New password again" autocomplete="new-password" style="margin-top:6px"><div class="m" id="pw_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="pw_go" style="flex:1">Save</button></div>`);
+    $("pw_go").onclick=async()=>{const m=$("pw_m");if($("pw_n").value!==$("pw_n2").value){m.textContent="The new passwords don't match.";return}
+      const r=await jpost("api/account/password",{old:$("pw_o").value,new:$("pw_n").value});
+      if(!r.ok){m.textContent=r.j.msg||"Couldn't change it.";return}
+      setTok(r.j.token);$("dlg").close();toast("Password changed")};
+  });
+  on("ac_us",usersForm);
+  on("ac_on",()=>{
+    show(`<h3 style="margin:0">Turn on accounts</h3><div class="m" style="margin-top:8px">Create the admin account. Everything saved on the server now moves into it. After this everyone, including this device, signs in with a username and password, and the server password setting no longer applies. You can add other people afterwards.</div><input id="ao_u" placeholder="Admin username" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" style="margin-top:10px"><input id="ao_p" type="password" placeholder="Password (8+ characters)" autocomplete="new-password" style="margin-top:6px"><input id="ao_p2" type="password" placeholder="Password again" autocomplete="new-password" style="margin-top:6px"><div class="m" id="ao_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="ao_go" style="flex:1">Turn on</button></div>`);
+    $("ao_go").onclick=async()=>{const m=$("ao_m");if($("ao_p").value!==$("ao_p2").value){m.textContent="The passwords don't match.";return}
+      const r=await jpost("api/accounts/setup",{user:$("ao_u").value,pass:$("ao_p").value});
+      if(!r.ok){m.textContent=r.j.msg||"Couldn't turn on accounts.";return}
+      setTok(r.j.token,r.j.user);location.reload()};
+  });
+}
+async function usersForm(){
+  show(`<h3 style="margin:0">Users</h3><div id="us_l" class="m" style="margin-top:10px">Loading\u2026</div><label>Add a person</label><input id="us_n" placeholder="Username" autocapitalize="none" autocorrect="off" spellcheck="false"><input id="us_p" placeholder="Starting password (8+ characters)" autocapitalize="none" autocorrect="off" spellcheck="false" style="margin-top:6px"><button class="p" id="us_a" style="margin-top:8px;width:100%">Add user</button><div class="m" id="us_m" style="margin-top:6px"></div><div class="m" style="margin-top:6px">Give them the username and password. They can change the password after signing in. Each person only ever sees their own equipment.</div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Close</button></div>`);
+  const load=async()=>{try{const L=await (await F("api/users",{cache:"no-store"})).json();$("us_l").innerHTML=L.map(u=>`<div class="row" style="margin:6px 0"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--tx)">${esc(u.name)}${u.admin?" (admin)":""}</span><button data-rp="${esc(u.name)}">Reset password</button>${u.admin?"":`<button data-rm="${esc(u.name)}">Remove</button>`}</div>`).join("")}catch(e){$("us_l").textContent="Couldn't load the users."}};
+  load();
+  $("us_a").onclick=async()=>{const m=$("us_m");m.style.color="var(--bad)";const r=await jpost("api/users",{user:$("us_n").value,pass:$("us_p").value});
+    if(!r.ok){m.textContent=r.j.msg||"Couldn't add that user.";return}
+    m.style.color="var(--mu)";m.textContent="Added "+$("us_n").value.trim().toLowerCase()+". Give them their password.";$("us_n").value="";$("us_p").value="";load()};
+  $("dbody").onclick=async e=>{const d=e.target.dataset;
+    if(d.rm){if(!confirm("Remove "+d.rm+"? They can no longer sign in. Their saved data is kept on the server, set aside."))return;const r=await jpost("api/users/remove",{user:d.rm});if(!r.ok)toast(r.j.msg||"Couldn't remove");load()}
+    else if(d.rp){const n=d.rp;
+      show(`<h3 style="margin:0">Reset password</h3><div class="m" style="margin-top:6px">New password for <b>${esc(n)}</b>. They are signed out everywhere.</div><input id="rp_p" placeholder="New password (8+ characters)" autocapitalize="none" autocorrect="off" spellcheck="false" style="margin-top:10px"><div class="m" id="rp_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="rp_go" style="flex:1">Save</button></div>`);
+      $("rp_go").onclick=async()=>{const r=await jpost("api/users/password",{user:n,pass:$("rp_p").value});if(!r.ok){$("rp_m").textContent=r.j.msg||"Couldn't change it.";return}usersForm();toast("Password changed for "+n)}}};
+}
+async function connectServer(u,pw,usr){
   const m=$("sv_m");u=(u||"").trim();if(!u){m.textContent="Enter the server address.";return}
   if(!/^https?:\/\//i.test(u))u="http://"+u;u=u.replace(/\/+$/,"")+"/";
   m.textContent="Connecting\u2026";
-  const hd=pw?{Authorization:"Basic "+b64("u:"+pw)}:{};let d,t="";
+  let hd=pw?{Authorization:"Basic "+b64("u:"+pw)}:{},d,t="",tk="",uname="";
   try{
+    // A server with accounts wants a username and password instead of the shared password.
+    const me=await (await fetch(u+"api/me",{cache:"no-store"})).json().catch(()=>null);
+    if(me&&me.accounts){
+      usr=(usr||"").trim().toLowerCase();
+      if(!usr){m.textContent="This server uses accounts. Enter your username and password.";return}
+      if(!pw&&SRV.tok&&SRV.user===usr&&SRV.u===u){tk=SRV.tok;uname=usr}
+      else{
+        const lr=await fetch(u+"api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user:usr,pass:pw||""})}),lj=await lr.json().catch(()=>({}));
+        if(!lr.ok||!lj.token){m.textContent=lj.msg||"Wrong username or password.";return}
+        tk=lj.token;uname=lj.user;
+      }
+      hd={Authorization:"Bearer "+tk};
+    }
     const v=await fetch(u+"api/version",{headers:hd,cache:"no-store"});
     if(v.status===401){m.textContent=pw?"The password was not accepted.":"That server needs a password.";return}
     const j=v.ok?await v.json():null;if(!j||!j.version)throw 0;
     const r=await fetch(u+"api/state",{headers:hd,cache:"no-store"});if(!r.ok)throw 0;d=await r.json();
     try{t=(await (await fetch(u+"api/calendar",{headers:hd})).json()).t||""}catch(e){}
   }catch(e){m.textContent="Couldn't reach that address. Check it, and that your phone is on the same network (or connected by VPN).";return}
+  let prevU="";try{prevU=localStorage.getItem("garagelog-user")||""}catch(e){}
+  if(uname&&prevU&&prevU!==uname)S={vehicles:[],records:[],inv:[],units:"imperial",cur:null}; // another person's data stays out of this account
   const n=o=>(o.vehicles||[]).length,hasS=d&&Array.isArray(d.vehicles)&&(n(d)||(d.records||[]).length||(d.inv||[]).length),hasL=S.vehicles.length||S.records.length||S.inv.length;
   const finish=mode=>{
     const cur=S.cur;
@@ -1093,7 +1175,7 @@ async function connectServer(u,pw){
     try{
       localStorage.setItem("garagelog",JSON.stringify(S));
       if(mode==="merge"||mode==="server")localStorage.setItem("garagelog-base",JSON.stringify(d));else localStorage.removeItem("garagelog-base");
-      localStorage.setItem("garagelog-server",JSON.stringify({u,pw,t}));
+      localStorage.setItem("garagelog-server",JSON.stringify(tk?{u,pw:"",t,tok:tk,user:uname}:{u,pw,t}));if(uname)localStorage.setItem("garagelog-user",uname);
     }catch(e){m.textContent="Couldn't save the settings on this phone.";return}
     location.reload();
   };
@@ -1109,7 +1191,8 @@ function dataForm(){
   <label>Text size</label><select id="ts"><option value="0">Normal</option><option value="1">Large</option><option value="2">Extra large</option></select><label>Appearance</label><select id="th"><option value="auto">Match my device</option><option value="dark">Dark</option><option value="light">Light</option></select>
   <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
   <label>Quick-pick services</label><div class="row"><select id="qk">${KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select><button id="qke" style="flex:none">Edit list</button></div>
-  ${APP?`<label>Server (optional)</label><div class="m" style="margin-top:4px">${BASE?"Syncing with "+esc(BASE):"Not connected. Everything is saved on this phone only. Add your Garage Log server to sync, back up photos and documents, and get alerts."}</div><input id="sv_u" type="url" inputmode="url" placeholder="http://192.168.1.50:30080" value="${esc(BASE)}" style="margin-top:6px"><input id="sv_p" type="password" placeholder="Server password (if you set one)" value="${esc(SRV.pw||"")}" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="p" id="sv_go" style="flex:1">${BASE?"Save":"Connect"}</button>${BASE?'<button id="sv_off" style="flex:1">Disconnect</button>':""}</div><div class="m" id="sv_m" style="margin-top:6px"></div>`:""}
+  ${acctBlock()}
+  ${APP?`<label>Server (optional)</label><div class="m" style="margin-top:4px">${BASE?"Syncing with "+esc(BASE):"Not connected. Everything is saved on this phone only. Add your Garage Log server to sync, back up photos and documents, and get alerts."}</div><input id="sv_u" type="url" inputmode="url" placeholder="http://192.168.1.50:30080" value="${esc(BASE)}" style="margin-top:6px"><input id="sv_n" placeholder="Username (only if the server has accounts)" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(SRV.user||"")}" style="margin-top:6px"><input id="sv_p" type="password" placeholder="Password (if the server has one)" value="${esc(SRV.pw||"")}" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="p" id="sv_go" style="flex:1">${BASE?"Save":"Connect"}</button>${BASE?'<button id="sv_off" style="flex:1">Disconnect</button>':""}</div><div class="m" id="sv_m" style="margin-top:6px"></div>`:""}
   ${SYNC?`<label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
   <div class="row" style="margin-top:6px"><select id="al_f"><option value="text" ${al.fmt!=="json"?"selected":""}>ntfy / text</option><option value="json" ${al.fmt==="json"?"selected":""}>JSON webhook</option></select><select id="al_h">${[...Array(18).keys()].map(i=>i+5).map(h=>`<option value="${h}" ${(+al.hour||8)===h?"selected":""}>${h%12||12}:00 ${h<12?"AM":"PM"}</option>`).join("")}</select></div>
   <div class="row" style="margin-top:6px"><button id="al_t" style="flex:1">Send test message</button></div>
@@ -1123,7 +1206,7 @@ function dataForm(){
   ${APP?`<div id="up_m">${updTile()}</div>`:""}
   <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}${APP?" \u00b7 Android app":""}</div>
   <div class="row" style="margin-top:10px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
-  $("hlp").onclick=()=>helpForm();
+  $("hlp").onclick=()=>helpForm();acctWire();
   $("ts").value=tsz();$("ts").onchange=()=>setTsz($("ts").value);
   $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
   $("u").onchange=()=>{S.units=$("u").value;save();render()};
@@ -1139,7 +1222,7 @@ function dataForm(){
   $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
   $("csvb").onclick=()=>csvExport();
   if(APP)checkUpd(true).then(()=>{const m=$("up_m");if(m)m.innerHTML=updTile();if(view==="garage"&&!$("dlg").open)render()});
-  if($("sv_go")){$("sv_go").onclick=()=>connectServer($("sv_u").value,$("sv_p").value);
+  if($("sv_go")){$("sv_go").onclick=()=>connectServer($("sv_u").value,$("sv_p").value,$("sv_n").value);
     if($("sv_off"))$("sv_off").onclick=()=>{if(!confirm("Disconnect from the server? Your data stays on this phone and on the server."))return;try{localStorage.removeItem("garagelog-server");localStorage.removeItem("garagelog-base")}catch(e){}location.reload()}}
   if(SYNC)F("api/backups",{cache:"no-store"}).then(r=>r.json()).then(L=>{const b=$("bkl");if(!b)return;b.innerHTML=L.length?`A copy is saved before the first change each day, and up to 14 are kept on your server. Tap one to download it, then use Restore from file.`+L.map(x=>`<div class="sp"><a href="backups/${esc(x.name)}" download style="color:var(--ac)">${esc(x.date)}</a><span class="m">${Math.max(1,Math.round(x.size/1024))} KB</span></div>`).join(""):"No copies yet. The first one appears after your next change."}).catch(()=>{if($("bkl"))$("bkl").textContent="Couldn't load the list."});
   if($("ro_b"))$("ro_b").onclick=async()=>{const m=$("ro_m");m.textContent="Getting the link…";
@@ -1262,7 +1345,12 @@ const pull=f=>{
 };
 addEventListener("online",()=>pull());addEventListener("offline",()=>setSync("off","offline (saved on this device only)"));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
-pull();
+async function boot(){
+  if(!RO&&SYNC){try{const r=await F("api/me",{cache:"no-store"});if(r.ok)ME=await r.json()}catch(e){}}
+  if(ME&&ME.accounts&&!ME.user){needLogin();return}
+  pull();
+}
+boot();
 if(APP)checkUpd();
 
 // ---- swipe on reminders

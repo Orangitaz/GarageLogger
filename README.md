@@ -123,6 +123,12 @@ rest:
 ## Password (optional)
 Set an environment variable `GARAGE_PASSWORD` on the app (TrueNAS: Edit > Environment Variables). The browser then asks for a password (any user name) before showing the app, your data or photos. Without it the app is open to anyone who can reach the port. The password is sent in a form that is only protected when you use the app through HTTPS (a reverse proxy) or a VPN, so it keeps casual visitors out on a home network but is not a substitute for those.
 
+## User accounts (optional)
+
+If more than one person will use the server, open **Settings** and tap **Turn on accounts**. You pick an admin username and password, and everything already on the server becomes that account (the original files stay where they were). After that everyone signs in, and the admin adds people under **Manage users**. Each person gets their own equipment, photos, inventory, settings, backups, reminder alerts and calendar link, and nobody sees anyone else's. Once accounts are on, `GARAGE_PASSWORD` is no longer used. The Android app's server settings have a Username box for this. Use HTTPS (a reverse proxy or a tunnel) if the server is reachable from the internet, because sign-in details are sent to the server.
+
+Where things go: `users/<name>/` holds each person's data and backups, `users.json` holds the sign-ins (passwords are hashed), and removed people are moved to `removed-users/`. To go back to a single shared garage, stop the app, delete `users.json`, and the original `db.json` in the data folder is used again.
+
 ## Versions
 Every release has a number (see `CHANGELOG.md` for what changed in each). The running version is shown at the bottom of **⚙️ > Settings & data** and at `/api/version`. The Docker image is tagged with it as well as `latest`, for example `ghcr.io/orangitaz/garagelogger:1.0.0`. To go back to an older version on TrueNAS, change the image tag from `latest` to that number and save. Your data stays as it is. To release a new version, raise the number in the `VERSION` file, add a line to `CHANGELOG.md`, and push to `main`.
 
@@ -131,7 +137,7 @@ Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > gara
 (or use the app's update/redeploy action) so it pulls the newest `latest` image. Your data stays in the dataset.
 
 ## Notes
-- No login unless you set `GARAGE_PASSWORD`. Keep it on your home network or behind a VPN or reverse proxy.
+- No login unless you set `GARAGE_PASSWORD` or turn on accounts. Keep it on your home network or behind a VPN or reverse proxy.
 - Change `30500` to any free port; the container always listens on 3000.
 - No GitHub? Build on any PC with Docker: `docker build -t YOURUSER/garage-log .` then
   `docker push YOURUSER/garage-log` (Docker Hub), and use `YOURUSER/garage-log` as the image name.
