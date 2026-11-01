@@ -135,7 +135,22 @@ The easy and safe way to reach your NAS from a phone that is off your network is
    - **iPhone:** open the address in Safari, then Share > Add to Home Screen.
 5. If other people will use it, turn on accounts first and have them install Tailscale and sign in to your Tailscale network (share the NAS with them from the Tailscale admin page, or add them to your network).
 
-Do not forward the Garage Log port from your router to the internet. The app has no HTTPS of its own, so sign-in details would travel in plain text. Tailscale encrypts the connection itself. If you would rather not use it, WireGuard (forward one UDP port and limit the peer to the NAS address) or a Cloudflare Tunnel with accounts turned on work too.
+### Option: WireGuard (no outside service)
+
+WireGuard does the same job without an account anywhere, but you set it up yourself and open one port on your router. TrueNAS can run a WireGuard server as an app from the catalog (search for "WireGuard"), or you can use your router if it has WireGuard built in.
+
+1. Install the WireGuard app on TrueNAS, or turn on WireGuard on your router.
+2. Forward **one UDP port** (the default is 51820) from your router to the WireGuard server. This is the only thing opened. Do not forward the Garage Log port.
+3. Give your phone a name for your home internet connection. If your home address changes, use a free dynamic DNS name (for example from DuckDNS or your router maker) as the endpoint.
+4. Make a key pair and a peer for the phone. Set the phone's tunnel address (for example `10.8.0.2/32`) and give the server a tunnel address on the same network (for example `10.8.0.1/24`). The server's peer entry for the phone lists the phone's tunnel address as the allowed address.
+5. Install the **WireGuard** app on the phone (Android or iPhone), add the tunnel by scanning the QR code or importing the config file, and turn it on.
+   - In the phone's config set **AllowedIPs** to just the NAS address (for example `192.168.1.50/32`) so only Garage Log traffic goes through the tunnel and the rest of the phone's internet stays direct. Setting it to `0.0.0.0/0` sends everything through your home connection instead.
+   - If the NAS is behind the WireGuard server on your home network, the server also has to be allowed to forward traffic to the NAS (this is on by default on most routers).
+6. With the tunnel on, open Garage Log at the NAS's home address and port, for example `http://192.168.1.50:30500`. In the Android app put that address under Settings > Server. On iPhone use Safari and Add to Home Screen.
+
+WireGuard encrypts everything between the phone and your home, so it is safe to use the app over `http` inside the tunnel. If other people will use it, give each person their own peer (one config per device) and turn on accounts.
+
+Whichever you choose, do not forward the Garage Log port itself from your router to the internet. The app has no HTTPS of its own, so sign-in details would travel in plain text. Tailscale and WireGuard encrypt the connection themselves. A Cloudflare Tunnel with accounts turned on also works.
 
 ## User accounts (optional)
 
