@@ -123,6 +123,20 @@ rest:
 ## Password (optional)
 Set an environment variable `GARAGE_PASSWORD` on the app (TrueNAS: Edit > Environment Variables). The browser then asks for a password (any user name) before showing the app, your data or photos. Without it the app is open to anyone who can reach the port. The password is sent in a form that is only protected when you use the app through HTTPS (a reverse proxy) or a VPN, so it keeps casual visitors out on a home network but is not a substitute for those.
 
+## Using it away from home
+
+The easy and safe way to reach your NAS from a phone that is off your network is **Tailscale** (free for personal use). It makes a private connection between your devices, so nothing is opened on your router and only your own devices can see the server.
+
+1. Make a free account at tailscale.com.
+2. On the NAS, install the **Tailscale** app from the TrueNAS app catalog (or run it as a container). Create an auth key in the Tailscale admin page (Settings > Keys) and paste it into the app's settings. The NAS then shows up in your Tailscale machine list.
+3. Install the Tailscale app on your phone and sign in to the same account. Turn it on.
+4. Open Garage Log at the NAS's Tailscale name or address and the same port you already use, for example `http://truenas:30500` (use the 100.x.x.x address if the name doesn't work).
+   - **Android app:** Settings > Server, enter that address.
+   - **iPhone:** open the address in Safari, then Share > Add to Home Screen.
+5. If other people will use it, turn on accounts first and have them install Tailscale and sign in to your Tailscale network (share the NAS with them from the Tailscale admin page, or add them to your network).
+
+Do not forward the Garage Log port from your router to the internet. The app has no HTTPS of its own, so sign-in details would travel in plain text. Tailscale encrypts the connection itself. If you would rather not use it, WireGuard (forward one UDP port and limit the peer to the NAS address) or a Cloudflare Tunnel with accounts turned on work too.
+
 ## User accounts (optional)
 
 If more than one person will use the server, open **Settings** and tap **Turn on accounts**. You pick an admin username and password, and everything already on the server becomes that account (the original files stay where they were). After that everyone signs in, and the admin adds people under **Manage users**. Each person gets their own equipment, photos, inventory, settings, backups, reminder alerts and calendar link, and nobody sees anyone else's. Once accounts are on, `GARAGE_PASSWORD` is no longer used. The Android app's server settings have a Username box for this. Use HTTPS (a reverse proxy or a tunnel) if the server is reachable from the internet, because sign-in details are sent to the server.

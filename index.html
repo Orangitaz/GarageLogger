@@ -354,6 +354,8 @@ const repTxt=n=>n%12===0?(n===12?"year":n/12+" years"):n+" months";
 const nextDate=(d,n)=>{let x=addM(d||today(),n),i=0;while(x<=today()&&i++<60)x=addM(x,n);return x};
 const vDates=v=>[v.kind==="offroad"&&v.ohv&&{k:"ohv",l:"OHV sticker expires",date:v.ohv,rep:v.ohvRep??24},v.kind!=="mower"&&v.reg&&{k:"reg",l:"Registration expires",date:v.reg,rep:v.regRep??24}].filter(Boolean).concat((v.dts||[]).filter(x=>x.date).map(x=>({k:"dt:"+x.id,l:x.l||"Other date",date:x.date,rep:x.rep??24})));
 const act=()=>S.vehicles.filter(v=>!v.arch);
+// Equipment in storage keeps its history, but its own reminders pause. Expiration dates (registration etc.) still count.
+const openRem=v=>v.stor?[]:S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done);
 const pseudo=v=>{const g=new Map();for(const x of vDates(v))g.set(x.date,[...(g.get(x.date)||[]),x]);
   return [...g.values()].map(a=>a.length===1?{desc:a[0].l,date:a[0].date,odo:"",vid:v.id,pk:a[0].k,rep:a[0].rep}:{desc:a.map(x=>x.l.replace(/ expires$/,"")).join(" + ")+" expire",date:a[0].date,odo:"",vid:v.id,pk:a.map(x=>x.k).join(","),rep:a.every(x=>x.rep===a[0].rep)?a[0].rep:0})};
 const partsOf=r=>(r.parts?[r.parts]:[]).concat(r.pl||[]).concat((r.iu||[]).map(x=>x.n+" ×"+x.q+(x.u?" "+x.u:"")));
@@ -378,8 +380,8 @@ function rinfo(r,lo){
   return{st,txt:p.join(" / ")};
 }
 function vstat(v){
-  const lo=lastOdo(v.id),a=S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done).map(r=>({r,i:rinfo(r,lo)})).concat(pseudo(v).map(r=>({r,i:rinfo(r,lo)}))).sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
-  if(!a.length)return{st:0,txt:"No reminders set"};
+  const lo=lastOdo(v.id),a=openRem(v).map(r=>({r,i:rinfo(r,lo)})).concat(pseudo(v).map(r=>({r,i:rinfo(r,lo)}))).sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
+  if(!a.length)return{st:0,txt:v.stor?"In storage":"No reminders set"};
   return{st:a[0].i.st,txt:`${a[0].r.desc||"Reminder"} · ${a[0].i.txt}`,bar:progBar(a[0].r,lo,v)};
 }
 // How far along the next reminder is, when it was created from a logged service (so we know where it started).
@@ -573,8 +575,8 @@ function odoStale(v){
 function attnData(){
   const o={over:[],soon:[],miles:[]};
   act().forEach(v=>{const lo=lastOdo(v.id);
-    S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done).map(r=>({r,i:rinfo(r,lo)})).concat(pseudo(v).map(r=>({r,i:rinfo(r,lo)}))).forEach(({r,i})=>{if(i.st===2)o.over.push({v,r,i});else if(i.st===1)o.soon.push({v,r,i})});
-    const n=odoStale(v);if(n)o.miles.push({v,n})});
+    openRem(v).map(r=>({r,i:rinfo(r,lo)})).concat(pseudo(v).map(r=>({r,i:rinfo(r,lo)}))).forEach(({r,i})=>{if(i.st===2)o.over.push({v,r,i});else if(i.st===1)o.soon.push({v,r,i})});
+    const n=v.stor?null:odoStale(v);if(n)o.miles.push({v,n})});
   return o;
 }
 function attnBanner(){
@@ -669,10 +671,60 @@ function fullExtra(v){
   const dc=(v.docs||[]).map(x=>esc(x.n)).join(", ");
   return(sp?`<h2>Parts and specs</h2>${sp}`:"")+(dt?`<h2>Dates</h2>${dt}`:"")+(tr?`<h2>Tires</h2>${tr}`:"")+(dc?`<h2>Documents on file</h2><div class="pvm">${dc}</div>`:"")+"<h2>History</h2>";
 }
+function storToggle(){
+  const v=veh();if(!v)return;
+  if(!v.stor){
+    if(!confirm("Put "+v.name+" in storage? Its reminders pause and stay out of the attention list and alerts. Registration and other expiration dates still count."))return;
+    v.stor=today();save();render();toast("In storage",()=>{delete v.stor;save();render()});return;
+  }
+  const was=v.stor,days=Math.max(0,Math.round((Date.parse(today()+"T00:00:00Z")-Date.parse(was+"T00:00:00Z"))/864e5)),pre=JSON.stringify(S.records);let n=0;
+  if(days>0)S.records.forEach(r=>{if(r.vid===v.id&&r.type==="reminder"&&!r.done&&r.date){r.date=addD(r.date,days);n++}});
+  delete v.stor;save();render();
+  toast("Back in use"+(n?". "+n+" dated reminder"+(n===1?"":"s")+" moved "+days+" days later":""),()=>{S.records=JSON.parse(pre);v.stor=was;save();render()});
+}
+// A reminder for another piece of equipment with the same timing: same interval when it came from a logged service, otherwise the time or distance left.
+function copyRem(r,v,t){
+  const src=S.records.find(x=>x.nrid===r.id&&x.type!=="reminder"),T0=Date.parse(today()+"T00:00:00Z"),D=x=>Date.parse(x+"T00:00:00Z");
+  let date="",odo="";
+  if(r.date){
+    if(r.rep>0)date=addM(today(),r.rep);
+    else{const iv=Math.round((D(r.date)-(src&&src.date?D(src.date):T0))/864e5);date=iv>0?addD(today(),iv):""}
+  }
+  if(r.odo!==""&&r.odo!=null&&!isT(t.id)&&isH(v.id)===isH(t.id)){
+    const iv=src&&src.odo!==""&&src.odo!=null?r.odo-src.odo:r.odo-lastOdo(v.id),lt=lastOdo(t.id);
+    if(iv>0&&lt>0)odo=lt+iv;
+  }
+  if(!date&&odo==="")return null;
+  return{id:uid(),vid:t.id,type:"reminder",date,odo,desc:r.desc||"",parts:"",pl:[],dl:[],notes:r.notes||"",ph:[],rc:[],done:false,nrid:"",next:0,iu:[],rep:r.rep||0};
+}
+function copySched(){
+  const v=veh(),T=act().filter(x=>x.id!==v.id),RL=S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done),C=v.cls||[];
+  if(!T.length){toast("Add another piece of equipment first");return}
+  if(!RL.length&&!C.length){toast("Nothing to copy yet. Add reminders or checklists first");return}
+  show(`<h3 style="margin:0">Copy to other equipment</h3><div class="m" style="margin-top:6px">Copies ${esc(v.name)}\u2019s reminders and checklists. Reminders keep the same interval but start from today (or from the other one\u2019s latest reading). Anything with the same name that it already has is skipped.</div>
+  <label>Copy to</label><div id="cp_t">${T.map(x=>`<label class="ck"><input type="checkbox" data-t="${x.id}"><span>${esc(x.name)}</span></label>`).join("")}</div>
+  ${RL.length?`<label>Reminders</label><div id="cp_r">${RL.map(r=>`<label class="ck"><input type="checkbox" data-r="${r.id}" checked><span>${esc(r.desc||"Reminder")}</span></label>`).join("")}</div>`:""}
+  ${C.length?`<label>Checklists</label><div id="cp_c">${C.map(c=>`<label class="ck"><input type="checkbox" data-c="${c.id}" checked><span>${esc(c.name)}</span></label>`).join("")}</div>`:""}
+  <div class="m" id="cp_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="cp_go" style="flex:1">Copy</button></div>`);
+  $("cp_go").onclick=()=>{
+    const ts=[...$("cp_t").querySelectorAll("input:checked")].map(i=>vOf(i.dataset.t)).filter(Boolean);
+    if(!ts.length){$("cp_m").textContent="Pick at least one piece of equipment.";return}
+    const rs=RL.filter(r=>($("cp_r")&&$("cp_r").querySelector(`[data-r="${r.id}"]`)||{}).checked),cs=C.filter(c=>($("cp_c")&&$("cp_c").querySelector(`[data-c="${c.id}"]`)||{}).checked);
+    if(!rs.length&&!cs.length){$("cp_m").textContent="Tick something to copy.";return}
+    const pre=JSON.stringify([S.records,S.vehicles]);let nr=0,nc=0,sk=0;
+    ts.forEach(t=>{
+      const have=S.records.filter(x=>x.vid===t.id&&x.type==="reminder"&&!x.done).map(x=>(x.desc||"").toLowerCase());
+      rs.forEach(r=>{if(have.includes((r.desc||"").toLowerCase())){sk++;return}const n=copyRem(r,v,t);if(n){S.records.push(n);nr++}else sk++});
+      cs.forEach(c=>{t.cls=t.cls||[];if(t.cls.some(x=>(x.name||"").toLowerCase()===(c.name||"").toLowerCase())){sk++;return}t.cls.push({id:uid(),name:c.name,items:[...(c.items||[])]});nc++});
+    });
+    save();$("dlg").close();render();
+    toast("Copied "+[nr&&nr+" reminder"+(nr===1?"":"s"),nc&&nc+" checklist"+(nc===1?"":"s")].filter(Boolean).join(" and ")+(nr||nc?"":"nothing")+(sk?" ("+sk+" skipped)":""),()=>{const p=JSON.parse(pre);S.records=p[0];S.vehicles=p[1];save();render()});
+  };
+}
 function moreMenu(){
   const v=veh();
-  show(`<h3 style="margin:0">More</h3><label>Tools</label>`+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
-  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.pvf){$("dlg").close();printView(v,true)}else if(e.target.dataset.cl){$("dlg").close();clList()}else if(e.target.dataset.tires){$("dlg").close();tireList()}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}};
+  show(`<h3 style="margin:0">More</h3><label>Tools</label>`+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button><button class="mrow" data-cpy="1">Copy reminders &amp; checklists to\u2026</button><button class="mrow" data-stm="1">'+(v.stor?"\u2744\uFE0F Take out of storage":"\u2744\uFE0F Put in storage for the season")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.pvf){$("dlg").close();printView(v,true)}else if(e.target.dataset.cl){$("dlg").close();clList()}else if(e.target.dataset.cpy){$("dlg").close();copySched()}else if(e.target.dataset.stm){$("dlg").close();storToggle()}else if(e.target.dataset.tires){$("dlg").close();tireList()}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}};
 }
 // ---- back gesture: sheets, photo viewer, report and equipment each take one history step
 const HS=[],HQ=[];let hskip=0,LV="garage",hbusy=false,hto=0;
@@ -725,14 +777,14 @@ function render(){
   else L.innerHTML=garageView();
 }
 function dashView(v){
-  const lo=lastOdo(v.id),up=S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done).map(r=>({r,i:rinfo(r,lo)}));
+  const lo=lastOdo(v.id),up=openRem(v).map(r=>({r,i:rinfo(r,lo)}));
   pseudo(v).forEach(r=>up.push({r,i:rinfo(r,lo)}));
   up.sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
   const rec=S.records.filter(r=>r.vid===v.id&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,6);
   const upH=up.length?up.map(({r,i})=>`<div class="c ce sc st${i.st}"${r.id?` data-sw="${r.id}"`:""}>${r.id?`<button class="ed" data-edit="${r.id}" title="Edit">\u270e</button>`:r.pk?`<button class="ed" data-vedit="1" title="Edit dates">\u270e</button>`:""}<h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="rmr"><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div></div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders. <a data-addrem="1" style="color:var(--ac);font-weight:600;cursor:pointer">Add one</a></div>';
   const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
     return `<div class="c ce sc st${r.type==="repair"?1:0}"><button class="ed" data-edit="${r.id}" title="Edit">\u270e</button><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div>${r.type==="service"?`<button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
-  const ns=odoStale(v),nH=ns?`<div class="c nudge"><b>Update the ${isH(v.id)?"hours":"odometer"}</b><div class="m" style="margin:4px 0 10px">Last updated ${ago2(ns.days)} ago (${lo.toLocaleString()} ${dU(v.id)}). A fresh reading keeps the due dates accurate.</div><div class="row"><button class="p" data-qodo="1">Update now</button><button data-nsnz="1">Later</button></div></div>`:"";
+  const stH=v.stor?`<div class="c nudge"><b>\u2744\uFE0F In storage since ${esc(v.stor)}</b><div class="m" style="margin:4px 0 10px">Reminders are paused and left out of alerts. Registration and other expiration dates still count. When you take it out, dated reminders move later by the days it was stored.</div><button class="p" data-stor="1" style="width:100%">Take out of storage</button></div>`:"",ns=v.stor?null:odoStale(v),nH=stH+(ns?`<div class="c nudge"><b>Update the ${isH(v.id)?"hours":"odometer"}</b><div class="m" style="margin:4px 0 10px">Last updated ${ago2(ns.days)} ago (${lo.toLocaleString()} ${dU(v.id)}). A fresh reading keeps the due dates accurate.</div><div class="row"><button class="p" data-qodo="1">Update now</button><button data-nsnz="1">Later</button></div></div>`:"");
   return nH+`<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">${ico("search")} Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH+infoCard(v)+recallCard(v);
 }
 function gSearch(){
@@ -850,6 +902,9 @@ const HELP=[
 ["Equipment icons","<p>Edit a piece of equipment and pick an <b>Icon</b> under Type: car, pickup, SUV or van; ATV, UTV, dirt bike or Jeep / 4x4; riding or push mower; camp trailer, utility trailer or car hauler; plus tractor, boat and generator under Other. The icon takes the color you gave the equipment.</p>"],
 ["Going back","<p>Swipe from the edge of the screen, or use your phone\u0027s back button, to go back one step: it closes an open sheet or photo first, then goes from a piece of equipment back to My Garage. Back on My Garage leaves the app.</p>"],
 ["Accounts","<p>If more than one person uses your server, the admin can turn on <b>accounts</b> in Settings. Everyone then signs in with their own username and password and only sees their own equipment, photos, inventory and settings. The admin adds people under <b>Manage users</b> and gives them the starting password. Turning accounts on moves what is already on the server into the admin account. Everyone, including you, has to sign in afterwards. The Android app has a Username box in its server settings for this.</p>"],
+["In storage","<p>For the winter mower or a trailer that sits all season, open the equipment, tap <b>More</b> and choose <b>Put in storage for the season</b>. Its reminders pause: they stay out of the attention list, the alerts and the calendar. Registration, the OHV sticker and other expiration dates still count, so you won\u0027t miss a renewal. When you take it out, dated reminders move later by the number of days it was stored, so they don\u0027t all show overdue at once. Distance and hours reminders aren\u0027t affected because they count use.</p>"],
+["Copy a schedule","<p>Set up reminders and checklists once, then open <b>More</b> and choose <b>Copy reminders &amp; checklists to\u2026</b>. Pick the equipment and what to copy. Reminders keep the same interval but start from today (or from the other one\u0027s latest reading). Anything the other equipment already has with the same name is skipped, and Undo puts everything back.</p>"],
+["Using it away from home","<p>To reach your server from outside your home network without opening your router, use <b>Tailscale</b>: install the Tailscale app on the NAS and on your phone, sign in to the same account, then use the NAS\u0027s Tailscale address (for example <b>http://truenas:30500</b>) in the browser, or in the Android app under Server in Settings. Never forward the Garage Log port from your router to the internet. If other people will use it, turn on accounts first. The README has the full steps.</p>"],
 ["Timeline","<p>Open the <b>Timeline</b> tab inside equipment to see every service, repair and upgrade in one list, newest first. Use the chips to show just one kind, or the search box to find a part, note or person.</p>"],
 ["Templates and remembered intervals","<p>When you log a service, tick <b>Save as a template</b>. Next time, tap it under <b>Quick pick</b> and the description, parts and next-service interval fill in. The app also remembers the next-service interval you chose for each job on each piece of equipment and offers it again when you type the same description.</p>"],
 ["Done by","<p>Each service, repair or upgrade has an optional <b>Done by</b> box (Me, a family member, a shop). It shows on the tile and is searchable.</p>"],
@@ -1268,6 +1323,7 @@ $("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]"
   else if(d.addrec)openForm()
   else if(d.addv)vehForm(false)
   else if(d.addi)invForm()
+  else if(d.stor)storToggle()
   else if(d.addrem)openForm(null,{type:"reminder"})
   else if(d.cover)lightbox([veh().cover],0)
   else if(d.ph){const[id,i,g]=d.ph.split(":"),r=S.records.find(r=>r.id===id);if(r)lightbox(r[g||"ph"]||[],+i)}

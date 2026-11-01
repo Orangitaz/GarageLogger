@@ -110,7 +110,7 @@ function dueItems(S,tz){
       if(r.odo!==""&&r.odo!=null){const d=r.odo-lo;st=Math.max(st,d<=0?2:d<=sm?1:0);p.push(d<=0?`${-d} ${unit} over`:`in ${d} ${unit}`)}
       return{st,txt:p.join(" / ")};
     };
-    for(const r of R.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done)){const i=info(r);if(i.st>=1)out.push({id:r.id,vid:v.id,name:v.name,what:r.desc||"Reminder",st:i.st,txt:i.txt})}
+    for(const r of v.stor?[]:R.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done)){const i=info(r);if(i.st>=1)out.push({id:r.id,vid:v.id,name:v.name,what:r.desc||"Reminder",st:i.st,txt:i.txt})}
     // Dates that fall on the same day (registration with inspection/emissions, say) are reported as one item.
     const ds=[];
     if(v.kind==="offroad"&&v.ohv)ds.push({k:"ohv:"+v.id,w:"OHV sticker expires",date:v.ohv});
@@ -175,7 +175,7 @@ const d8=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||"")?s.replace(/-/g,""):null;
 function calendar(S){
   const ev=[],now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
   for(const v of (S.vehicles||[]).filter(v=>!v.arch)){
-    for(const r of (S.records||[]).filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done&&d8(r.date)))ev.push({uid:r.id,date:r.date,sum:v.name+": "+(r.desc||"Reminder")});
+    for(const r of v.stor?[]:(S.records||[]).filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done&&d8(r.date)))ev.push({uid:r.id,date:r.date,sum:v.name+": "+(r.desc||"Reminder")});
     const ds=[];
     if(v.kind==="offroad"&&v.ohv)ds.push({k:"ohv",w:"OHV sticker expires",date:v.ohv});
     if(v.kind!=="mower"&&v.reg)ds.push({k:"reg",w:"Registration expires",date:v.reg});

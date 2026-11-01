@@ -2,6 +2,11 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.19.0 - 2026-10-31
+- In storage mode. In an equipment's More menu, **Put in storage for the season** pauses its reminders: they leave the attention list, the alerts, the calendar link and the Home Assistant status. Registration, the OHV sticker and other expiration dates keep counting. Taking it out moves dated reminders later by the days it was stored, with Undo.
+- Copy reminders and checklists from one piece of equipment to others (More menu). Intervals carry over, restarting from today or from the other equipment's latest reading; same-name items are skipped and Undo reverses it. Distance reminders are not copied onto hours-tracked equipment, or the reverse.
+- A guide for using Garage Log away from home (Tailscale), in the README and in Help.
+
 ## 1.18.0 - 2026-10-27
 - Optional user accounts. The admin turns them on in Settings, then adds people under Manage users. Everyone signs in with their own username and password and only sees their own equipment, photos, inventory, settings, backups, alerts and calendar feed. Your existing data becomes the admin account, and the original files are left untouched.
 - Passwords are stored hashed, sign-ins last 90 days, changing or resetting a password signs that person out everywhere, and repeated wrong passwords lock the sign-in for 15 minutes. Removing a user keeps their files, set aside on the server.
