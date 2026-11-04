@@ -24,6 +24,8 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 - **Fast logging:** **Log again** copies an earlier service, **quick jobs** remember parts and intervals, tap the odometer on a garage card to update it, swipe a reminder to finish or snooze it.
 - **Finding things:** **When did I last…** searches every piece of equipment for a job or part, and each timeline has its own search and filters.
 - **Reports and records:** documents (PDFs and photos), a printable **service history**, a **full history report** with photos, a one-record share page for a sale or a shop, **CSV export**, a link to **nhtsa.gov/recalls** with your VIN copied, **archive** for sold equipment, and **Undo** for deletes.
+- **In storage mode** for seasonal equipment (reminders pause, expiration dates still count) and **copy reminders and checklists** from one piece of equipment to others.
+- **Optional user accounts** so several people can share one server, each with their own sign-in and their own separate data.
 - **Alerts** to your phone through ntfy, Home Assistant or Gotify, a calendar feed, a status feed for Home Assistant dashboards, and a **view-only link** to share your garage.
 - Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes, three text sizes, swipe-back navigation, built-in **Help**, and a **connection log** for troubleshooting sync. Optional password.
 
@@ -105,7 +107,7 @@ Press **Send test message** to check it. The server then sends a message once a 
 
 ## Home Assistant
 `http://TRUENAS-IP:30500/api/summary` returns what is overdue or due soon, in total and per equipment:
-`{"overdue":1,"due_soon":2,"total":3,"vehicles":[{"name":"Daily Driver","status":"due_soon","overdue":0,"due_soon":1,"items":[...]}]}`. `status` is `ok`, `due_soon` or `overdue`. Example for `configuration.yaml` (add `authentication: basic`, `username` and `password` under `rest:` if you set a password):
+`{"overdue":1,"due_soon":2,"total":3,"vehicles":[{"name":"Daily Driver","status":"due_soon","overdue":0,"due_soon":1,"items":[...]}]}`. `status` is `ok`, `due_soon` or `overdue`. With accounts turned on there is no shared password, so use `/api/summary?t=TOKEN` instead, where TOKEN is the part after `t=` in the link from **Settings > Get calendar link** (it is tied to that person's account and can't edit anything). Equipment in storage shows its expiration dates only. Example for `configuration.yaml` (add `authentication: basic`, `username` and `password` under `rest:` if you set a password):
 
 ```yaml
 rest:
@@ -156,7 +158,7 @@ Whichever you choose, do not forward the Garage Log port itself from your router
 
 If more than one person will use the server, open **Settings** and tap **Turn on accounts**. You pick an admin username and password, and everything already on the server becomes that account (the original files stay where they were). After that everyone signs in, and the admin adds people under **Manage users**. Each person gets their own equipment, photos, inventory, settings, backups, reminder alerts and calendar link, and nobody sees anyone else's. Once accounts are on, `GARAGE_PASSWORD` is no longer used. The Android app's server settings have a Username box for this. Use HTTPS (a reverse proxy or a tunnel) if the server is reachable from the internet, because sign-in details are sent to the server.
 
-Where things go: `users/<name>/` holds each person's data and backups, `users.json` holds the sign-ins (passwords are hashed), and removed people are moved to `removed-users/`. To go back to a single shared garage, stop the app, delete `users.json`, and the original `db.json` in the data folder is used again.
+Where things go: `users/<name>/` holds each person's data and backups, `users.json` holds the sign-ins (passwords are hashed), and removed people are moved to `removed-users/`. To go back to a single shared garage, stop the app, copy `users/<name>/db.json` over `db.json` (otherwise you get the data as it was when you turned accounts on, without later changes), then delete `users.json`.
 
 ## Versions
 Every release has a number (see `CHANGELOG.md` for what changed in each). The running version is shown at the bottom of **⚙️ > Settings & data** and at `/api/version`. The Docker image is tagged with it as well as `latest`, for example `ghcr.io/orangitaz/garagelogger:1.0.0`. To go back to an older version on TrueNAS, change the image tag from `latest` to that number and save. Your data stays as it is. To release a new version, raise the number in the `VERSION` file, add a line to `CHANGELOG.md`, and push to `main`.

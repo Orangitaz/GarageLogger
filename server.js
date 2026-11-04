@@ -41,6 +41,7 @@ const saveAcc=()=>{fs.writeFileSync(USERS+".tmp",JSON.stringify(ACC));fs.renameS
 loadAcc();
 const uctx=n=>({FILE:path.join(UDIR,n,"db.json"),BACKUPS:path.join(UDIR,n,"backups"),ALERT_STATE:path.join(UDIR,n,"alert-state.json")});
 const UNAME=/^[a-z0-9][a-z0-9._-]{1,31}$/;
+const hasU=n=>!!ACC&&typeof n==="string"&&Object.prototype.hasOwnProperty.call(ACC.users,n);
 const hmac=(k,x)=>crypto.createHmac("sha256",k).update(x).digest("hex");
 const scrypt=(pw,salt)=>new Promise((ok,no)=>crypto.scrypt(String(pw),salt,32,{N:16384,r:8,p:1},(e,k)=>e?no(e):ok(k)));
 async function mkPw(pw){const salt=crypto.randomBytes(16);return{s:salt.toString("hex"),h:(await scrypt(pw,salt)).toString("hex")}}
@@ -53,7 +54,7 @@ function userOf(req){
   const m=/^Bearer (.+)$/i.exec(req.headers.authorization||"");if(!m)return null;
   const[p,sig]=m[1].split(".");if(!p||!sig)return null;
   const want=hmac(ACC.secret,"s:"+p);if(sig.length!==want.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(want)))return null;
-  try{const j=JSON.parse(Buffer.from(p,"base64url").toString()),u=ACC.users[j.u];if(u&&j.e>Date.now()&&j.v===pv(u))return j.u}catch(e){}
+  try{const j=JSON.parse(Buffer.from(p,"base64url").toString()),u=hasU(j.u)?ACC.users[j.u]:null;if(u&&j.e>Date.now()&&j.v===pv(u))return j.u}catch(e){}
   return null;
 }
 // Links that can't send a password (calendar feed, view-only link) carry user.signature instead.
@@ -61,11 +62,12 @@ const linkTok=(n,kind)=>n+"."+hmac(ACC.secret,kind+":"+n).slice(0,32);
 function linkUser(req,kind){
   if(!ACC)return null;
   const q=new URLSearchParams(req.url.split("?")[1]||""),t=q.get("t")||q.get("ro")||"",i=t.lastIndexOf(".");if(i<1)return null;
-  const n=t.slice(0,i);if(!ACC.users[n])return null;
+  const n=t.slice(0,i);if(!hasU(n))return null;
   const want=linkTok(n,kind);return t.length===want.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(want))?n:null;
 }
 const fails=new Map();
 const throttled=k=>{const f=fails.get(k);return !!f&&f.n>=8&&Date.now()<f.until};
+setInterval(()=>{const t=Date.now();for(const[k,f]of fails)if(t>f.until)fails.delete(k)},10*60e3).unref();
 const failed=k=>{const f=fails.get(k)||{n:0};if(Date.now()>=(f.until||0))f.n=0;f.n++;f.until=Date.now()+15*60e3;fails.set(k,f)};
 
 // ---------- photos are stored as files, not inside db.json ----------
@@ -229,13 +231,15 @@ http.createServer((req,res)=>{
     return jb(4e3,async j=>{
       const n=String(j.user||"").trim().toLowerCase(),k=ip+"|"+n;
       if(throttled(k))return out(429,{ok:false,msg:"Too many tries. Wait 15 minutes and try again."});
-      if(UNAME.test(n)&&ACC.users[n]&&await checkPw(ACC.users[n],j.pass||"")){fails.delete(k);return out(200,{ok:true,token:mkTok(n),user:n,admin:!!ACC.users[n].admin})}
+      if(UNAME.test(n)&&hasU(n)&&await checkPw(ACC.users[n],j.pass||"")){fails.delete(k);return out(200,{ok:true,token:mkTok(n),user:n,admin:!!ACC.users[n].admin})}
       failed(k);await new Promise(r=>setTimeout(r,400));out(401,{ok:false,msg:"Wrong username or password."});
     });
   }
   // Turning accounts on: the first account is the admin and takes over the data that is already on the server.
   if(u==="/api/accounts/setup"&&req.method==="POST"){
     if(ACC){req.resume();return out(409,{ok:false,msg:"Accounts are already on."})}
+    // With a server password set, only someone who knows it may turn accounts on.
+    if(!authed(req)){req.resume();return out(401,{ok:false,msg:"The server password is needed to turn on accounts."})}
     return jb(4e3,async j=>{
       const n=String(j.user||"").trim().toLowerCase(),pw=String(j.pass||"");
       if(!UNAME.test(n))return out(400,{ok:false,msg:"Username: 2 to 32 letters, numbers, dot, dash or underscore."});
@@ -261,19 +265,19 @@ http.createServer((req,res)=>{
     if(u==="/api/users"&&req.method==="POST")return jb(4e3,async j=>{
       const n=String(j.user||"").trim().toLowerCase(),pw=String(j.pass||"");
       if(!UNAME.test(n))return out(400,{ok:false,msg:"Username: 2 to 32 letters, numbers, dot, dash or underscore."});
-      if(ACC.users[n])return out(409,{ok:false,msg:"That username is taken."});
+      if(hasU(n))return out(409,{ok:false,msg:"That username is taken."});
       if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
       ACC.users[n]=Object.assign(await mkPw(pw),{admin:false,created:Date.now()});fs.mkdirSync(path.dirname(uctx(n).FILE),{recursive:true});saveAcc();out(200,{ok:true});
     });
     if(u==="/api/users/password"&&req.method==="POST")return jb(4e3,async j=>{
       const n=String(j.user||""),pw=String(j.pass||"");
-      if(!ACC.users[n])return out(404,{ok:false,msg:"No such user."});
+      if(!hasU(n))return out(404,{ok:false,msg:"No such user."});
       if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
       Object.assign(ACC.users[n],await mkPw(pw));saveAcc();out(200,{ok:true});
     });
     if(u==="/api/users/remove"&&req.method==="POST")return jb(4e3,async j=>{
       const n=String(j.user||"");
-      if(!ACC.users[n])return out(404,{ok:false,msg:"No such user."});
+      if(!hasU(n))return out(404,{ok:false,msg:"No such user."});
       if(n===U)return out(400,{ok:false,msg:"You can't remove your own account."});
       // Their files are moved aside, not deleted.
       try{const to=path.join(DIR,"removed-users");fs.mkdirSync(to,{recursive:true});fs.renameSync(path.join(UDIR,n),path.join(to,n+"-"+Date.now()))}catch(e){}
