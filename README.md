@@ -16,7 +16,7 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 *Screenshots show sample data.*
 
 ## What it does
-- **Garage and dashboards:** My Garage shows each piece of equipment as a colored tile with an icon you choose (car, pickup, ATV, UTV, dirt bike, Jeep, riding or push mower, camp, utility or car-hauler trailer and more) and a status, with quick tiles for adding a service, an odometer reading or a checklist. Each one has a dashboard with upcoming reminders and recent services and repairs. A **Needs attention** list shows what is overdue, due soon or needs a fresh odometer reading, with **Done** and **Snooze** right there.
+- **Garage and dashboards:** My Garage shows each piece of equipment as a colored tile with its cover photo (if you added one) and a status, with quick tiles for adding a service, an odometer reading or a checklist. Each one has a dashboard with upcoming reminders and recent services and repairs. A **Needs attention** list shows what is overdue, due soon or needs a fresh odometer reading, with **Done** and **Snooze** right there.
 - **Service, repair and upgrade records** with notes, photos, receipts, quick-pick services, who did the work, and parts used. Parts are either **bought for this job** or **taken from inventory** (which deducts the stock). A **Timeline** tab shows all three together.
 - **Reminders** by date, miles or hours, with repeats (every 6 months, 1, 2 or 3 years, custom, or "every April"). Mileage reminders show an estimated date. Registration, the OHV sticker, warranty dates and your own dates (inspection, emissions, insurance) renew with one tap. After you add equipment, pick from a list of **common reminders** for that kind.
 - **Parts and specs list** per piece of equipment, plus an **inventory** of oil, filters and supplies with low-stock badges and optional **where to buy** links. Several part numbers or brands per entry, with a camera button to scan barcodes and VINs.
@@ -178,6 +178,3 @@ Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > gara
 Optional. The web app also installs from Chrome (⋮ > Install app). For a real Android app, see the separate repo [GarageLogger-Android](https://github.com/Orangitaz/garagelogger-android). It builds the same app into an APK that **works on its own, with no server**: your data stays on the phone. If you also run Garage Log on a server, enter its address in **Settings & data > Server** and the phone syncs with it (and with your other devices).
 
 Without a server the phone can't send reminder alerts, store documents or offer a calendar link, because those run on the server.
-
-## Credits
-Equipment icons come from open icon sets: [Material Design Icons](https://pictogrammers.com/library/mdi/) by Pictogrammers (Apache 2.0), [Font Awesome Free](https://fontawesome.com) (the motorcycle and utility trailer icons; CC BY 4.0), and the Jeep icon by [Delapouite](https://delapouite.com) from [game-icons.net](https://game-icons.net) (CC BY 3.0). The car hauler is a car icon placed on a trailer.

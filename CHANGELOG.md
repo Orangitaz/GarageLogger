@@ -2,6 +2,10 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.20.0 - 2026-11-06
+- Removed the equipment icons and the icon picker. A tile and a dashboard now show the equipment's cover photo when it has one. With no photo, that picture area is hidden and the tile is just its name and status.
+- Pickers ("Log a service for…", "Add to…") list the equipment by name only.
+
 ## 1.19.1 - 2026-11-03
 - Security fix: on a server that has `GARAGE_PASSWORD` set, someone who could reach the server could have turned on accounts without knowing that password. Turning accounts on now needs the server password. If you use a server password and turned on accounts on 1.18.0 or 1.19.0, check Manage users for any account you don't recognize.
 - Usernames like "constructor" no longer cause a server error at sign-in.
