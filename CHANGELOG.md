@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.20.1 - 2026-11-06
+- Cleanup: removed unused styles and code left over from earlier versions (the old equipment card layout, the old icon styling, an unused tap handler and two unused constants). Nothing looks or behaves differently; the app is a little smaller.
+
 ## 1.20.0 - 2026-11-06
 - Removed the equipment icons and the icon picker. A tile and a dashboard now show the equipment's cover photo when it has one. With no photo, that picture area is hidden and the tile is just its name and status.
 - Pickers ("Log a service for…", "Add to…") list the equipment by name only.

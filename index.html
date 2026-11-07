@@ -33,8 +33,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ac);box-
 .tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 6px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tabs:empty{padding:0}
-.tabs.wrap{flex-wrap:wrap;overflow:visible;gap:8px}
-.tabs.wrap button{flex:1 1 auto}
 .tabs button{white-space:nowrap;background:var(--card);color:var(--mu);padding:8px 15px;border-radius:99px;font-size:14px;flex:none}
 .tabs button.on{background:linear-gradient(135deg,var(--ac),var(--ac2));color:var(--on);border-color:transparent;box-shadow:0 8px 20px -8px var(--ac)}
 main{padding:16px;max-width:640px;margin:auto}
@@ -51,23 +49,11 @@ main{padding:16px;max-width:640px;margin:auto}
 .st0{--sc:var(--ac)}.st1{--sc:var(--warn)}.st2{--sc:var(--bad)}.stn{--sc:var(--mu)}.stu{--sc:var(--ac2)}
 .tag{--c:var(--mu);display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
 .tag.ok{--c:var(--ac)}.tag.bad{--c:var(--bad)}.tag.warn{--c:var(--warn)}
-.vc{padding:0;overflow:hidden}
-.vc-img{position:relative;height:152px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 70% 20%,color-mix(in srgb,var(--k) 70%,transparent),transparent 60%),linear-gradient(135deg,color-mix(in srgb,var(--k) 38%,#000),color-mix(in srgb,var(--k) 8%,var(--pop)))}
-.vc-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.vc-img::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.5),transparent 55%)}
 .ic{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.2em;flex:none}
 .tabs button .ic{width:16px;height:16px;margin-right:6px;vertical-align:-3px}
 .empty .ei .ic{width:1em;height:1em;stroke-width:1.5;color:var(--ac)}
 .pb{height:6px;border-radius:99px;background:color-mix(in srgb,var(--sc) 16%,var(--field));margin-top:10px;overflow:hidden}.pb i{display:block;height:100%;border-radius:99px;background:var(--sc)}
-.pbl{margin-top:5px;font-size:12px}
 .sec .n{margin-left:8px;font-weight:700;opacity:.7}
-.vc-img .tag{position:absolute;z-index:2;top:12px;right:12px;margin:0;color:color-mix(in srgb,var(--c) 65%,#fff);background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.vc-b{padding:14px 16px 16px}
-.vc-b h3{font-size:20px;font-weight:800;letter-spacing:-.02em}
-.vc-nx{display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 12px;border-radius:14px;background:color-mix(in srgb,var(--sc) 11%,transparent);font-size:13.5px}
-.vc-nx i{flex:none;width:9px;height:9px;border-radius:50%;background:var(--sc);box-shadow:0 0 10px var(--sc)}
-.chip{display:inline-block;font-size:12px;padding:4px 10px;border-radius:99px;background:var(--field);color:var(--mu);margin:10px 6px 0 0}
-.chip b{color:var(--tx);font-weight:600}
 .hero{position:relative;height:170px;border-radius:22px;overflow:hidden;margin-bottom:14px;border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 75% 15%,color-mix(in srgb,var(--k) 70%,transparent),transparent 60%),linear-gradient(135deg,color-mix(in srgb,var(--k) 38%,#000),color-mix(in srgb,var(--k) 8%,var(--pop)))}
 .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .hero::after{pointer-events:none;content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.4),transparent 55%)}
@@ -147,7 +133,6 @@ html[data-ts="1"]{zoom:1.12}html[data-ts="2"]{zoom:1.26}html[data-ts] .rsb{max-w
 .ed::before,.ed2::before,#ev::before{content:"";width:17px;height:17px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z'/%3E%3Cpath d='M14.5 6.5l3 3'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z'/%3E%3Cpath d='M14.5 6.5l3 3'/%3E%3C/svg%3E") center/contain no-repeat}
 .ed{position:absolute;top:10px;right:10px;width:36px;height:36px;padding:0;border-radius:50%;font-size:16px;line-height:1;background:var(--field);color:var(--mu);z-index:2}
 .c.ce{padding-right:58px}
-.vc-b{position:relative}.vc-b .ed{top:12px}.vc-b h3,.vc-b>.m{padding-right:44px}
 .ed2{flex:none;width:34px;height:34px;padding:0;border-radius:50%;font-size:15px;line-height:1;background:var(--field);color:var(--mu);align-self:center}
 .upd{position:relative}.upd::after{content:"";position:absolute;top:7px;right:7px;width:10px;height:10px;border-radius:50%;background:var(--ac);box-shadow:0 0 0 2px var(--bg)}
 @keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
@@ -191,7 +176,6 @@ body{overscroll-behavior-y:contain}
 
 /* ---- 1.16 refresh: emoji icons, docked bar, tiles */
 button .ic,a .ic,.tabs .ic{pointer-events:none}
-.ic.em svg{width:1em;height:1em;display:block;stroke:none}.ic.em:has(svg){display:inline-block;width:1em;height:1em;vertical-align:-.15em}
 .ic.em{width:auto;height:auto;font-style:normal;font-size:1.1em;line-height:1;vertical-align:-.12em;stroke:none;fill:none}
 .tabs button .ic.em{width:auto;height:auto;font-size:15px;margin-right:6px;vertical-align:-1px}
 #bn{left:0;right:0;bottom:0;transform:none;width:auto;gap:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid var(--bd);border-radius:0;box-shadow:none;background:var(--hbg)}
@@ -308,7 +292,7 @@ oil:'<path d="M12 3.5s6 6.2 6 10.3a6 6 0 0 1-12 0c0-4.100 6-10.300 6-10.300z"/>'
 const EM={car:"🚗",mtn:"🏍️",trailer:"🚚",mower:"🚜",wrench:"🔧",hammer:"🛠️",up:"⬆️",grid:"📊",timeline:"📜",cube:"⚙️",bell:"⏰",gauge:"⏱️",note:"📝",dots:"⋯",flag:"🚩",cal:"📅",search:"🔍",cam:"📷",help:"❓",oil:"🛢️"};
 const EMS={trailer:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="16" height="9.5" rx="1.6" fill="#d5dde8"/><rect x="5" y="6" width="16" height="2.4" rx="1.2" fill="#9fb0c3"/><path d="M5 13.2H2.2L.8 15" stroke="#8a97a8" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="17" r="3.2" fill="#2b3340"/><circle cx="13" cy="17" r="1.2" fill="#d5dde8"/></svg>'};
 const ico=n=>EM[n]?`<span class="ic em" aria-hidden="true">${EMS[n]||EM[n]}</span>`:`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IP[n]||""}</svg>`;
-const KIC={car:"car",offroad:"mtn",trailer:"trailer",mower:"mower"},TIC={dash:"grid",service:"wrench",repair:"hammer",upgrade:"up",timeline:"timeline",parts:"cube",reminder:"bell",odometer:"gauge",note:"note",more:"dots"};
+const TIC={dash:"grid",service:"wrench",repair:"hammer",upgrade:"up",timeline:"timeline",parts:"cube",reminder:"bell",odometer:"gauge",note:"note",more:"dots"};
 
 const veh=()=>S.vehicles.find(v=>v.id===S.cur);
 const lastOdo=id=>Math.max(0,...S.records.filter(r=>r.vid===id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
@@ -361,7 +345,6 @@ function progBar(r,lo,v){
 }
 const tag=st=>st==2?'<span class="tag bad">Overdue</span>':st==1?'<span class="tag warn">Due soon</span>':'<span class="tag ok">OK</span>';
 
-const MAIN=["dash","service","repair","parts","reminder"];
 const PRE0={
   car:[["Oil & filter",5000,0,6],["Tire rotation",7500,0,6],["Engine air filter",15000,0,12],["Cabin air filter",15000,0,12],["Brake fluid",30000,0,24],["Coolant",30000,0,24],["Transmission fluid",60000,0,36],["Battery test",0,0,12],["Wiper blades",0,0,12]],
   offroad:[["Engine oil & filter",1500,25,6],["Air filter clean",1000,20,3],["Differential fluid",3000,50,12],["Greasing",500,10,3],["Coolant",5000,100,24],["Drive belt check",2000,50,12]],
@@ -1261,7 +1244,7 @@ $("bn").onclick=e=>{const b=e.target.closest("[data-v]"),v=b&&b.dataset.v;if(v){
 $("fab").onclick=()=>view==="vehicle"?(tab==="dash"||tab==="timeline"?addChooser():tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
 $("fabE").onclick=()=>{em=!em;render()};
 $("list").addEventListener("input",e=>{if(e.target.id==="rs"){rq=e.target.value;const r=$("rl");if(r)r.innerHTML=recRows(veh())}});
-$("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");if(e.target.closest("[data-addcover]")&&view==="vehicle"){vehForm(true);return}if(e.target.closest("[data-attn]")){attnSheet();return}if(d.infot){infoOpen=!infoOpen;const y0=scrollY;render();scrollTo(0,y0);return}if(d.nsnz){const v0=veh();v0.nsnz=addD(today(),7);save();render();return}if(RO&&(d.edit||d.vedit||d.pedit!=null||d.specs||d.mv))return;
+$("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");if(e.target.closest("[data-attn]")){attnSheet();return}if(d.infot){infoOpen=!infoOpen;const y0=scrollY;render();scrollTo(0,y0);return}if(d.nsnz){const v0=veh();v0.nsnz=addD(today(),7);save();render();return}if(RO&&(d.edit||d.vedit||d.pedit!=null||d.specs||d.mv))return;
   if(d.vedit2){S.cur=d.vedit2;vehForm(true)}
   else if(d.vedit)vehForm(true);
   else if(d.pedit!=null)partEdit(+d.pedit);
