@@ -2,6 +2,11 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.21.0 - 2026-11-10
+- Accounts: Manage users shows when each person last signed in.
+- Accounts: the admin can turn an account off and on. A turned-off account can't sign in, its calendar and view-only links stop and its reminder alerts pause, but its data is kept.
+- Accounts: "Sign out everywhere" for each person (admin) and "Sign out of every device" in your own account settings, for a lost phone. Existing sign-ins stay valid when you update.
+
 ## 1.20.1 - 2026-11-06
 - Cleanup: removed unused styles and code left over from earlier versions (the old equipment card layout, the old icon styling, an unused tap handler and two unused constants). Nothing looks or behaves differently; the app is a little smaller.
 

@@ -46,7 +46,8 @@ const hmac=(k,x)=>crypto.createHmac("sha256",k).update(x).digest("hex");
 const scrypt=(pw,salt)=>new Promise((ok,no)=>crypto.scrypt(String(pw),salt,32,{N:16384,r:8,p:1},(e,k)=>e?no(e):ok(k)));
 async function mkPw(pw){const salt=crypto.randomBytes(16);return{s:salt.toString("hex"),h:(await scrypt(pw,salt)).toString("hex")}}
 async function checkPw(u,pw){if(!u)return false;const k=await scrypt(pw,Buffer.from(u.s,"hex"));return crypto.timingSafeEqual(k,Buffer.from(u.h,"hex"))}
-const pv=u=>crypto.createHash("sha256").update(u.h).digest("hex").slice(0,8);
+// tv goes up on "Sign out everywhere", which stops every earlier token. Without it the value is what earlier versions used, so updating signs nobody out.
+const pv=u=>crypto.createHash("sha256").update(u.tv?u.h+":"+u.tv:u.h).digest("hex").slice(0,8);
 const b64u=x=>Buffer.from(x).toString("base64url");
 const mkTok=n=>{const p=b64u(JSON.stringify({u:n,e:Date.now()+90*DAYMS,v:pv(ACC.users[n])}));return p+"."+hmac(ACC.secret,"s:"+p)};
 function userOf(req){
@@ -54,7 +55,7 @@ function userOf(req){
   const m=/^Bearer (.+)$/i.exec(req.headers.authorization||"");if(!m)return null;
   const[p,sig]=m[1].split(".");if(!p||!sig)return null;
   const want=hmac(ACC.secret,"s:"+p);if(sig.length!==want.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(want)))return null;
-  try{const j=JSON.parse(Buffer.from(p,"base64url").toString()),u=hasU(j.u)?ACC.users[j.u]:null;if(u&&j.e>Date.now()&&j.v===pv(u))return j.u}catch(e){}
+  try{const j=JSON.parse(Buffer.from(p,"base64url").toString()),u=hasU(j.u)?ACC.users[j.u]:null;if(u&&!u.disabled&&j.e>Date.now()&&j.v===pv(u))return j.u}catch(e){}
   return null;
 }
 // Links that can't send a password (calendar feed, view-only link) carry user.signature instead.
@@ -62,7 +63,7 @@ const linkTok=(n,kind)=>n+"."+hmac(ACC.secret,kind+":"+n).slice(0,32);
 function linkUser(req,kind){
   if(!ACC)return null;
   const q=new URLSearchParams(req.url.split("?")[1]||""),t=q.get("t")||q.get("ro")||"",i=t.lastIndexOf(".");if(i<1)return null;
-  const n=t.slice(0,i);if(!hasU(n))return null;
+  const n=t.slice(0,i);if(!hasU(n)||ACC.users[n].disabled)return null;
   const want=linkTok(n,kind);return t.length===want.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(want))?n:null;
 }
 const fails=new Map();
@@ -133,7 +134,7 @@ async function sendAlert(a,title,message,urgent){
 let alertRunning=false;
 async function runAlerts(){
   if(alertRunning)return;alertRunning=true;
-  try{for(const c of ACC?Object.keys(ACC.users).map(uctx):[LEG])await runAlertsFor(c)}finally{alertRunning=false}
+  try{for(const c of ACC?Object.keys(ACC.users).filter(n=>!ACC.users[n].disabled).map(uctx):[LEG])await runAlertsFor(c)}finally{alertRunning=false}
 }
 async function runAlertsFor(c){
   try{
@@ -231,7 +232,11 @@ http.createServer((req,res)=>{
     return jb(4e3,async j=>{
       const n=String(j.user||"").trim().toLowerCase(),k=ip+"|"+n;
       if(throttled(k))return out(429,{ok:false,msg:"Too many tries. Wait 15 minutes and try again."});
-      if(UNAME.test(n)&&hasU(n)&&await checkPw(ACC.users[n],j.pass||"")){fails.delete(k);return out(200,{ok:true,token:mkTok(n),user:n,admin:!!ACC.users[n].admin})}
+      if(UNAME.test(n)&&hasU(n)&&await checkPw(ACC.users[n],j.pass||"")){
+        fails.delete(k);
+        if(ACC.users[n].disabled)return out(403,{ok:false,msg:"This account is turned off. Ask the admin to turn it back on."});
+        ACC.users[n].last=Date.now();saveAcc();
+        return out(200,{ok:true,token:mkTok(n),user:n,admin:!!ACC.users[n].admin})}
       failed(k);await new Promise(r=>setTimeout(r,400));out(401,{ok:false,msg:"Wrong username or password."});
     });
   }
@@ -252,7 +257,7 @@ http.createServer((req,res)=>{
       saveAcc();out(200,{ok:true,token:mkTok(n),user:n,admin:true});
     });
   }
-  if(ACC&&U&&!linkOnly&&u.startsWith("/api/")&&(u==="/api/account/password"||u==="/api/users"||u.startsWith("/api/users/"))){
+  if(ACC&&U&&!linkOnly&&u.startsWith("/api/")&&(u==="/api/account/password"||u==="/api/account/signout-all"||u==="/api/users"||u.startsWith("/api/users/"))){
     const admin=!!ACC.users[U].admin;
     if(u==="/api/account/password"&&req.method==="POST")return jb(4e3,async j=>{
       const pw=String(j.new||"");
@@ -260,8 +265,10 @@ http.createServer((req,res)=>{
       if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
       Object.assign(ACC.users[U],await mkPw(pw));saveAcc();out(200,{ok:true,token:mkTok(U)});
     });
+    // Sign out of every device, this one included.
+    if(u==="/api/account/signout-all"&&req.method==="POST"){req.resume();ACC.users[U].tv=(ACC.users[U].tv|0)+1;saveAcc();return out(200,{ok:true})}
     if(!admin){req.resume();return out(403,{ok:false,msg:"Only the admin can do that."})}
-    if(u==="/api/users"&&req.method==="GET")return out(200,Object.keys(ACC.users).sort().map(n=>({name:n,admin:!!ACC.users[n].admin})));
+    if(u==="/api/users"&&req.method==="GET")return out(200,Object.keys(ACC.users).sort().map(n=>({name:n,admin:!!ACC.users[n].admin,disabled:!!ACC.users[n].disabled,last:ACC.users[n].last||0})));
     if(u==="/api/users"&&req.method==="POST")return jb(4e3,async j=>{
       const n=String(j.user||"").trim().toLowerCase(),pw=String(j.pass||"");
       if(!UNAME.test(n))return out(400,{ok:false,msg:"Username: 2 to 32 letters, numbers, dot, dash or underscore."});
@@ -274,6 +281,17 @@ http.createServer((req,res)=>{
       if(!hasU(n))return out(404,{ok:false,msg:"No such user."});
       if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
       Object.assign(ACC.users[n],await mkPw(pw));saveAcc();out(200,{ok:true});
+    });
+    if(u==="/api/users/disable"&&req.method==="POST")return jb(4e3,async j=>{
+      const n=String(j.user||"");
+      if(!hasU(n))return out(404,{ok:false,msg:"No such user."});
+      if(n===U)return out(400,{ok:false,msg:"You can't turn off your own account."});
+      ACC.users[n].disabled=!!j.disabled;saveAcc();out(200,{ok:true});
+    });
+    if(u==="/api/users/signout"&&req.method==="POST")return jb(4e3,async j=>{
+      const n=String(j.user||"");
+      if(!hasU(n))return out(404,{ok:false,msg:"No such user."});
+      ACC.users[n].tv=(ACC.users[n].tv|0)+1;saveAcc();out(200,{ok:true});
     });
     if(u==="/api/users/remove"&&req.method==="POST")return jb(4e3,async j=>{
       const n=String(j.user||"");
