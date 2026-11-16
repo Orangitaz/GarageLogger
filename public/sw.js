@@ -8,6 +8,6 @@ self.addEventListener("fetch", e => {
   const r = e.request, u = new URL(r.url);
   if (r.method !== "GET" || u.origin !== location.origin || u.pathname.endsWith("/api/state")) return;
   if (r.mode === "navigate" && (u.pathname.endsWith("/") || u.pathname.endsWith("/index.html"))) {
-    e.respondWith(fetch(r).then(res => { const c = res.clone(); caches.open(C).then(x => x.put("./", c)); return res; }).catch(() => caches.match("./")));
+    e.respondWith(fetch(r).then(res => { if (res.ok) { const c = res.clone(); caches.open(C).then(x => x.put("./", c)); } return res; }).catch(() => caches.match("./")));
   }
 });

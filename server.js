@@ -1,4 +1,4 @@
-const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto");
+const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto"),zlib=require("zlib");
 const DIR=process.env.DATA_DIR||"/data",FILE=path.join(DIR,"db.json"),PHOTOS=path.join(DIR,"photos"),BACKUPS=path.join(DIR,"backups"),ALERT_STATE=path.join(DIR,"alert-state.json"),PORT=+process.env.PORT||3000;
 const VERSION=(()=>{try{return fs.readFileSync(path.join(__dirname,"VERSION"),"utf8").trim()}catch(e){return"dev"}})(),BUILD=String(process.env.GIT_SHA||"").slice(0,7);
 const PASS=process.env.GARAGE_PASSWORD||"",sha=x=>crypto.createHash("sha256").update(String(x)).digest(),PASSH=PASS?sha(PASS):null;
@@ -37,8 +37,8 @@ function write(d,c=LEG){
 const USERS=path.join(DIR,"users.json"),UDIR=path.join(DIR,"users"),DAYMS=864e5;
 let ACC=null;
 const loadAcc=()=>{try{const a=JSON.parse(fs.readFileSync(USERS,"utf8"));ACC=a&&a.users&&a.secret?a:null}catch(e){ACC=null}};
-const saveAcc=()=>{fs.writeFileSync(USERS+".tmp",JSON.stringify(ACC));fs.renameSync(USERS+".tmp",USERS)};
-loadAcc();
+const saveAcc=()=>{fs.writeFileSync(USERS+".tmp",JSON.stringify(ACC),{mode:0o600});fs.renameSync(USERS+".tmp",USERS)};
+loadAcc();try{fs.chmodSync(USERS,0o600)}catch(e){}
 const uctx=n=>({FILE:path.join(UDIR,n,"db.json"),BACKUPS:path.join(UDIR,n,"backups"),ALERT_STATE:path.join(UDIR,n,"alert-state.json")});
 const UNAME=/^[a-z0-9][a-z0-9._-]{1,31}$/;
 const hasU=n=>!!ACC&&typeof n==="string"&&Object.prototype.hasOwnProperty.call(ACC.users,n);
@@ -66,6 +66,7 @@ function linkUser(req,kind){
   const n=t.slice(0,i);if(!hasU(n)||ACC.users[n].disabled)return null;
   const want=linkTok(n,kind);return t.length===want.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(want))?n:null;
 }
+const TRUST_PROXY=/^(1|true|yes)$/i.test(process.env.TRUST_PROXY||"");
 const fails=new Map();
 const throttled=k=>{const f=fails.get(k);return !!f&&f.n>=8&&Date.now()<f.until};
 setInterval(()=>{const t=Date.now();for(const[k,f]of fails)if(t>f.until)fails.delete(k)},10*60e3).unref();
@@ -173,7 +174,8 @@ const ROT=PASS?crypto.createHmac("sha256",PASS).update("garagelog-readonly").dig
 const roOk=req=>{if(!ROT)return false;const q=new URLSearchParams(req.url.split("?")[1]||""),t=q.get("t")||q.get("ro")||"";return t.length===ROT.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(ROT))};
 const calOk=req=>{if(!CALT)return true;const t=new URLSearchParams(req.url.split("?")[1]||"").get("t")||"";return t.length===CALT.length&&crypto.timingSafeEqual(Buffer.from(t),Buffer.from(CALT))};
 const icsText=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
-const icsFold=l=>(l.match(/[\s\S]{1,72}/g)||[l]).join("\r\n ");
+// Lines are folded at 75 bytes (not characters) and never inside a character, so emoji and accents survive.
+const icsFold=l=>{const o=[];let cur="",n=0;for(const ch of l){const b=Buffer.byteLength(ch);if(n+b>75){o.push(cur);cur=" ";n=1}cur+=ch;n+=b}o.push(cur);return o.join("\r\n")};
 const d8=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||"")?s.replace(/-/g,""):null;
 function calendar(S){
   const ev=[],now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
@@ -203,12 +205,30 @@ function authed(req){
 }
 // The Android app talks to this server from its own origin, so only those origins (plus any in CORS_ORIGINS) get CORS headers.
 const ORIGINS=["http://localhost","https://localhost","capacitor://localhost","ionic://localhost",...String(process.env.CORS_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean)];
+// Text replies are compressed when the browser accepts it. Compressed copies of the app page are kept, since it never changes while running.
+const accepts=(req,e)=>new RegExp("\\b"+e+"\\b","i").test(req.headers["accept-encoding"]||"");
+function sendText(req,res,hd,str){
+  hd.Vary="Accept-Encoding";
+  if(str.length<1024||!accepts(req,"gzip")){res.writeHead(200,hd);return res.end(str)}
+  zlib.gzip(str,(e,z)=>{if(e){res.writeHead(200,hd);return res.end(str)}hd["Content-Encoding"]="gzip";res.writeHead(200,hd);res.end(z)});
+}
+let PAGE=null;
+function page(req,res){
+  if(!PAGE){const html=fs.readFileSync(path.join(__dirname,"index.html"),"utf8").replace("__VERSION__",VERSION).replace("__BUILD__",BUILD);
+    PAGE={raw:Buffer.from(html),br:zlib.brotliCompressSync(html),gz:zlib.gzipSync(html,{level:9}),etag:'"'+crypto.createHash("sha1").update(html).digest("hex").slice(0,16)+'"'}}
+  const hd={"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache",ETag:PAGE.etag,Vary:"Accept-Encoding",
+    "Content-Security-Policy":"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"};
+  if(req.headers["if-none-match"]===PAGE.etag){res.writeHead(304,hd);return res.end()}
+  let b=PAGE.raw;if(accepts(req,"br")){hd["Content-Encoding"]="br";b=PAGE.br}else if(accepts(req,"gzip")){hd["Content-Encoding"]="gzip";b=PAGE.gz}
+  res.writeHead(200,hd);res.end(b);
+}
 http.createServer((req,res)=>{
   const u=req.url.split("?")[0],og=req.headers.origin;
   if(og&&ORIGINS.includes(og)){
     res.setHeader("Access-Control-Allow-Origin",og);res.setHeader("Vary","Origin");
     res.setHeader("Access-Control-Allow-Headers","Authorization, Content-Type");res.setHeader("Access-Control-Allow-Methods","GET, PUT, POST, OPTIONS");res.setHeader("Access-Control-Max-Age","86400");
   }
+  res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("X-Frame-Options","DENY");res.setHeader("Referrer-Policy","no-referrer");
   if(req.method==="OPTIONS"){res.writeHead(204).end();return}
   // Accounts: everything except the app shell, photos and the login calls needs a signed-in user.
   let c=LEG,U=null,linkOnly=false;
@@ -223,10 +243,13 @@ http.createServer((req,res)=>{
     if(U)c=uctx(U);
   }
   if(u==="/api/me"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(ACC?{accounts:true,user:U,admin:!!(U&&ACC.users[U].admin)}:{accounts:false}))}
-  const jb=(limit,cb)=>body(req,limit,async buf=>{let j;try{j=JSON.parse(buf.toString())}catch(e){res.writeHead(400,JSON_H);return res.end('{"ok":false}')}
-    try{await cb(j||{})}catch(e){res.writeHead(500,JSON_H);res.end('{"ok":false}')}});
+  // Only real JSON requests are accepted. A web page on another site can't send those without the browser asking the server first, which keeps other sites from posting to this one.
+  const isJson=()=>/^application\/json/i.test(req.headers["content-type"]||"");
+  const jb=(limit,cb)=>{if(!isJson()){req.resume();res.writeHead(415,JSON_H);return res.end('{"ok":false}')}return body(req,limit,async buf=>{let j;try{j=JSON.parse(buf.toString())}catch(e){res.writeHead(400,JSON_H);return res.end('{"ok":false}')}
+    try{await cb(j||{})}catch(e){res.writeHead(500,JSON_H);res.end('{"ok":false}')}})};
   const out=(code,o)=>{res.writeHead(code,JSON_H);res.end(JSON.stringify(o))};
-  const ip=req.socket.remoteAddress||"";
+  // Behind a reverse proxy every request comes from the proxy, so sign-in lockouts would hit everyone at once. With TRUST_PROXY=1 the address the proxy reports is used instead.
+  const ip=TRUST_PROXY&&req.headers["x-forwarded-for"]?String(req.headers["x-forwarded-for"]).split(",").pop().trim():(req.socket.remoteAddress||"");
   if(u==="/api/login"&&req.method==="POST"){
     if(!ACC){req.resume();return out(404,{ok:false})}
     return jb(4e3,async j=>{
@@ -311,8 +334,9 @@ http.createServer((req,res)=>{
     if(req.method==="GET"){
       let d="{}";try{d=fs.readFileSync(c.FILE,"utf8")}catch(e){}
       if(ACC?linkOnly:!authed(req)){try{const j=JSON.parse(d);delete j.alert;d=JSON.stringify(j)}catch(e){d="{}"}}
-      res.writeHead(200,JSON_H);return res.end(d);
+      return sendText(req,res,Object.assign({},JSON_H),d);
     }
+    if(req.method==="PUT"&&!isJson()){req.resume();res.writeHead(415,JSON_H);return res.end('{"ok":false}')}
     if(req.method==="PUT")return body(req,300e6,buf=>{
       try{
         const d=JSON.parse(buf.toString());
@@ -373,10 +397,15 @@ http.createServer((req,res)=>{
   if(u.startsWith("/photos/")){
     const n=u.slice(8);
     if(!/^[a-f0-9]{16}\.(jpg|png|webp|gif)$/.test(n)){res.writeHead(404).end();return}
-    try{const b=fs.readFileSync(path.join(PHOTOS,n));res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"Cache-Control":"public, max-age=31536000, immutable"});return res.end(b)}
+    try{const b=fs.readFileSync(path.join(PHOTOS,n));res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"X-Content-Type-Options":"nosniff","Cache-Control":"public, max-age=31536000, immutable"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
   if(u==="/api/version"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({version:VERSION,build:BUILD}))}
+  if(u==="/api/alert/test"&&req.method==="POST"){
+    if(!isJson()){req.resume();res.writeHead(415,JSON_H);return res.end('{"ok":false}')}
+    // With accounts the test reaches any address from the server, so only the admin may use it.
+    if(ACC&&!(U&&ACC.users[U].admin)){req.resume();return out(403,{ok:false,msg:"Only the admin can send a test alert."})}
+  }
   if(u==="/api/alert/test"&&req.method==="POST")return body(req,10e3,async buf=>{
     try{
       const a=JSON.parse(buf.toString());
@@ -391,9 +420,8 @@ http.createServer((req,res)=>{
   }
   if(u==="/healthz"){res.writeHead(200,{"Content-Type":"text/plain"});return res.end("ok")}
   if(u==="/"||u==="/index.html"){
-    res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});
-    return res.end(fs.readFileSync(path.join(__dirname,"index.html"),"utf8").replace("__VERSION__",VERSION).replace("__BUILD__",BUILD));
+    return page(req,res);
   }
   res.writeHead(404).end();
-}).listen(PORT,"0.0.0.0",()=>console.log("Garage Log listening on "+PORT));
+}).listen(PORT,()=>console.log("Garage Log listening on "+PORT));
 for(const sg of ["SIGTERM","SIGINT"])process.on(sg,()=>process.exit(0));

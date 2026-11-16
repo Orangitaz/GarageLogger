@@ -2,6 +2,17 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.21.1 - 2026-11-16
+- Security: the server now accepts only real JSON requests. Before, a web page on another site could post to a server with no password and turn on accounts without you knowing.
+- Security: with accounts on, only the admin can use the "Test" button for alerts, because it contacts any address you type from the server.
+- Security: added headers that stop the app being shown inside other sites and stop browsers guessing file types; `users.json` is now readable only by the app.
+- Fix: a failed page load (for example "Password required") is no longer saved and shown later when you're offline.
+- Fix: behind a reverse proxy, set the environment variable `TRUST_PROXY=1` so a lockout from wrong sign-in tries only affects the person who typed them, not everyone.
+- Fix: calendar lines are folded by bytes, so names with emoji or accents are no longer split.
+- Faster: the app page and your data are compressed, and the page isn't re-downloaded when it hasn't changed.
+- The server also answers on IPv6 now.
+- Added `tests/run.js` (run `node tests/run.js`) and it runs before each image build.
+
 ## 1.21.0 - 2026-11-10
 - Accounts: Manage users shows when each person last signed in.
 - Accounts: the admin can turn an account off and on. A turned-off account can't sign in, its calendar and view-only links stop and its reminder alerts pause, but its data is kept.

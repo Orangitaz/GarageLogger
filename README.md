@@ -154,6 +154,9 @@ WireGuard encrypts everything between the phone and your home, so it is safe to 
 
 Whichever you choose, do not forward the Garage Log port itself from your router to the internet. The app has no HTTPS of its own, so sign-in details would travel in plain text. Tailscale and WireGuard encrypt the connection themselves. A Cloudflare Tunnel with accounts turned on also works.
 
+## Behind a reverse proxy
+If you reach Garage Log through a reverse proxy (Nginx Proxy Manager, Caddy, Traefik, Tailscale Serve), set `TRUST_PROXY=1` so sign-in lockouts count the real visitor instead of the proxy. Only set it when a proxy really is in front, because otherwise a visitor could fake the address.
+
 ## User accounts (optional)
 
 If more than one person will use the server, open **Settings** and tap **Turn on accounts**. You pick an admin username and password, and everything already on the server becomes that account (the original files stay where they were). After that everyone signs in, and the admin adds people under **Manage users**. Each person gets their own equipment, photos, inventory, settings, backups, reminder alerts and calendar link, and nobody sees anyone else's. Once accounts are on, `GARAGE_PASSWORD` is no longer used. The Android app's server settings have a Username box for this. Under **Manage users** the admin sees when each person last signed in, can **turn an account off** (sign-in, calendar and view-only links and alerts stop, the data is kept) or on again, and can **sign someone out everywhere**. Everyone also has **Sign out of every device** in their own account settings. Use HTTPS (a reverse proxy or a tunnel) if the server is reachable from the internet, because sign-in details are sent to the server.
