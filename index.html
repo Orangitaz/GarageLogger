@@ -243,7 +243,7 @@ const tok=()=>APP?(SRV.tok||""):TOK;
 const HDR=()=>tok()?{Authorization:"Bearer "+tok()}:SRV.pw?{Authorization:"Basic "+b64("u:"+SRV.pw)}:{};
 const F=(p,o={})=>APP&&!BASE?Promise.reject(new Error("no server")):fetch(BASE+p,Object.assign({},o,{headers:Object.assign({},o.headers,HDR())})).then(r=>{if(r.status===401&&ME&&ME.accounts&&!RO)needLogin();return r});
 const pu=u=>RO&&u&&!/^(data:|blob:|https?:)/.test(u)?u+(u.includes("?")?"&":"?")+"t="+RO:!BASE||!u||/^(data:|blob:|https?:)/.test(u)?u:BASE+u+(SRV.t?"?t="+SRV.t:"");
-const TYPES=[["dash","Dashboard"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["timeline","Timeline"],["parts","Parts"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
+const TYPES=[["dash","Dashboard"],["parts","Parts"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["timeline","Timeline"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
 const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair","upgrade"];
 let S={vehicles:[],records:[],inv:[],cur:null,units:"imperial"},view="garage",tab="dash",ic="All",gk="All",em=false,lk="";
@@ -353,7 +353,8 @@ const PRE0={
   trailer:[["Wheel bearings",0,0,12],["Brake check",0,0,6],["Tire check",0,0,6],["Lights check",0,0,6]],
   other:[["Oil change",0,50,12],["General service",0,0,12]]};
 const PR=k=>(S.presets&&S.presets[k])||(PRE0[k]||PRE0.other).map(([n,d,h,m])=>({n,d,h,m}));
-const vTabs=v=>TYPES.filter(t=>!(isT(v.id)&&t[0]==="odometer")).map(([k,l])=>[k,k==="odometer"&&isH(v.id)?"Hours":l]);
+// The odometer / hours log is opened from the More menu (the dashboard has a quick update for the reading).
+const vTabs=v=>TYPES.filter(t=>t[0]!=="odometer").map(([k,l])=>[k,l]);
 function printView(v,full,only){
   const L={service:"Service",repair:"Repair",upgrade:"Upgrade"},tm=isT(v.id);
   const rows=S.records.filter(r=>r.vid===v.id&&L[r.type]&&(!only||r.id===only)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));
@@ -672,7 +673,7 @@ function copySched(){
 }
 function moreMenu(){
   const v=veh();
-  show(`<h3 style="margin:0">More</h3><label>Tools</label>`+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button><button class="mrow" data-cpy="1">Copy reminders &amp; checklists to\u2026</button><button class="mrow" data-stm="1">'+(v.stor?"\u2744\uFE0F Take out of storage":"\u2744\uFE0F Put in storage for the season")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  show(`<h3 style="margin:0">More</h3><label>Tools</label>`+(isT(v.id)?"":'<button class="mrow" data-mt="odometer">'+(isH(v.id)?"Hours":"Odometer")+' log</button>')+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button><button class="mrow" data-cpy="1">Copy reminders &amp; checklists to\u2026</button><button class="mrow" data-stm="1">'+(v.stor?"\u2744\uFE0F Take out of storage":"\u2744\uFE0F Put in storage for the season")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
   $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.pvf){$("dlg").close();printView(v,true)}else if(e.target.dataset.cl){$("dlg").close();clList()}else if(e.target.dataset.cpy){$("dlg").close();copySched()}else if(e.target.dataset.stm){$("dlg").close();storToggle()}else if(e.target.dataset.tires){$("dlg").close();tireList()}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}};
 }
 // ---- back gesture: sheets, photo viewer, report and equipment each take one history step
@@ -716,7 +717,7 @@ function render(){
   $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="ev">✎</button><button id="more"${UPD?' class="upd"':""} aria-label="Settings" title="Settings">⚙️</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="more"${UPD?' class="upd"':""} aria-label="Settings" title="Settings">⚙️</button>`;
   const pk=KINDS.filter(k=>act().some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
   const vt=inV?vTabs(v):[],tl=inV?[...vt,["more","More"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
-  $("tabs").className="tabs";$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?tab:view==="inventory"?ic:gk)?"on":""}" data-t="${k}">${inV&&TIC[k]?ico(TIC[k]):""}${l}</button>`).join("");
+  $("tabs").className="tabs";$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?(tab==="odometer"?"more":tab):view==="inventory"?ic:gk)?"on":""}" data-t="${k}">${inV&&TIC[k]?ico(TIC[k]):""}${l}</button>`).join("");
   {const on=$("tabs").querySelector(".on"),tb=$("tabs");if(on&&tb.scrollWidth>tb.clientWidth)tb.scrollLeft=on.offsetLeft-(tb.clientWidth-on.offsetWidth)/2}
   $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
   $("fab").style.display="";$("fabE").style.display=view==="garage"&&act().length>1?"":"none";$("fabE").textContent=em?"✓":"⇅";

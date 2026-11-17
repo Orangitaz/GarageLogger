@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.22.1 - 2026-11-16
+- Equipment tabs: Parts now sits right after Dashboard, and the Odometer (or Hours) tab moved into the More menu as "Odometer log" / "Hours log", since the dashboard already has a quick update for the reading. While you're in it, More stays highlighted. Time-only equipment has no log entry, as before.
+
 ## 1.22.0 - 2026-11-16
 - Settings & data is tidier. The long list is now grouped into sections you tap to open: Look & units, Account & server, Alerts, calendar & sharing, Backup & restore, and (when you have any) Archived equipment. Help and the sync status stay at the top, and the sections you open stay open while you use the menu.
 
