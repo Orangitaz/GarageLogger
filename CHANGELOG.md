@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.22.0 - 2026-11-16
+- Settings & data is tidier. The long list is now grouped into sections you tap to open: Look & units, Account & server, Alerts, calendar & sharing, Backup & restore, and (when you have any) Archived equipment. Help and the sync status stay at the top, and the sections you open stay open while you use the menu.
+
 ## 1.21.1 - 2026-11-16
 - Security: the server now accepts only real JSON requests. Before, a web page on another site could post to a server with no password and turn on accounts without you knowing.
 - Security: with accounts on, only the admin can use the "Test" button for alerts, because it contacts any address you type from the server.
