@@ -2,6 +2,9 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.22.2 - 2026-11-17
+- Fix: when the app is used on a phone without a server, its storage holds roughly 55 photos. After that a save failed without any message and the change was lost when the app closed. The app now warns you straight away, explains that the change was not saved, and tells you to download a backup and remove some photos or add a server. With a server connected nothing changes.
+
 ## 1.22.1 - 2026-11-16
 - Equipment tabs: Parts now sits right after Dashboard, and the Odometer (or Hours) tab moved into the More menu as "Odometer log" / "Hours log", since the dashboard already has a quick update for the reading. While you're in it, More stays highlighted. Time-only equipment has no log entry, as before.
 

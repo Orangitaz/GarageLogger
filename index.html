@@ -249,7 +249,18 @@ const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair
 let S={vehicles:[],records:[],inv:[],cur:null,units:"imperial"},view="garage",tab="dash",ic="All",gk="All",em=false,lk="";
 try{const r=localStorage.getItem("garagelog");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 S.records=S.records.filter(r=>r.type!=="fuel");
-const save=()=>{try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}push()};
+// Phone-only use keeps everything in the app's own storage, which is limited (about 5 MB, roughly 55 photos). When a write fails the change is only in memory, so say so instead of failing quietly.
+let fullWarned=false;
+const writeLocal=()=>{
+  try{localStorage.setItem("garagelog",JSON.stringify(S));return true}
+  catch(e){
+    if(SYNC)return false;
+    const m="This phone's storage for Garage Log is full, so your latest change was NOT saved and will be lost when the app closes. Open Settings & data and tap Download backup now, then delete some photos or old entries. Adding a server in Settings removes this limit.";
+    if(!fullWarned){fullWarned=true;setTimeout(()=>alert(m),0)}else toast("Storage is full. Your latest change was not saved.");
+    return false;
+  }
+};
+const save=()=>{writeLocal();push()};
 const $=id=>document.getElementById(id);
 let ours=false;
 const theme=()=>{try{return localStorage.getItem("garagelog-theme")||"auto"}catch(e){return"auto"}};
@@ -1303,7 +1314,7 @@ const api=()=>"api/state"+(RO?"?t="+encodeURIComponent(RO):""),AK=["vehicles","r
 const clone=o=>JSON.parse(JSON.stringify(o));
 const norm=o=>{o.records=(o.records||[]).filter(r=>r.type!=="fuel");o.vehicles=o.vehicles||[];o.vehicles.forEach(fixV);return o};
 const cmp=o=>JSON.stringify(Object.assign({},o,{cur:null,rev:0}));
-const stash=()=>{try{localStorage.setItem("garagelog",JSON.stringify(S))}catch(e){}};
+const stash=()=>{writeLocal()};
 const setBase=o=>{base=norm(clone(o));try{localStorage.setItem("garagelog-base",JSON.stringify(base))}catch(e){}};
 try{const b=localStorage.getItem("garagelog-base");if(b)base=norm(JSON.parse(b))}catch(e){}
 // What changed on this device since the last sync, by item id.
