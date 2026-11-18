@@ -12,6 +12,11 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 <img src="screenshots/service-form.png" width="31%" alt="Logging a service">
 <img src="screenshots/dashboard-light.png" width="31%" alt="Light theme">
 </p>
+<p>
+<img src="screenshots/parts.png" width="31%" alt="Parts and specs list">
+<img src="screenshots/inventory.png" width="31%" alt="Inventory with low-stock badges">
+<img src="screenshots/settings.png" width="31%" alt="Settings and data, grouped into sections">
+</p>
 
 *Screenshots show sample data.*
 
@@ -27,7 +32,7 @@ A self-hosted maintenance log for the things in your garage: cars and trucks, UT
 - **In storage mode** for seasonal equipment (reminders pause, expiration dates still count) and **copy reminders and checklists** from one piece of equipment to others.
 - **Optional user accounts** so several people can share one server, each with their own sign-in and their own separate data.
 - **Alerts** to your phone through ntfy, Home Assistant or Gotify, a calendar feed, a status feed for Home Assistant dashboards, and a **view-only link** to share your garage.
-- Works on phones and computers, installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes, three text sizes, swipe-back navigation, built-in **Help**, and a **connection log** for troubleshooting sync. Optional password.
+- Works on phones and computers (on an iPhone it installs from Safari with Add to Home Screen; barcode scanning from a photo is not available in Safari), installs like an app, keeps working offline, and merges edits from two devices. Dark and light themes, three text sizes, swipe-back navigation, built-in **Help**, and a **connection log** for troubleshooting sync. Optional password.
 
 One image, one port, one data folder. No YAML needed.
 
@@ -180,4 +185,4 @@ Change the code, commit it, and let GitHub rebuild. Then on TrueNAS: Apps > gara
 
 Optional. The web app also installs from Chrome (⋮ > Install app). For a real Android app, see the separate repo [GarageLogger-Android](https://github.com/Orangitaz/garagelogger-android). It builds the same app into an APK that **works on its own, with no server**: your data stays on the phone. If you also run Garage Log on a server, enter its address in **Settings & data > Server** and the phone syncs with it (and with your other devices).
 
-Without a server the phone can't send reminder alerts, store documents or offer a calendar link, because those run on the server.
+Without a server the phone can't send reminder alerts, store documents or offer a calendar link, because those run on the server. On its own the phone keeps everything in the app's own storage, which holds roughly 55 photos. When it is full the app warns you that the latest change was not saved, so download a backup (**Settings & data > Backup & restore**) and remove some photos, or connect a server, which has no such limit.
