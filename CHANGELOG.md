@@ -2,6 +2,11 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.23.2 - 2026-11-19
+- The server now checks every save before writing it. Lists that must be lists (equipment, records, inventory, photos, extra dates, documents, checklists, tires), entries that must have an id, dates that must be real dates (`2027-02-31` and `2027-13-45` are refused), numbers, text fields and the alert settings are all checked. A bad save is answered with a clear message and nothing is changed; anything else in the data is kept as it is, so newer versions of the app keep working.
+- Before, a bad value could be stored and later break things. For example, an extra date list that wasn't a list made the calendar and the Home Assistant status feed crash the whole server every time they were fetched. The calendar, status feed and alerts now skip broken entries instead, an error in one request can no longer stop the server, and broken data in `db.json` no longer stops it starting.
+- When the server refuses a save, the sync log in Settings now says why.
+
 ## 1.23.1 - 2026-11-19
 - Security: the address you save under Reminder alerts can no longer be used to reach other machines on your network. With accounts on, only the admin may use an internal address (for example a Home Assistant or ntfy server at 192.168.x.x); other accounts can only use public web addresses. Blocked ranges include local, private, Tailscale (100.64.x.x), link-local and cloud-metadata addresses, in every spelling (127.1, ::ffff:127.0.0.1 and so on), and a name that points inside is refused too. Redirects are never followed.
 - To let everyone use an internal server, list it in the new `ALERT_HOSTS` setting (comma separated). Without accounts nothing changes.

@@ -128,6 +128,57 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   S=start({});await wait(1200);g=S.port;before=ln.hits;
   r=await req(g,"POST","/api/alert/test",{body:{url:"http://127.0.0.1:"+ln.port+"/"}});T(r.s===200&&ln.hits===before+1,"without accounts any address works");
   S.stop();ln.close();ln2.close();lr.close();
+  // ----- what a save may contain -----
+  S=start({});await wait(1200);g=S.port;
+  const okState=()=>({vehicles:[{id:"v1",name:"Truck",model:"",kind:"car",meter:"dist",color:"",cover:"",reg:"2027-03-01",regRep:24,ohv:"",wd:"",wo:"",soonDays:0,soonDist:0,specs:{},
+      plist:[{l:"Oil",v:"5W-30"}],dts:[{id:"d1",l:"Inspection",date:"2027-05-01",rep:12}],docs:[{id:"x1",n:"Manual",url:"docs/0123456789abcdef.pdf",t:"application/pdf",at:"2026-11-01"}],
+      tires:[{id:"t1",name:"Winter",size:"265/70R17",date:"2026-10-01",st:"on",mi:0,notes:"",tr:[{d:"2026-10-01",v:["9","9","9","9"]}]}],cls:[{id:"c1",name:"Before a trip",items:["Tires","Oil"]}]}],
+    records:[{id:"r1",vid:"v1",type:"service",date:"2026-10-01",odo:50000,desc:"Oil",dl:["Rotate"],parts:"",pl:["Filter"],notes:"",by:"Me",ph:[],rc:[],done:false,nrid:"r2",next:5000,iu:[{id:"i1",n:"Oil",u:"qt",q:5}],rep:0},
+      {id:"r2",vid:"v1",type:"reminder",date:"",odo:55000,desc:"Next: Oil",dl:[],parts:"",pl:[],notes:"",ph:[],rc:[],done:false,rep:0,wr:1}],
+    inv:[{id:"i1",name:"Oil",cat:"Oil",qty:3,unit:"qt",notes:"",pns:["44855"],low:"",src:"",url:""}],
+    cur:null,units:"imperial",presets:{car:[{n:"Oil",d:5000,h:"",m:6}]},lastNext:{},alert:{url:"https://ntfy.sh/x",fmt:"text",hour:8,tz:"America/Los_Angeles"},rev:0,somethingNew:{any:"thing"}});
+  r=await req(g,"PUT","/api/state",{body:okState()});T(r.s===200,"a full save like the app makes is accepted (empty current equipment, spare fields and all)");
+  const refuse=(name,edit)=>{const d=okState();edit(d);return req(g,"PUT","/api/state",{body:d}).then(x=>T(x.s===422&&!!(x.j&&x.j.msg),"refused: "+name+(x.j&&x.j.msg?" ("+x.j.msg+")":"")))};
+  const cur=(await req(g,"GET","/api/state")).j;
+  await refuse("records is not a list",d=>d.records={a:1});
+  await refuse("records is empty (null)",d=>d.records=null);
+  await refuse("records is text",d=>d.records="abc");
+  await refuse("inv is not a list",d=>d.inv={});
+  await refuse("a record that is not an entry",d=>d.records.push(null));
+  await refuse("a record with a number for an id",d=>d.records[0].id=7);
+  await refuse("a record without an id",d=>delete d.records[0].id);
+  await refuse("a record without its equipment",d=>delete d.records[0].vid);
+  await refuse("photos that are not a list",d=>d.records[0].ph="photos/x.jpg");
+  await refuse("a photo that is not text",d=>d.records[0].ph=[5]);
+  await refuse("a date that is not a date",d=>d.records[0].date="next week");
+  await refuse("a date that doesn't exist",d=>d.vehicles[0].reg="2027-13-45");
+  await refuse("a February 31",d=>d.vehicles[0].reg="2027-02-31");
+  await refuse("a description that is a list",d=>d.records[0].desc=["x"]);
+  await refuse("an odometer that is text",d=>d.records[0].odo="lots");
+  await refuse("a vehicle without an id",d=>delete d.vehicles[0].id);
+  await refuse("a vehicle id that is far too long",d=>d.vehicles[0].id="x".repeat(500));
+  await refuse("a vehicle that is a number",d=>d.vehicles.push(5));
+  await refuse("extra dates that are not a list",d=>d.vehicles[0].dts={});
+  await refuse("an extra date label that is a number",d=>d.vehicles[0].dts[0].l=5);
+  await refuse("documents that are not a list",d=>d.vehicles[0].docs="x");
+  await refuse("units that are made up",d=>d.units="parsecs");
+  await refuse("the current equipment is a number",d=>d.cur=5);
+  await refuse("alert is a list",d=>d.alert=[]);
+  await refuse("alert address is a number",d=>d.alert.url=5);
+  await refuse("presets is a list",d=>d.presets=[]);
+  await refuse("a checklist whose items are text",d=>d.vehicles[0].cls[0].items="Tires");
+  await refuse("an inventory item with a made-up quantity",d=>d.inv[0].qty="plenty");
+  r=await req(g,"PUT","/api/state",{body:[1,2]});T(r.s===422,"refused: the data itself is a list");
+  r=await req(g,"PUT","/api/state",{body:"{not json",ct:"application/json"});T(r.s===400,"refused: not JSON at all");
+  const after=(await req(g,"GET","/api/state")).j;T(JSON.stringify(after)===JSON.stringify(cur),"none of the refused saves changed what is stored");
+  S.stop();
+  // data that is already broken on disk (saved by an older version, or edited by hand) must not take the server down
+  const bd=fs.mkdtempSync(path.join(os.tmpdir(),"gl-"));fs.writeFileSync(path.join(bd,"db.json"),JSON.stringify({vehicles:[null,{id:"a",name:"X",dts:{},reg:"2027-13-45",ohv:5},{id:"b",name:"Y",kind:"offroad",ohv:"2027-02-01",dts:[null,{id:"q",l:5,date:"2027-04-01"},{id:"r",l:"Smog",date:"2027-04-01"}]}],records:{x:1}}));
+  S=start({},bd);await wait(1500);g=S.port;
+  r=await req(g,"GET","/calendar.ics");T(r.s===200&&r.b.toString().includes("BEGIN:VCALENDAR")&&!/2027-13/.test(r.b.toString()),"calendar still works with broken data on disk");
+  r=await req(g,"GET","/api/summary");T(r.s===200,"summary still works with broken data on disk");
+  r=await req(g,"GET","/healthz");T(r.s===200,"server is still running afterwards");
+  S.stop();
   // ----- behind a proxy -----
   S=start({TRUST_PROXY:"1"});await wait(1200);g=S.port;
   r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});

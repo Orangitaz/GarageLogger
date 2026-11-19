@@ -1356,7 +1356,7 @@ async function send(){
         if(base){mergeIn(T);merged=true;redraw();continue}
         adopt(T);setBase(T);setSync("ok","loaded changes from another device");redraw();break;
       }
-      if(!r.ok)throw new Error("the server answered "+r.status+(r.status===401?" (password needed or wrong)":""));
+      if(!r.ok)throw new Error("the server answered "+r.status+(r.status===401?" (password needed or wrong)":"")+(r.status===422?": "+((await r.json().catch(()=>({}))).msg||"the data was refused"):""));
       const j=await r.json();S.rev=j.rev;const b=JSON.parse(sent);b.rev=j.rev;setBase(b);stash();
       setSync("ok",merged?"saved to server (merged with changes from another device)":"saved to server");if(sent.includes('"data:image'))more=true;break;
     }

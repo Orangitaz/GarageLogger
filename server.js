@@ -7,6 +7,7 @@ fs.mkdirSync(PHOTOS,{recursive:true});fs.mkdirSync(DOCS,{recursive:true});
 const ST={"/manifest.webmanifest":"application/manifest+json","/sw.js":"text/javascript","/icon.svg":"image/svg+xml","/icon-192.png":"image/png","/icon-512.png":"image/png","/apple-touch-icon.png":"image/png"};
 const EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"},DEXT=Object.assign({"application/pdf":"pdf"},{"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"}),MIME={jpg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif"};
 const JSON_H={"Content-Type":"application/json","Cache-Control":"no-store"};
+const arr=x=>Array.isArray(x)?x:[],has=x=>x!==undefined&&x!==null,isObj=x=>!!x&&typeof x==="object"&&!Array.isArray(x);
 
 // ---------- data file ----------
 // One data context per person. Without accounts there is just one (LEG); with accounts each user gets DIR/users/<name>/.
@@ -90,18 +91,18 @@ function dataUrlToFile(u,c){
 function movePhotos(d,c=LEG){
   let changed=false;
   const f=u=>{const r=dataUrlToFile(u,c);if(r!==u)changed=true;return r};
-  (d.vehicles||[]).forEach(v=>{if(v.cover)v.cover=f(v.cover)});
-  (d.records||[]).forEach(r=>{if(Array.isArray(r.ph))r.ph=r.ph.map(f);if(Array.isArray(r.rc))r.rc=r.rc.map(f)});
+  arr(d.vehicles).forEach(v=>{if(isObj(v)&&typeof v.cover==="string")v.cover=f(v.cover)});
+  arr(d.records).forEach(r=>{if(!isObj(r))return;if(Array.isArray(r.ph))r.ph=r.ph.map(f);if(Array.isArray(r.rc))r.rc=r.rc.map(f)});
   return changed;
 }
 // Existing installs: move photos out of db.json once, keeping a copy of the original first.
-{
+try{
   const d=read();
   if(Array.isArray(d.vehicles)&&movePhotos(d)){
     try{fs.mkdirSync(BACKUPS,{recursive:true});const f=path.join(BACKUPS,"db-before-photo-move.json");if(!fs.existsSync(f))fs.copyFileSync(FILE,f)}catch(e){}
     write(d);console.log("Moved photos out of db.json");
   }
-}
+}catch(e){console.error("Checking photos in db.json was skipped:",e&&e.message)}
 
 // Before 1.23.0 every account shared the top-level photos/ and docs/ folders. Copy each person's files (the ones their data and backups point to) into their own folders once.
 // The old folders are left alone and are no longer served, so nothing is lost if a file is wanted back.
@@ -130,12 +131,63 @@ function migrateMedia(force){
 }
 migrateMedia();
 
+// ---------- checking what a save contains ----------
+// A save is checked before it is written, so a broken or hand-made request can't leave data on the server that later breaks the app (a list that isn't a list,
+// a date that isn't a date). Only the fields the app and server rely on are checked; anything else in the data is kept as it is, so newer app versions still work.
+const realDate=s=>{if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T00:00:00Z");return !isNaN(d)&&d.toISOString().slice(0,10)===s};
+const KIND={
+  str:x=>typeof x==="string",
+  date:x=>x===""||realDate(x),
+  num:x=>typeof x==="number"?isFinite(x):typeof x==="string"&&(x.trim()===""||isFinite(+x)),
+  bool:x=>typeof x==="boolean"||x===0||x===1,
+  obj:isObj,
+  strs:x=>Array.isArray(x)&&x.every(y=>typeof y==="string"),
+  objs:x=>Array.isArray(x)&&x.every(isObj),
+};
+const SHAPE={
+  vehicle:{name:"str",model:"str",plate:"str",vin:"str",kind:"str",meter:"str",color:"str",cover:"str",ohv:"date",reg:"date",stor:"date",wd:"date",ohvRep:"num",regRep:"num",soonDays:"num",soonDist:"num",wo:"num",arch:"bool",specs:"obj",plist:"objs",dts:"objs",docs:"objs",tires:"objs",cls:"objs"},
+  dt:{l:"str",date:"date"},doc:{n:"str",url:"str",t:"str",at:"date"},part:{l:"str",v:"str"},
+  check:{name:"str",items:"strs"},tire:{name:"str",size:"str",date:"date",st:"str",mi:"num",notes:"str",tr:"objs"},
+  record:{type:"str",date:"date",odo:"num",desc:"str",dl:"strs",pl:"strs",parts:"str",notes:"str",by:"str",ph:"strs",rc:"strs",done:"bool",nrid:"str",wrid:"str",next:"num",iu:"objs",rep:"num",wd:"date",wo:"num"},
+  used:{n:"str",u:"str",q:"num"},
+  item:{name:"str",cat:"str",qty:"num",unit:"str",notes:"str",pns:"strs",low:"num",src:"str",url:"str"},
+  alert:{url:"str",fmt:"str",hour:"num",tz:"str"},
+};
+const idOk=x=>typeof x==="string"&&x.length>0&&x.length<=100;
+function checkFields(o,shape,at){for(const k in shape){const v=o[k];if(v===undefined||v===null)continue;if(!KIND[shape[k]](v))return at+"."+k+" has the wrong kind of value."}return""}
+function checkList(list,at,shape,needId,each){
+  for(let i=0;i<list.length;i++){
+    const o=list[i],w=at+"["+i+"]";
+    if(!isObj(o))return w+" must be an entry, not "+(o===null?"empty":typeof o)+".";
+    if(needId&&!idOk(o.id))return w+" needs an id.";
+    const e=checkFields(o,shape,w)||(each&&each(o,w));if(e)return e;
+  }
+  return"";
+}
+function checkState(d){
+  if(!isObj(d))return"The data must be an object.";
+  if(!Array.isArray(d.vehicles))return"vehicles must be a list.";
+  for(const k of["records","inv"])if(d[k]!==undefined&&!Array.isArray(d[k]))return k+" must be a list.";
+  // The app saves some of these as null when they are not set, so empty is fine.
+  if(has(d.units)&&d.units!=="imperial"&&d.units!=="metric")return"units must be imperial or metric.";
+  if(has(d.cur)&&typeof d.cur!=="string")return"cur must be text.";
+  if(has(d.rev)&&!KIND.num(d.rev))return"rev must be a number.";
+  for(const k of["presets","lastNext"])if(d[k]!==undefined&&d[k]!==null&&!isObj(d[k]))return k+" must be an object.";
+  if(isObj(d.presets))for(const k in d.presets)if(!Array.isArray(d.presets[k])||!d.presets[k].every(isObj))return"presets."+k+" must be a list.";
+  if(d.alert!==undefined&&d.alert!==null){if(!isObj(d.alert))return"alert must be an object.";const e=checkFields(d.alert,SHAPE.alert,"alert");if(e)return e}
+  return checkList(d.vehicles,"vehicles",SHAPE.vehicle,true,(v,w)=>
+      checkList(arr(v.dts),w+".dts",SHAPE.dt,true)||checkList(arr(v.docs),w+".docs",SHAPE.doc,true)||checkList(arr(v.plist),w+".plist",SHAPE.part,false)
+      ||checkList(arr(v.cls),w+".cls",SHAPE.check,true)||checkList(arr(v.tires),w+".tires",SHAPE.tire,true))
+    ||checkList(arr(d.records),"records",SHAPE.record,true,(r,w)=>(idOk(r.vid)?"":w+" needs the id of its equipment (vid).")||(typeof r.type==="string"&&r.type?"":w+" needs a type.")||checkList(arr(r.iu),w+".iu",SHAPE.used,false))
+    ||checkList(arr(d.inv),"inv",SHAPE.item,true);
+}
+
 // ---------- reminder alerts ----------
 const DAY=864e5;
 function dueItems(S,tz){
-  const out=[],today=ymd(tz),units=S.units==="metric"?"km":"mi",R=S.records||[];
+  const out=[],today=ymd(tz),units=S.units==="metric"?"km":"mi",R=arr(S.records);
   const days=s=>Math.round((new Date(s+"T00:00:00Z")-new Date(today+"T00:00:00Z"))/DAY);
-  for(const v of (S.vehicles||[]).filter(v=>!v.arch)){
+  for(const v of arr(S.vehicles).filter(v=>v&&!v.arch)){
     const hrs=v.meter==="hrs",unit=hrs?"hrs":units,sd=+v.soonDays||30,sm=+v.soonDist||(hrs?10:500);
     const lo=Math.max(0,...R.filter(r=>r.vid===v.id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
     const info=r=>{
@@ -149,7 +201,7 @@ function dueItems(S,tz){
     const ds=[];
     if(v.kind==="offroad"&&v.ohv)ds.push({k:"ohv:"+v.id,w:"OHV sticker expires",date:v.ohv});
     if(v.kind!=="mower"&&v.reg)ds.push({k:"reg:"+v.id,w:"Registration expires",date:v.reg});
-    for(const x of v.dts||[])if(x.date)ds.push({k:"dt:"+x.id,w:x.l||"Other date",date:x.date});
+    for(const x of arr(v.dts))if(x&&x.date)ds.push({k:"dt:"+x.id,w:String(x.l||"Other date"),date:x.date});
     const g=new Map();for(const x of ds)g.set(x.date,[...(g.get(x.date)||[]),x]);
     for(const[date,a]of g){const i=info({date,odo:""});if(i.st>=1)out.push({id:a.map(x=>x.k).join("+"),vid:v.id,name:v.name,what:a.length===1?a[0].w:a.map(x=>x.w.replace(/ expires$/,"")).join(" + ")+" expire",st:i.st,txt:i.txt})}
   }
@@ -230,15 +282,15 @@ const calOk=req=>{if(!CALT)return true;const t=new URLSearchParams(req.url.split
 const icsText=s=>String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
 // Lines are folded at 75 bytes (not characters) and never inside a character, so emoji and accents survive.
 const icsFold=l=>{const o=[];let cur="",n=0;for(const ch of l){const b=Buffer.byteLength(ch);if(n+b>75){o.push(cur);cur=" ";n=1}cur+=ch;n+=b}o.push(cur);return o.join("\r\n")};
-const d8=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||"")?s.replace(/-/g,""):null;
+const d8=s=>realDate(s)?s.replace(/-/g,""):null;
 function calendar(S){
   const ev=[],now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
-  for(const v of (S.vehicles||[]).filter(v=>!v.arch)){
-    for(const r of v.stor?[]:(S.records||[]).filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done&&d8(r.date)))ev.push({uid:r.id,date:r.date,sum:v.name+": "+(r.desc||"Reminder")});
+  for(const v of arr(S.vehicles).filter(v=>v&&!v.arch)){
+    for(const r of v.stor?[]:arr(S.records).filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done&&d8(r.date)))ev.push({uid:r.id,date:r.date,sum:v.name+": "+(r.desc||"Reminder")});
     const ds=[];
     if(v.kind==="offroad"&&v.ohv)ds.push({k:"ohv",w:"OHV sticker expires",date:v.ohv});
     if(v.kind!=="mower"&&v.reg)ds.push({k:"reg",w:"Registration expires",date:v.reg});
-    for(const x of v.dts||[])if(x.date)ds.push({k:"dt"+x.id,w:x.l||"Other date",date:x.date});
+    for(const x of arr(v.dts))if(x&&x.date)ds.push({k:"dt"+x.id,w:String(x.l||"Other date"),date:x.date});
     const g=new Map();for(const x of ds)if(d8(x.date))g.set(x.date,[...(g.get(x.date)||[]),x]);
     for(const[date,a]of g)ev.push({uid:v.id+"-"+a.map(x=>x.k).join("+"),date,sum:v.name+": "+(a.length===1?a[0].w:a.map(x=>x.w.replace(/ expires$/,"")).join(" + ")+" expire")});
   }
@@ -276,7 +328,7 @@ function page(req,res){
   let b=PAGE.raw;if(accepts(req,"br")){hd["Content-Encoding"]="br";b=PAGE.br}else if(accepts(req,"gzip")){hd["Content-Encoding"]="gzip";b=PAGE.gz}
   res.writeHead(200,hd);res.end(b);
 }
-http.createServer((req,res)=>{
+function handle(req,res){
   const u=req.url.split("?")[0],og=req.headers.origin;
   if(og&&ORIGINS.includes(og)){
     res.setHeader("Access-Control-Allow-Origin",og);res.setHeader("Vary","Origin");
@@ -396,7 +448,8 @@ http.createServer((req,res)=>{
     if(req.method==="PUT")return body(req,300e6,buf=>{
       try{
         const d=JSON.parse(buf.toString());
-        if(!d||typeof d!=="object"||!Array.isArray(d.vehicles))throw 0;
+        const bad=checkState(d);
+        if(bad){console.error("save refused: "+bad);res.writeHead(422,JSON_H);return res.end(JSON.stringify({ok:false,msg:bad}))}
         const cur=read(c);
         // Another device saved since this one last synced: hand back the latest so the app can merge.
         if((d.rev|0)!==(cur.rev|0)){res.writeHead(409,JSON_H);return res.end(JSON.stringify(cur))}
@@ -430,7 +483,7 @@ http.createServer((req,res)=>{
   // Read-only status for dashboards (Home Assistant etc.): what is overdue or due soon, per equipment.
   if(u==="/api/summary"&&req.method==="GET"){
     const S=read(c),items=dueItems(S,(S.alert||{}).tz||undefined);
-    const vehicles=(S.vehicles||[]).filter(v=>!v.arch).map(v=>{
+    const vehicles=arr(S.vehicles).filter(v=>v&&!v.arch).map(v=>{
       const it=items.filter(i=>i.vid===v.id),over=it.filter(i=>i.st===2).length;
       return{id:v.id,name:v.name,kind:v.kind,status:over?"overdue":it.length?"due_soon":"ok",overdue:over,due_soon:it.length-over,items:it.map(i=>({what:i.what,status:i.st===2?"overdue":"due_soon",detail:i.txt}))};
     });
@@ -481,5 +534,8 @@ http.createServer((req,res)=>{
     return page(req,res);
   }
   res.writeHead(404).end();
-}).listen(PORT,()=>console.log("Garage Log listening on "+PORT));
+}
+// A request that fails for any reason answers with an error and the server keeps running.
+http.createServer((req,res)=>{try{handle(req,res)}catch(e){console.error("request failed:",e&&e.message);try{if(!res.headersSent)res.writeHead(500,JSON_H);res.end('{"ok":false}')}catch(_){}}}).listen(PORT,()=>console.log("Garage Log listening on "+PORT));
+process.on("unhandledRejection",e=>console.error("unhandled:",e&&e.message));
 for(const sg of ["SIGTERM","SIGINT"])process.on(sg,()=>process.exit(0));
