@@ -242,7 +242,12 @@ let ME=null,TOK="";try{TOK=localStorage.getItem("garagelog-tok")||""}catch(e){}
 const tok=()=>APP?(SRV.tok||""):TOK;
 const HDR=()=>tok()?{Authorization:"Bearer "+tok()}:SRV.pw?{Authorization:"Basic "+b64("u:"+SRV.pw)}:{};
 const F=(p,o={})=>APP&&!BASE?Promise.reject(new Error("no server")):fetch(BASE+p,Object.assign({},o,{headers:Object.assign({},o.headers,HDR())})).then(r=>{if(r.status===401&&ME&&ME.accounts&&!RO)needLogin();return r});
-const pu=u=>RO&&u&&!/^(data:|blob:|https?:)/.test(u)?u+(u.includes("?")?"&":"?")+"t="+RO:!BASE||!u||/^(data:|blob:|https?:)/.test(u)?u:BASE+u+(SRV.t?"?t="+SRV.t:"");
+// Photo and document addresses carry a link that proves who is asking, because pictures can't send a sign-in header: the view-only link, this person's own media link (accounts), or the server's link.
+const pu=u=>{
+  if(!u||/^(data:|blob:|https?:)/.test(u))return u;
+  const t=RO||(ME&&ME.media)||(BASE&&SRV.t)||"";
+  return (BASE&&!RO?BASE:"")+u+(t?(u.includes("?")?"&":"?")+"t="+t:"");
+};
 const TYPES=[["dash","Dashboard"],["parts","Parts"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["timeline","Timeline"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
 const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair","upgrade"];
@@ -1130,7 +1135,7 @@ function acctWire(){
     $("pw_go").onclick=async()=>{const m=$("pw_m");if($("pw_n").value!==$("pw_n2").value){m.textContent="The new passwords don't match.";return}
       const r=await jpost("api/account/password",{old:$("pw_o").value,new:$("pw_n").value});
       if(!r.ok){m.textContent=r.j.msg||"Couldn't change it.";return}
-      setTok(r.j.token);$("dlg").close();toast("Password changed")};
+      setTok(r.j.token);if(ME&&r.j.media)ME.media=r.j.media;$("dlg").close();toast("Password changed");render()};
   });
   on("ac_us",usersForm);
   on("ac_on",()=>{

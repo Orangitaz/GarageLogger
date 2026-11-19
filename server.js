@@ -10,7 +10,7 @@ const JSON_H={"Content-Type":"application/json","Cache-Control":"no-store"};
 
 // ---------- data file ----------
 // One data context per person. Without accounts there is just one (LEG); with accounts each user gets DIR/users/<name>/.
-const LEG={FILE,BACKUPS,ALERT_STATE};
+const LEG={FILE,BACKUPS,ALERT_STATE,PHOTOS,DOCS};
 const read=(c=LEG)=>{try{return JSON.parse(fs.readFileSync(c.FILE,"utf8"))}catch(e){return{}}};
 const ymd=(tz,d=new Date())=>{try{return new Intl.DateTimeFormat("en-CA",{timeZone:tz||undefined}).format(d)}catch(e){return d.toISOString().slice(0,10)}};
 
@@ -39,7 +39,8 @@ let ACC=null;
 const loadAcc=()=>{try{const a=JSON.parse(fs.readFileSync(USERS,"utf8"));ACC=a&&a.users&&a.secret?a:null}catch(e){ACC=null}};
 const saveAcc=()=>{fs.writeFileSync(USERS+".tmp",JSON.stringify(ACC),{mode:0o600});fs.renameSync(USERS+".tmp",USERS)};
 loadAcc();try{fs.chmodSync(USERS,0o600)}catch(e){}
-const uctx=n=>({FILE:path.join(UDIR,n,"db.json"),BACKUPS:path.join(UDIR,n,"backups"),ALERT_STATE:path.join(UDIR,n,"alert-state.json")});
+// With accounts every person also has their own photos/ and docs/ folders, so one person's files can never be reached through another's account.
+const uctx=n=>({FILE:path.join(UDIR,n,"db.json"),BACKUPS:path.join(UDIR,n,"backups"),ALERT_STATE:path.join(UDIR,n,"alert-state.json"),PHOTOS:path.join(UDIR,n,"photos"),DOCS:path.join(UDIR,n,"docs")});
 const UNAME=/^[a-z0-9][a-z0-9._-]{1,31}$/;
 const hasU=n=>!!ACC&&typeof n==="string"&&Object.prototype.hasOwnProperty.call(ACC.users,n);
 const hmac=(k,x)=>crypto.createHmac("sha256",k).update(x).digest("hex");
@@ -59,7 +60,8 @@ function userOf(req){
   return null;
 }
 // Links that can't send a password (calendar feed, view-only link) carry user.signature instead.
-const linkTok=(n,kind)=>n+"."+hmac(ACC.secret,kind+":"+n).slice(0,32);
+// The "media" link (used by photo and document addresses, which can't carry a sign-in header) also changes when the password changes or the person signs out everywhere.
+const linkTok=(n,kind)=>n+"."+hmac(ACC.secret,kind+":"+n+(kind==="media"?":"+pv(ACC.users[n]):"")).slice(0,32);
 function linkUser(req,kind){
   if(!ACC)return null;
   const q=new URLSearchParams(req.url.split("?")[1]||""),t=q.get("t")||q.get("ro")||"",i=t.lastIndexOf(".");if(i<1)return null;
@@ -74,19 +76,20 @@ const failed=k=>{const f=fails.get(k)||{n:0};if(Date.now()>=(f.until||0))f.n=0;f
 
 // ---------- photos are stored as files, not inside db.json ----------
 function saveFile(dir,buf,ext){
+  fs.mkdirSync(dir,{recursive:true});
   const name=crypto.createHash("sha1").update(ACC?Buffer.concat([buf,Buffer.from(ACC.secret)]):buf).digest("hex").slice(0,16)+"."+ext,f=path.join(dir,name);
   if(!fs.existsSync(f))fs.writeFileSync(f,buf);
   return name;
 }
-const savePhoto=(buf,ext)=>saveFile(PHOTOS,buf,ext);
-function dataUrlToFile(u){
+const savePhoto=(buf,ext,c=LEG)=>saveFile(c.PHOTOS,buf,ext);
+function dataUrlToFile(u,c){
   if(typeof u!=="string"||!u.startsWith("data:image/"))return u;
   const i=u.indexOf(";base64,"),ext=i<0?null:EXT[u.slice(5,i)];
-  return ext?"photos/"+savePhoto(Buffer.from(u.slice(i+8),"base64"),ext):u;
+  return ext?"photos/"+savePhoto(Buffer.from(u.slice(i+8),"base64"),ext,c):u;
 }
-function movePhotos(d){
+function movePhotos(d,c=LEG){
   let changed=false;
-  const f=u=>{const r=dataUrlToFile(u);if(r!==u)changed=true;return r};
+  const f=u=>{const r=dataUrlToFile(u,c);if(r!==u)changed=true;return r};
   (d.vehicles||[]).forEach(v=>{if(v.cover)v.cover=f(v.cover)});
   (d.records||[]).forEach(r=>{if(Array.isArray(r.ph))r.ph=r.ph.map(f);if(Array.isArray(r.rc))r.rc=r.rc.map(f)});
   return changed;
@@ -99,6 +102,33 @@ function movePhotos(d){
     write(d);console.log("Moved photos out of db.json");
   }
 }
+
+// Before 1.23.0 every account shared the top-level photos/ and docs/ folders. Copy each person's files (the ones their data and backups point to) into their own folders once.
+// The old folders are left alone and are no longer served, so nothing is lost if a file is wanted back.
+function migrateMedia(force){
+  if(!ACC)return;
+  const mark=path.join(DIR,"media-per-user.done");
+  if(!force&&fs.existsSync(mark))return;
+  let copied=0,missing=0;
+  for(const name of Object.keys(ACC.users)){
+    const c=uctx(name),txt=[];
+    try{txt.push(fs.readFileSync(c.FILE,"utf8"))}catch(e){}
+    try{for(const f of fs.readdirSync(c.BACKUPS))txt.push(fs.readFileSync(path.join(c.BACKUPS,f),"utf8"))}catch(e){}
+    const seen=new Set();
+    for(const m of txt.join("\n").matchAll(/\b(photos|docs)\/([a-f0-9]{16}\.(?:jpg|png|webp|gif|pdf))/g)){
+      if(seen.has(m[0]))continue;seen.add(m[0]);
+      const dst=path.join(m[1]==="photos"?c.PHOTOS:c.DOCS,m[2]);
+      try{
+        if(fs.existsSync(dst))continue;
+        fs.mkdirSync(path.dirname(dst),{recursive:true});
+        fs.copyFileSync(path.join(m[1]==="photos"?PHOTOS:DOCS,m[2]),dst);copied++;
+      }catch(e){missing++}
+    }
+  }
+  try{fs.writeFileSync(path.join(DIR,"media-per-user.done"),String(Date.now()))}catch(e){}
+  console.log("Photos and documents are now stored per person: "+copied+" copied"+(missing?", "+missing+" listed but not found":""));
+}
+migrateMedia();
 
 // ---------- reminder alerts ----------
 const DAY=864e5;
@@ -234,15 +264,17 @@ http.createServer((req,res)=>{
   let c=LEG,U=null,linkOnly=false;
   if(ACC){
     U=userOf(req);
-    const pub=ST[u]||u==="/healthz"||u==="/api/me"||u==="/api/login"||u==="/api/version"||u.startsWith("/photos/")||u.startsWith("/docs/")||u==="/"||u==="/index.html";
+    const pub=ST[u]||u==="/healthz"||u==="/api/me"||u==="/api/login"||u==="/api/version"||u==="/"||u==="/index.html";
     if(!pub&&!U){
-      const kind=u==="/api/state"&&req.method==="GET"?"ro":(u==="/calendar.ics"||u==="/api/summary")&&req.method==="GET"?"cal":null,L=kind&&linkUser(req,kind);
+      // Photos and documents belong to one person. Pictures can't send a sign-in header, so their addresses carry that person's "media" link (or the view-only link).
+      const media=(u.startsWith("/photos/")||u.startsWith("/docs/"))&&req.method==="GET";
+      const kind=media?"media":u==="/api/state"&&req.method==="GET"?"ro":(u==="/calendar.ics"||u==="/api/summary")&&req.method==="GET"?"cal":null,L=kind&&(linkUser(req,kind)||(media&&linkUser(req,"ro")));
       if(L){U=L;linkOnly=true}
       else{req.resume();res.writeHead(401,JSON_H);return res.end('{"login":true}')}
     }
     if(U)c=uctx(U);
   }
-  if(u==="/api/me"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(ACC?{accounts:true,user:U,admin:!!(U&&ACC.users[U].admin)}:{accounts:false}))}
+  if(u==="/api/me"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(ACC?{accounts:true,user:U,admin:!!(U&&ACC.users[U].admin),media:U?linkTok(U,"media"):undefined}:{accounts:false}))}
   // Only real JSON requests are accepted. A web page on another site can't send those without the browser asking the server first, which keeps other sites from posting to this one.
   const isJson=()=>/^application\/json/i.test(req.headers["content-type"]||"");
   const jb=(limit,cb)=>{if(!isJson()){req.resume();res.writeHead(415,JSON_H);return res.end('{"ok":false}')}return body(req,limit,async buf=>{let j;try{j=JSON.parse(buf.toString())}catch(e){res.writeHead(400,JSON_H);return res.end('{"ok":false}')}
@@ -277,7 +309,7 @@ http.createServer((req,res)=>{
         if(fs.existsSync(BACKUPS)){fs.mkdirSync(nc.BACKUPS,{recursive:true});for(const f of fs.readdirSync(BACKUPS))fs.copyFileSync(path.join(BACKUPS,f),path.join(nc.BACKUPS,f))}}
       catch(e){return out(500,{ok:false,msg:"Couldn't copy your data. Nothing was changed."})}
       ACC={secret:crypto.randomBytes(32).toString("hex"),users:{[n]:Object.assign(await mkPw(pw),{admin:true,created:Date.now()})}};
-      saveAcc();out(200,{ok:true,token:mkTok(n),user:n,admin:true});
+      saveAcc();migrateMedia(true);out(200,{ok:true,token:mkTok(n),user:n,admin:true,media:linkTok(n,"media")});
     });
   }
   if(ACC&&U&&!linkOnly&&u.startsWith("/api/")&&(u==="/api/account/password"||u==="/api/account/signout-all"||u==="/api/users"||u.startsWith("/api/users/"))){
@@ -286,7 +318,7 @@ http.createServer((req,res)=>{
       const pw=String(j.new||"");
       if(!await checkPw(ACC.users[U],j.old||""))return out(403,{ok:false,msg:"The current password is wrong."});
       if(pw.length<8)return out(400,{ok:false,msg:"Password needs at least 8 characters."});
-      Object.assign(ACC.users[U],await mkPw(pw));saveAcc();out(200,{ok:true,token:mkTok(U)});
+      Object.assign(ACC.users[U],await mkPw(pw));saveAcc();out(200,{ok:true,token:mkTok(U),media:linkTok(U,"media")});
     });
     // Sign out of every device, this one included.
     if(u==="/api/account/signout-all"&&req.method==="POST"){req.resume();ACC.users[U].tv=(ACC.users[U].tv|0)+1;saveAcc();return out(200,{ok:true})}
@@ -344,7 +376,7 @@ http.createServer((req,res)=>{
         const cur=read(c);
         // Another device saved since this one last synced: hand back the latest so the app can merge.
         if((d.rev|0)!==(cur.rev|0)){res.writeHead(409,JSON_H);return res.end(JSON.stringify(cur))}
-        movePhotos(d);d.rev=(cur.rev|0)+1;write(d,c);
+        movePhotos(d,c);d.rev=(cur.rev|0)+1;write(d,c);
         res.writeHead(200,JSON_H);res.end(JSON.stringify({rev:d.rev}));
       }catch(e){res.writeHead(400).end()}
     });
@@ -354,7 +386,7 @@ http.createServer((req,res)=>{
     if(!ext){res.writeHead(415).end();return}
     return body(req,25e6,buf=>{
       if(!buf.length){res.writeHead(400).end();return}
-      try{res.writeHead(200,JSON_H);res.end(JSON.stringify({url:"photos/"+savePhoto(buf,ext)}))}catch(e){res.writeHead(500).end()}
+      try{res.writeHead(200,JSON_H);res.end(JSON.stringify({url:"photos/"+savePhoto(buf,ext,c)}))}catch(e){res.writeHead(500).end()}
     });
   }
   if(u==="/api/doc"&&req.method==="POST"){
@@ -362,13 +394,13 @@ http.createServer((req,res)=>{
     if(!ext){req.resume();res.writeHead(415).end();return}
     return body(req,25e6,buf=>{
       if(!buf.length){res.writeHead(400).end();return}
-      try{res.writeHead(200,JSON_H);res.end(JSON.stringify({url:"docs/"+saveFile(DOCS,buf,ext)}))}catch(e){res.writeHead(500).end()}
+      try{res.writeHead(200,JSON_H);res.end(JSON.stringify({url:"docs/"+saveFile(c.DOCS,buf,ext)}))}catch(e){res.writeHead(500).end()}
     });
   }
   if(u.startsWith("/docs/")){
     const n=u.slice(6);
     if(!/^[a-f0-9]{16}\.(pdf|jpg|png|webp|gif)$/.test(n)){res.writeHead(404).end();return}
-    try{const b=fs.readFileSync(path.join(DOCS,n));res.writeHead(200,{"Content-Type":n.endsWith(".pdf")?"application/pdf":MIME[n.split(".")[1]],"Content-Disposition":"inline","X-Content-Type-Options":"nosniff","Cache-Control":"private, max-age=31536000, immutable"});return res.end(b)}
+    try{const b=fs.readFileSync(path.join(c.DOCS,n));res.writeHead(200,{"Content-Type":n.endsWith(".pdf")?"application/pdf":MIME[n.split(".")[1]],"Content-Disposition":"inline","X-Content-Type-Options":"nosniff","Cache-Control":"private, max-age=31536000, immutable"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
   // Read-only status for dashboards (Home Assistant etc.): what is overdue or due soon, per equipment.
@@ -397,7 +429,7 @@ http.createServer((req,res)=>{
   if(u.startsWith("/photos/")){
     const n=u.slice(8);
     if(!/^[a-f0-9]{16}\.(jpg|png|webp|gif)$/.test(n)){res.writeHead(404).end();return}
-    try{const b=fs.readFileSync(path.join(PHOTOS,n));res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"X-Content-Type-Options":"nosniff","Cache-Control":"public, max-age=31536000, immutable"});return res.end(b)}
+    try{const b=fs.readFileSync(path.join(c.PHOTOS,n));res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"X-Content-Type-Options":"nosniff","Cache-Control":(ACC?"private":"public")+", max-age=31536000, immutable"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
   if(u==="/api/version"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({version:VERSION,build:BUILD}))}

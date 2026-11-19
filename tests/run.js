@@ -1,10 +1,10 @@
 // Server checks. Run with: node tests/run.js   (no packages needed; starts its own server on a temporary data folder)
 const {spawn}=require("child_process"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),http=require("http");
 let bad=0;const T=(ok,m)=>{console.log((ok?"PASS ":"FAIL ")+m);if(!ok)bad++};
-function start(env){
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),"gl-")),port=3300+Math.floor(Math.random()*500);
+function start(env,reuse){
+  const dir=reuse||fs.mkdtempSync(path.join(os.tmpdir(),"gl-")),port=3300+Math.floor(Math.random()*500);
   const p=spawn("node",[path.join(__dirname,"..","server.js")],{env:Object.assign({},process.env,{DATA_DIR:dir,PORT:port},env),stdio:"ignore"});
-  return{dir,port,stop:()=>{p.kill();fs.rmSync(dir,{recursive:true,force:true})}};
+  return{dir,port,stop:(keep)=>{p.kill();if(!keep)fs.rmSync(dir,{recursive:true,force:true})}};
 }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 function req(port,method,p,{body,tok,ct,headers}={}){
@@ -58,6 +58,50 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   for(let i=0;i<8;i++)await P("/api/login",{user:"mike",pass:"wrong"+i});
   T((await P("/api/login",{user:"mike",pass:"password1"})).s===429,"8 wrong tries lock that sign-in");
   S.stop();
+  // ----- photos and documents belong to one person -----
+  S=start({});await wait(1200);g=S.port;
+  const png=n=>Buffer.from("not-really-a-png-"+n+"-"+Math.random()),pdf=Buffer.from("%PDF-1.4 test "+Math.random());
+  // before accounts: one shared garage, files in the shared folders
+  const legacy=(await req(g,"POST","/api/photo",{body:png("legacy"),ct:"image/png"})).j.url;
+  r=await req(g,"PUT","/api/state",{body:{vehicles:[{id:"a",name:"Truck",cover:legacy}],records:[],rev:0}});
+  r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});const MA=r.j.token,MM=r.j.media;
+  T(r.s===200&&!!MM,"accounts turned on and a media link is issued");
+  T(fs.existsSync(path.join(S.dir,"users","mike","photos",legacy.slice(7))),"existing photo was copied into the admin's own folder");
+  T((await req(g,"GET","/"+legacy)).s===401,"old photo address needs sign-in now");
+  T((await req(g,"GET","/"+legacy+"?t="+MM)).s===200,"admin's media link opens it");
+  r=await req(g,"POST","/api/photo",{body:png("m1"),ct:"image/png",tok:MA});const mp=r.j.url;T(r.s===200&&fs.existsSync(path.join(S.dir,"users","mike","photos",mp.slice(7))),"new photo is saved in that person's folder");
+  r=await req(g,"POST","/api/doc",{body:pdf,ct:"application/pdf",tok:MA});const md=r.j.url;T(r.s===200&&fs.existsSync(path.join(S.dir,"users","mike","docs",md.slice(5))),"new document is saved in that person's folder");
+  T(!fs.existsSync(path.join(S.dir,"photos",mp.slice(7))),"nothing new lands in the shared folder");
+  await req(g,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:MA});
+  r=await req(g,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}});const KA=r.j.token;const KM=(await req(g,"GET","/api/me",{tok:KA})).j.media;
+  T((await req(g,"GET","/"+mp)).s===401,"no sign-in: photo refused");
+  T((await req(g,"GET","/"+md)).s===401,"no sign-in: document refused");
+  T((await req(g,"GET","/"+mp,{tok:MA})).s===200,"owner can open their photo (sign-in header)");
+  T((await req(g,"GET","/"+mp+"?t="+MM)).s===200&&(await req(g,"GET","/"+md+"?t="+MM)).s===200,"owner can open photo and document (media link)");
+  T((await req(g,"GET","/"+mp,{tok:KA})).s===404&&(await req(g,"GET","/"+mp+"?t="+KM)).s===404,"another person can't open it, even knowing the address");
+  T((await req(g,"GET","/"+md+"?t="+KM)).s===404,"nor the document");
+  r=await req(g,"GET","/api/readonly",{tok:MA});T((await req(g,"GET","/"+mp+"?ro="+r.j.t)).s===200,"view-only link opens the owner's photo");
+  T((await req(g,"GET","/"+mp+"?t=mike.00000000000000000000000000000000")).s===401,"made-up link refused");
+  // same bytes uploaded by two people stay separate
+  const same=png("same");const u1=(await req(g,"POST","/api/photo",{body:same,ct:"image/png",tok:MA})).j.url,u2=(await req(g,"POST","/api/photo",{body:same,ct:"image/png",tok:KA})).j.url;
+  T((await req(g,"GET","/"+u2+"?t="+KM)).s===200&&fs.existsSync(path.join(S.dir,"users","kim","photos",u2.slice(7))),"each person gets their own copy of identical files");
+  // media link stops working when the password changes, the person signs out everywhere, or the account is turned off
+  r=await req(g,"POST","/api/account/password",{body:{old:"kimspass1",new:"kimspass2"},tok:KA});T(r.s===200&&r.j.media&&r.j.media!==KM,"password change issues a new media link");
+  T((await req(g,"GET","/"+u2+"?t="+KM)).s===401&&(await req(g,"GET","/"+u2+"?t="+r.j.media)).s===200,"old media link stops, new one works");
+  await req(g,"POST","/api/users/disable",{body:{user:"kim",disabled:true},tok:MA});
+  T((await req(g,"GET","/"+u2+"?t="+r.j.media)).s===401,"turned-off account's media link stops");
+  // files that only the old shared folder held are copied on the next start (upgrade from an older version)
+  S.stop(true);
+  const old=path.join(S.dir,"users","mike","photos");fs.rmSync(old,{recursive:true,force:true});fs.rmSync(path.join(S.dir,"media-per-user.done"));
+  fs.mkdirSync(path.join(S.dir,"photos"),{recursive:true});fs.copyFileSync(path.join(S.dir,"users","mike","docs",md.slice(5)),path.join(S.dir,"docs",md.slice(5))); // old layout
+  fs.writeFileSync(path.join(S.dir,"photos",mp.slice(7)),"old photo");fs.rmSync(path.join(S.dir,"users","mike","docs"),{recursive:true,force:true});
+  const S2=start({},S.dir);await wait(1500);g=S2.port;
+  r=await req(g,"POST","/api/login",{body:{user:"mike",pass:"password1"}});
+  const mdb=JSON.parse(fs.readFileSync(path.join(S.dir,"users","mike","db.json"),"utf8"));mdb.records=[{id:"z",vid:"a",type:"service",ph:[mp],rc:[]}];fs.writeFileSync(path.join(S.dir,"users","mike","db.json"),JSON.stringify(mdb));
+  S2.stop(true);fs.rmSync(path.join(S.dir,"media-per-user.done"),{force:true});
+  const S3=start({},S.dir);await wait(1500);g=S3.port;
+  T(fs.existsSync(path.join(S.dir,"users","mike","photos",mp.slice(7))),"on the next start, files the data points to are copied from the old shared folder");
+  S3.stop();
   // ----- behind a proxy -----
   S=start({TRUST_PROXY:"1"});await wait(1200);g=S.port;
   r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});

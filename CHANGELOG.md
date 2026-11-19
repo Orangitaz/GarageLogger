@@ -2,6 +2,13 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.23.0 - 2026-11-19
+- Security, accounts: photos and documents are now stored in each person's own folder (`users/<name>/photos` and `docs`) instead of shared top-level folders, and opening one needs that person's sign-in. Before, anyone who knew a file's address could open it without signing in. The address now carries a private link that is tied to the person, and it stops working when they change their password, sign out everywhere or are turned off. The view-only link still shows the owner's photos.
+- On the first start, each person's existing files are copied into their folders automatically. The old shared folders are left in place and no longer served; delete them when you have checked your photos show.
+- Update the Android app too (1.23.0 or newer): older versions of the app can't show photos from a server with accounts on.
+- Without accounts nothing changes.
+- Added tests for all of this to `tests/run.js`.
+
 ## 1.22.2 - 2026-11-17
 - Fix: when the app is used on a phone without a server, its storage holds roughly 55 photos. After that a save failed without any message and the change was lost when the app closed. The app now warns you straight away, explains that the change was not saved, and tells you to download a backup and remove some photos or add a server. With a server connected nothing changes.
 
