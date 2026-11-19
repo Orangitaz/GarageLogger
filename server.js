@@ -536,6 +536,7 @@ function handle(req,res){
   res.writeHead(404).end();
 }
 // A request that fails for any reason answers with an error and the server keeps running.
-http.createServer((req,res)=>{try{handle(req,res)}catch(e){console.error("request failed:",e&&e.message);try{if(!res.headersSent)res.writeHead(500,JSON_H);res.end('{"ok":false}')}catch(_){}}}).listen(PORT,()=>console.log("Garage Log listening on "+PORT));
+const srv=http.createServer((req,res)=>{try{handle(req,res)}catch(e){console.error("request failed:",e&&e.message);try{if(!res.headersSent)res.writeHead(500,JSON_H);res.end('{"ok":false}')}catch(_){}}});
+srv.listen(PORT,()=>console.log("Garage Log listening on "+srv.address().port));
 process.on("unhandledRejection",e=>console.error("unhandled:",e&&e.message));
 for(const sg of ["SIGTERM","SIGINT"])process.on(sg,()=>process.exit(0));

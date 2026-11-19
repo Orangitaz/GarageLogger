@@ -1,10 +1,16 @@
 // Server checks. Run with: node tests/run.js   (no packages needed; starts its own server on a temporary data folder)
 const {spawn}=require("child_process"),fs=require("fs"),os=require("os"),path=require("path"),zlib=require("zlib"),http=require("http");
 let bad=0;const T=(ok,m)=>{console.log((ok?"PASS ":"FAIL ")+m);if(!ok)bad++};
+// Starts the server on a free port (the operating system picks it) and resolves once it says it is listening.
 function start(env,reuse){
-  const dir=reuse||fs.mkdtempSync(path.join(os.tmpdir(),"gl-")),port=3300+Math.floor(Math.random()*500);
-  const p=spawn("node",[path.join(__dirname,"..","server.js")],{env:Object.assign({},process.env,{DATA_DIR:dir,PORT:port},env),stdio:"ignore"});
-  return{dir,port,stop:(keep)=>{p.kill();if(!keep)fs.rmSync(dir,{recursive:true,force:true})}};
+  const dir=reuse||fs.mkdtempSync(path.join(os.tmpdir(),"gl-"));
+  const p=spawn("node",[path.join(__dirname,"..","server.js")],{env:Object.assign({},process.env,{DATA_DIR:dir,PORT:"0"},env),stdio:["ignore","pipe","ignore"]});
+  const S={dir,port:0,stop:keep=>{p.kill();if(!keep)fs.rmSync(dir,{recursive:true,force:true})}};
+  return new Promise((ok,no)=>{
+    let buf="";const to=setTimeout(()=>no(new Error("server did not start")),15000);
+    p.stdout.on("data",d=>{buf+=d;const m=/listening on (\d+)/.exec(buf);if(m){clearTimeout(to);S.port=+m[1];ok(S)}});
+    p.on("exit",()=>{clearTimeout(to);no(new Error("server stopped while starting"))});
+  });
 }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 function listener(redirect){const L={hits:0,port:0};const srv=http.createServer((q,r)=>{L.hits++;q.resume();if(redirect){r.writeHead(302,{Location:redirect});r.end()}else{r.writeHead(200);r.end("ok")}});
@@ -19,7 +25,7 @@ function req(port,method,p,{body,tok,ct,headers}={}){
 }
 (async()=>{
   // ----- no accounts -----
-  let S=start({});await wait(1200);let g=S.port;
+  let S=await start({});let g=S.port;
   let r=await req(g,"GET","/healthz");T(r.s===200,"health check");
   r=await req(g,"POST","/api/accounts/setup",{body:'{"user":"evil","pass":"longpassword1"}',ct:"text/plain"});T(r.s===415,"plain-text POST can't turn accounts on");
   r=await req(g,"GET","/api/me");T(r.j&&r.j.accounts===false,"accounts still off after that attempt");
@@ -37,13 +43,13 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   r=await req(g,"GET","/calendar.ics");const ics=r.b.toString("utf8");T(r.s===200&&ics.includes("BEGIN:VCALENDAR"),"calendar served");
   S.stop();
   // calendar folding keeps emoji whole and lines under 76 bytes
-  S=start({});await wait(1200);g=S.port;
+  S=await start({});g=S.port;
   const st={vehicles:[{id:"x",name:"🚚".repeat(40)+" pickup",reg:"2030-01-15",kind:"truck"}],records:[],rev:0};
   await req(g,"PUT","/api/state",{body:st});r=await req(g,"GET","/calendar.ics");const lines=r.b.toString("utf8").split("\r\n");
   T(lines.every(l=>Buffer.byteLength(l)<=75)&&!r.b.toString("utf8").includes("�"),"calendar lines are 75 bytes or less and emoji aren't split");
   S.stop();
   // ----- accounts -----
-  S=start({});await wait(1200);g=S.port;
+  S=await start({});g=S.port;
   const P=(p,b,tok)=>req(g,"POST",p,{body:b,tok});
   r=await P("/api/accounts/setup",{user:"mike",pass:"password1"});T(r.s===200&&r.j.admin,"admin created");const A=r.j.token;
   r=await P("/api/users",{user:"kim",pass:"kimspass1"},A);T(r.s===200,"add user");
@@ -60,7 +66,7 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   T((await P("/api/login",{user:"mike",pass:"password1"})).s===429,"8 wrong tries lock that sign-in");
   S.stop();
   // ----- photos and documents belong to one person -----
-  S=start({});await wait(1200);g=S.port;
+  S=await start({});g=S.port;
   const png=n=>Buffer.from("not-really-a-png-"+n+"-"+Math.random()),pdf=Buffer.from("%PDF-1.4 test "+Math.random());
   // before accounts: one shared garage, files in the shared folders
   const legacy=(await req(g,"POST","/api/photo",{body:png("legacy"),ct:"image/png"})).j.url;
@@ -96,16 +102,16 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   const old=path.join(S.dir,"users","mike","photos");fs.rmSync(old,{recursive:true,force:true});fs.rmSync(path.join(S.dir,"media-per-user.done"));
   fs.mkdirSync(path.join(S.dir,"photos"),{recursive:true});fs.copyFileSync(path.join(S.dir,"users","mike","docs",md.slice(5)),path.join(S.dir,"docs",md.slice(5))); // old layout
   fs.writeFileSync(path.join(S.dir,"photos",mp.slice(7)),"old photo");fs.rmSync(path.join(S.dir,"users","mike","docs"),{recursive:true,force:true});
-  const S2=start({},S.dir);await wait(1500);g=S2.port;
+  const S2=await start({},S.dir);g=S2.port;
   r=await req(g,"POST","/api/login",{body:{user:"mike",pass:"password1"}});
   const mdb=JSON.parse(fs.readFileSync(path.join(S.dir,"users","mike","db.json"),"utf8"));mdb.records=[{id:"z",vid:"a",type:"service",ph:[mp],rc:[]}];fs.writeFileSync(path.join(S.dir,"users","mike","db.json"),JSON.stringify(mdb));
   S2.stop(true);fs.rmSync(path.join(S.dir,"media-per-user.done"),{force:true});
-  const S3=start({},S.dir);await wait(1500);g=S3.port;
+  const S3=await start({},S.dir);g=S3.port;
   T(fs.existsSync(path.join(S.dir,"users","mike","photos",mp.slice(7))),"on the next start, files the data points to are copied from the old shared folder");
   S3.stop();
   // ----- alerts can't be used to reach machines on your network -----
   const ln=await listener(),ln2=await listener(),lr=await listener("http://127.0.0.1:"+ln2.port+"/");
-  S=start({});await wait(1200);g=S.port;
+  S=await start({});g=S.port;
   r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});const AA=r.j.token;
   await req(g,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:AA});const KK=(await req(g,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}})).j.token;
   const test=(url,tok)=>req(g,"POST","/api/alert/test",{body:{url},tok});
@@ -118,18 +124,18 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   before=ln2.hits;r=await test("http://127.0.0.1:"+lr.port+"/",AA);T(r.s===502&&ln2.hits===before,"a redirect is not followed");
   r=await test("ftp://example.com/",AA);T(r.s===502,"only http and https");
   S.stop();
-  S=start({ALERT_HOSTS:"127.0.0.1"});await wait(1200);g=S.port;
+  S=await start({ALERT_HOSTS:"127.0.0.1"});g=S.port;
   r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});const A3=r.j.token;
   await req(g,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:A3});const K3=(await req(g,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}})).j.token;
   before=ln.hits;r=await req(g,"POST","/api/alert/test",{body:{url:"http://127.0.0.1:"+ln.port+"/"},tok:K3});T(r.s===200&&ln.hits===before+1,"ALERT_HOSTS lets everyone use a listed internal server");
   r=await req(g,"POST","/api/alert/test",{body:{url:"http://[::ffff:127.0.0.1]:"+ln.port+"/"},tok:K3});T(r.s===502,"...but not other internal addresses");
   S.stop();
   // without accounts the owner may use any address
-  S=start({});await wait(1200);g=S.port;before=ln.hits;
+  S=await start({});g=S.port;before=ln.hits;
   r=await req(g,"POST","/api/alert/test",{body:{url:"http://127.0.0.1:"+ln.port+"/"}});T(r.s===200&&ln.hits===before+1,"without accounts any address works");
   S.stop();ln.close();ln2.close();lr.close();
   // ----- what a save may contain -----
-  S=start({});await wait(1200);g=S.port;
+  S=await start({});g=S.port;
   const okState=()=>({vehicles:[{id:"v1",name:"Truck",model:"",kind:"car",meter:"dist",color:"",cover:"",reg:"2027-03-01",regRep:24,ohv:"",wd:"",wo:"",soonDays:0,soonDist:0,specs:{},
       plist:[{l:"Oil",v:"5W-30"}],dts:[{id:"d1",l:"Inspection",date:"2027-05-01",rep:12}],docs:[{id:"x1",n:"Manual",url:"docs/0123456789abcdef.pdf",t:"application/pdf",at:"2026-11-01"}],
       tires:[{id:"t1",name:"Winter",size:"265/70R17",date:"2026-10-01",st:"on",mi:0,notes:"",tr:[{d:"2026-10-01",v:["9","9","9","9"]}]}],cls:[{id:"c1",name:"Before a trip",items:["Tires","Oil"]}]}],
@@ -174,13 +180,13 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   S.stop();
   // data that is already broken on disk (saved by an older version, or edited by hand) must not take the server down
   const bd=fs.mkdtempSync(path.join(os.tmpdir(),"gl-"));fs.writeFileSync(path.join(bd,"db.json"),JSON.stringify({vehicles:[null,{id:"a",name:"X",dts:{},reg:"2027-13-45",ohv:5},{id:"b",name:"Y",kind:"offroad",ohv:"2027-02-01",dts:[null,{id:"q",l:5,date:"2027-04-01"},{id:"r",l:"Smog",date:"2027-04-01"}]}],records:{x:1}}));
-  S=start({},bd);await wait(1500);g=S.port;
+  S=await start({},bd);g=S.port;
   r=await req(g,"GET","/calendar.ics");T(r.s===200&&r.b.toString().includes("BEGIN:VCALENDAR")&&!/2027-13/.test(r.b.toString()),"calendar still works with broken data on disk");
   r=await req(g,"GET","/api/summary");T(r.s===200,"summary still works with broken data on disk");
   r=await req(g,"GET","/healthz");T(r.s===200,"server is still running afterwards");
   S.stop();
   // ----- behind a proxy -----
-  S=start({TRUST_PROXY:"1"});await wait(1200);g=S.port;
+  S=await start({TRUST_PROXY:"1"});g=S.port;
   r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});
   const L=(ip,pw)=>req(g,"POST","/api/login",{body:{user:"mike",pass:pw},headers:{"X-Forwarded-For":ip}});
   for(let i=0;i<8;i++)await L("9.9.9.9","bad"+i);
