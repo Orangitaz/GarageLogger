@@ -7,6 +7,8 @@ function start(env,reuse){
   return{dir,port,stop:(keep)=>{p.kill();if(!keep)fs.rmSync(dir,{recursive:true,force:true})}};
 }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function listener(redirect){const L={hits:0,port:0};const srv=http.createServer((q,r)=>{L.hits++;q.resume();if(redirect){r.writeHead(302,{Location:redirect});r.end()}else{r.writeHead(200);r.end("ok")}});
+  return new Promise(ok=>srv.listen(0,"127.0.0.1",()=>{L.port=srv.address().port;L.close=()=>srv.close();ok(L)}))}
 function req(port,method,p,{body,tok,ct,headers}={}){
   return new Promise(ok=>{
     const h=Object.assign({},headers||{});if(tok)h.Authorization="Bearer "+tok;
@@ -46,8 +48,7 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   r=await P("/api/accounts/setup",{user:"mike",pass:"password1"});T(r.s===200&&r.j.admin,"admin created");const A=r.j.token;
   r=await P("/api/users",{user:"kim",pass:"kimspass1"},A);T(r.s===200,"add user");
   const K=(await P("/api/login",{user:"kim",pass:"kimspass1"})).j.token;
-  r=await P("/api/alert/test",{url:"http://127.0.0.1:1/"},K);T(r.s===403,"non-admin can't use the alert test");
-  r=await P("/api/alert/test",{url:"http://127.0.0.1:1/"},A);T(r.s===502,"admin can (and an unreachable address reports failure)");
+  // alerts: the server contacts the saved address, so who may point it where matters (see the block further down)
   r=await P("/api/users/disable",{user:"kim",disabled:true},A);T(r.s===200&&(await req(g,"GET","/api/state",{tok:K})).s===401,"turned-off user is signed out");
   r=await P("/api/login",{user:"kim",pass:"kimspass1"});T(r.s===403,"turned-off user can't sign in");
   await P("/api/users/disable",{user:"kim",disabled:false},A);
@@ -102,6 +103,31 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   const S3=start({},S.dir);await wait(1500);g=S3.port;
   T(fs.existsSync(path.join(S.dir,"users","mike","photos",mp.slice(7))),"on the next start, files the data points to are copied from the old shared folder");
   S3.stop();
+  // ----- alerts can't be used to reach machines on your network -----
+  const ln=await listener(),ln2=await listener(),lr=await listener("http://127.0.0.1:"+ln2.port+"/");
+  S=start({});await wait(1200);g=S.port;
+  r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});const AA=r.j.token;
+  await req(g,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:AA});const KK=(await req(g,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}})).j.token;
+  const test=(url,tok)=>req(g,"POST","/api/alert/test",{body:{url},tok});
+  r=await test("http://127.0.0.1:"+ln.port+"/",AA);T(r.s===200&&ln.hits===1,"admin can send an alert to an address on the network");
+  let before=ln.hits;
+  for(const[name,url]of[["a local address","http://127.0.0.1:"+ln.port+"/"],["a short local address","http://127.1:"+ln.port+"/"],["a number-style address","http://2130706433:"+ln.port+"/"],["an IPv4-in-IPv6 address","http://[::ffff:127.0.0.1]:"+ln.port+"/"],["localhost","http://localhost:"+ln.port+"/"],["the unspecified address","http://0.0.0.0:"+ln.port+"/"],["a LAN address","http://192.168.1.1/"],["a cloud metadata address","http://169.254.169.254/latest/meta-data/"],["a Tailscale address","http://100.100.100.100/"],["an address with a name and password","http://user:pw@127.0.0.1:"+ln.port+"/"]]){
+    r=await test(url,KK);T(r.s===502&&/public web addresses/.test(r.j.msg||"")&&ln.hits===before,"other accounts can't send to "+name);
+  }
+  r=await test("http://127.1:"+ln.port+"/",AA);T(r.s===200&&ln.hits>before,"admin can use the same short address (so the refusals above are the check, not a failed connection)");
+  before=ln2.hits;r=await test("http://127.0.0.1:"+lr.port+"/",AA);T(r.s===502&&ln2.hits===before,"a redirect is not followed");
+  r=await test("ftp://example.com/",AA);T(r.s===502,"only http and https");
+  S.stop();
+  S=start({ALERT_HOSTS:"127.0.0.1"});await wait(1200);g=S.port;
+  r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});const A3=r.j.token;
+  await req(g,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:A3});const K3=(await req(g,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}})).j.token;
+  before=ln.hits;r=await req(g,"POST","/api/alert/test",{body:{url:"http://127.0.0.1:"+ln.port+"/"},tok:K3});T(r.s===200&&ln.hits===before+1,"ALERT_HOSTS lets everyone use a listed internal server");
+  r=await req(g,"POST","/api/alert/test",{body:{url:"http://[::ffff:127.0.0.1]:"+ln.port+"/"},tok:K3});T(r.s===502,"...but not other internal addresses");
+  S.stop();
+  // without accounts the owner may use any address
+  S=start({});await wait(1200);g=S.port;before=ln.hits;
+  r=await req(g,"POST","/api/alert/test",{body:{url:"http://127.0.0.1:"+ln.port+"/"}});T(r.s===200&&ln.hits===before+1,"without accounts any address works");
+  S.stop();ln.close();ln2.close();lr.close();
   // ----- behind a proxy -----
   S=start({TRUST_PROXY:"1"});await wait(1200);g=S.port;
   r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});

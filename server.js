@@ -1,4 +1,4 @@
-const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto"),zlib=require("zlib");
+const http=require("http"),fs=require("fs"),path=require("path"),crypto=require("crypto"),zlib=require("zlib"),dns=require("dns"),net=require("net"),https=require("https");
 const DIR=process.env.DATA_DIR||"/data",FILE=path.join(DIR,"db.json"),PHOTOS=path.join(DIR,"photos"),BACKUPS=path.join(DIR,"backups"),ALERT_STATE=path.join(DIR,"alert-state.json"),PORT=+process.env.PORT||3000;
 const VERSION=(()=>{try{return fs.readFileSync(path.join(__dirname,"VERSION"),"utf8").trim()}catch(e){return"dev"}})(),BUILD=String(process.env.GIT_SHA||"").slice(0,7);
 const PASS=process.env.GARAGE_PASSWORD||"",sha=x=>crypto.createHash("sha256").update(String(x)).digest(),PASSH=PASS?sha(PASS):null;
@@ -155,19 +155,43 @@ function dueItems(S,tz){
   }
   return out.sort((a,b)=>b.st-a.st);
 }
-async function sendAlert(a,title,message,urgent){
-  const h={};let body;
-  if(a.fmt==="json"){h["Content-Type"]="application/json";body=JSON.stringify({title,message,priority:urgent?8:5})}
-  else{h["Content-Type"]="text/plain";h.Title=title;h.Tags="wrench";h.Priority=urgent?"high":"default";body=message}
-  const r=await fetch(a.url,{method:"POST",headers:h,body,signal:AbortSignal.timeout(10000)});
-  if(!r.ok)throw new Error("HTTP "+r.status);
+// ---------- sending alerts ----------
+// The server contacts whatever address is saved under Reminder alerts. The admin (or the only user, without accounts) may use any address, such as an ntfy
+// server on your own network. Everyone else may only use public addresses, so an account can't be used to reach other machines on your network
+// (the router, TrueNAS itself, cameras, cloud metadata). ALERT_HOSTS (comma separated hostnames or addresses) lists internal servers that everyone may use.
+// The check is made on the address actually connected to, so a name that points inside, or changes after the check, is refused too. Redirects are never followed.
+const ALERT_HOSTS=new Set(String(process.env.ALERT_HOSTS||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean));
+const INTERNAL=new net.BlockList();
+for(const[a,p]of[["0.0.0.0",8],["10.0.0.0",8],["100.64.0.0",10],["127.0.0.0",8],["169.254.0.0",16],["172.16.0.0",12],["192.0.0.0",24],["192.168.0.0",16],["198.18.0.0",15],["224.0.0.0",4],["240.0.0.0",4]])INTERNAL.addSubnet(a,p,"ipv4");
+for(const[a,p]of[["::",128],["::1",128],["fc00::",7],["fe80::",10],["ff00::",8],["64:ff9b::",96],["100::",64],["2001:db8::",32]])INTERNAL.addSubnet(a,p,"ipv6");
+const internalIp=ip=>{const f=net.isIP(ip);return !f||INTERNAL.check(ip,f===4?"ipv4":"ipv6")};
+function sendAlert(a,title,message,urgent,trusted=true){
+  return new Promise((ok,no)=>{
+    let u;try{u=new URL(a.url)}catch(e){return no(new Error("bad address"))}
+    if(u.protocol!=="http:"&&u.protocol!=="https:")return no(new Error("bad address"));
+    const host=u.hostname.replace(/^\[|\]$/g,""),open=trusted||ALERT_HOSTS.has(host.toLowerCase());
+    if(!open&&net.isIP(host)&&internalIp(host))return no(new Error("not allowed"));
+    const h={};let body;
+    if(a.fmt==="json"){h["Content-Type"]="application/json";body=JSON.stringify({title,message,priority:urgent?8:5})}
+    else{h["Content-Type"]="text/plain";h.Title=title;h.Tags="wrench";h.Priority=urgent?"high":"default";body=message}
+    h["Content-Length"]=Buffer.byteLength(body);
+    const req=(u.protocol==="https:"?https:http).request({hostname:host,port:u.port||undefined,path:u.pathname+u.search,method:"POST",headers:h,timeout:10000,
+      auth:u.username?decodeURIComponent(u.username)+":"+decodeURIComponent(u.password):undefined,
+      lookup:(hn,o,cb)=>dns.lookup(hn,Object.assign({},o,{all:true}),(e,list)=>{
+        if(e)return cb(e);
+        const good=open?list:list.filter(x=>!internalIp(x.address));
+        if(!good.length)return cb(new Error("not allowed"));
+        o&&o.all?cb(null,good):cb(null,good[0].address,good[0].family);
+      })},res=>{res.resume();res.statusCode>=200&&res.statusCode<300?ok():no(new Error("HTTP "+res.statusCode))});
+    req.on("timeout",()=>req.destroy(new Error("timeout")));req.on("error",no);req.end(body);
+  });
 }
 let alertRunning=false;
 async function runAlerts(){
   if(alertRunning)return;alertRunning=true;
-  try{for(const c of ACC?Object.keys(ACC.users).filter(n=>!ACC.users[n].disabled).map(uctx):[LEG])await runAlertsFor(c)}finally{alertRunning=false}
+  try{if(ACC){for(const n of Object.keys(ACC.users).filter(n=>!ACC.users[n].disabled))await runAlertsFor(uctx(n),!!ACC.users[n].admin)}else await runAlertsFor(LEG,true)}finally{alertRunning=false}
 }
-async function runAlertsFor(c){
+async function runAlertsFor(c,trusted){
   try{
     const S=read(c),a=S.alert;
     if(!a||!/^https?:\/\//.test(a.url||""))return;
@@ -182,7 +206,7 @@ async function runAlertsFor(c){
     if(fresh.length){
       const over=items.filter(i=>i.st===2).length,soon=items.length-over;
       const title="Garage Log: "+[over&&over+" overdue",soon&&soon+" due soon"].filter(Boolean).join(", ");
-      await sendAlert(a,title,items.map(i=>`${i.name}: ${i.what} (${i.txt})`).join("\n"),over>0);
+      await sendAlert(a,title,items.map(i=>`${i.name}: ${i.what} (${i.txt})`).join("\n"),over>0,trusted);
       for(const i of items)next[i.id]={st:i.st,at:today};
     }else for(const i of items)if(sent[i.id])next[i.id]=sent[i.id];
     fs.writeFileSync(c.ALERT_STATE,JSON.stringify({sent:next}));
@@ -435,17 +459,19 @@ http.createServer((req,res)=>{
   if(u==="/api/version"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({version:VERSION,build:BUILD}))}
   if(u==="/api/alert/test"&&req.method==="POST"){
     if(!isJson()){req.resume();res.writeHead(415,JSON_H);return res.end('{"ok":false}')}
-    // With accounts the test reaches any address from the server, so only the admin may use it.
-    if(ACC&&!(U&&ACC.users[U].admin)){req.resume();return out(403,{ok:false,msg:"Only the admin can send a test alert."})}
+    const trusted=!ACC||!!(U&&ACC.users[U].admin);
+    return body(req,10e3,async buf=>{
+      try{
+        const a=JSON.parse(buf.toString());
+        if(!/^https?:\/\//.test(a.url||""))throw 0;
+        await sendAlert({url:a.url,fmt:a.fmt},"Garage Log test","This is a test message from Garage Log.",false,trusted);
+        res.writeHead(200,JSON_H);res.end('{"ok":true}');
+      }catch(e){
+        // Non-admin accounts get one answer for every failure, so the test can't be used to find out what is on the network.
+        res.writeHead(502,JSON_H);res.end(JSON.stringify(trusted?{ok:false}:{ok:false,msg:"Couldn't send. Accounts other than the admin can only send alerts to public web addresses."}));
+      }
+    });
   }
-  if(u==="/api/alert/test"&&req.method==="POST")return body(req,10e3,async buf=>{
-    try{
-      const a=JSON.parse(buf.toString());
-      if(!/^https?:\/\//.test(a.url||""))throw 0;
-      await sendAlert({url:a.url,fmt:a.fmt},"Garage Log test","This is a test message from Garage Log.",false);
-      res.writeHead(200,JSON_H);res.end('{"ok":true}');
-    }catch(e){res.writeHead(502,JSON_H);res.end('{"ok":false}')}
-  });
   if(ST[u]){
     try{const b=fs.readFileSync(path.join(__dirname,"public",u));res.writeHead(200,{"Content-Type":ST[u],"Cache-Control":u==="/sw.js"?"no-cache":"public, max-age=86400"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}

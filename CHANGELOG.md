@@ -2,6 +2,12 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.23.1 - 2026-11-19
+- Security: the address you save under Reminder alerts can no longer be used to reach other machines on your network. With accounts on, only the admin may use an internal address (for example a Home Assistant or ntfy server at 192.168.x.x); other accounts can only use public web addresses. Blocked ranges include local, private, Tailscale (100.64.x.x), link-local and cloud-metadata addresses, in every spelling (127.1, ::ffff:127.0.0.1 and so on), and a name that points inside is refused too. Redirects are never followed.
+- To let everyone use an internal server, list it in the new `ALERT_HOSTS` setting (comma separated). Without accounts nothing changes.
+- The Send test message button now works for every account (with the same rule), and non-admin accounts get one generic answer for any failure, so it can't be used to map the network.
+- Alerts accept `https://user:password@host/` addresses now.
+
 ## 1.23.0 - 2026-11-19
 - Security, accounts: photos and documents are now stored in each person's own folder (`users/<name>/photos` and `docs`) instead of shared top-level folders, and opening one needs that person's sign-in. Before, anyone who knew a file's address could open it without signing in. The address now carries a private link that is tied to the person, and it stops working when they change their password, sign out everywhere or are turned off. The view-only link still shows the owner's photos.
 - On the first start, each person's existing files are copied into their folders automatically. The old shared folders are left in place and no longer served; delete them when you have checked your photos show.

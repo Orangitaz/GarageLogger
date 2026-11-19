@@ -87,6 +87,8 @@ In the app go to **⚙️ > Settings & data > Reminder alerts** and paste a web 
 
 Press **Send test message** to check it. The server then sends a message once a day at the time you pick, only when something has newly become due soon or overdue, and again weekly while it stays overdue. The server needs to be able to reach the address (a home server on your network works; ntfy.sh needs internet access).
 
+**Who may use which address:** the server contacts whatever address is saved, so with accounts on only the admin may point alerts at a machine on your own network (a Home Assistant or ntfy server at `192.168…`). Other accounts can only use public web addresses such as `https://ntfy.sh/…`. This stops an account from being used to probe your router, TrueNAS or cameras. To let everyone use an internal server, list it in the `ALERT_HOSTS` environment variable (comma separated names or addresses, for example `ALERT_HOSTS=homeassistant.local,192.168.1.20`). The check is made on the address actually connected to, so a name that points inside is refused too, and redirects are never followed. Without accounts there is no restriction.
+
 ## Repeating reminders, registration and the OHV sticker
 - On any reminder, **Repeats** can be every 6 months, 1 year, 2 years, 3 years, or a custom number of months. Repeating reminders show **Renew** instead of Mark done. Renew marks it done and creates the next one, with the date filled in for you to adjust.
 - Equipment has a **Registration expiration** (not for mowers) and offroad equipment has an **OHV sticker expiration**. Each has its own renewal interval, set to 2 years by default. They show on the dashboard with a **Renew** button and are included in the alerts.
