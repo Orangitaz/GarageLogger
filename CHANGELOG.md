@@ -2,6 +2,13 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.24.0 - 2026-11-19
+- The app's single page file is split up. `index.html` is now a small page that loads `app.css` (styles), `lib.js` (shared logic) and `app.js` (screens, forms and syncing). Nothing looks or behaves differently.
+- The shared logic (dates, text helpers and the merge used when two devices edit the same data) is now in `lib.js` and has its own checks, `tests/lib.test.js`, which run before every image build. The checks also make sure the files load together without clashing and that no version placeholder is left behind.
+- The server sends the three files compressed and lets the browser re-check them cheaply, and the offline copy of the app now includes them, so the app still opens without a connection.
+- The Android build bundles the new files (the Android build was updated first, so any build in between still works).
+- The README has a short section on how the files fit together.
+
 ## 1.23.3 - 2026-11-19
 - The checks in `tests/run.js` now start the server on a free port and wait until it is ready, instead of guessing a port and waiting a fixed time. One check had failed once at random on a busy machine. The app is unchanged.
 

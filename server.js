@@ -4,7 +4,7 @@ const VERSION=(()=>{try{return fs.readFileSync(path.join(__dirname,"VERSION"),"u
 const PASS=process.env.GARAGE_PASSWORD||"",sha=x=>crypto.createHash("sha256").update(String(x)).digest(),PASSH=PASS?sha(PASS):null;
 const DOCS=path.join(DIR,"docs");
 fs.mkdirSync(PHOTOS,{recursive:true});fs.mkdirSync(DOCS,{recursive:true});
-const ST={"/manifest.webmanifest":"application/manifest+json","/sw.js":"text/javascript","/icon.svg":"image/svg+xml","/icon-192.png":"image/png","/icon-512.png":"image/png","/apple-touch-icon.png":"image/png"};
+const ST={"/manifest.webmanifest":"application/manifest+json","/sw.js":"text/javascript","/app.js":"text/javascript","/lib.js":"text/javascript","/app.css":"text/css","/icon.svg":"image/svg+xml","/icon-192.png":"image/png","/icon-512.png":"image/png","/apple-touch-icon.png":"image/png"};
 const EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"},DEXT=Object.assign({"application/pdf":"pdf"},{"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"}),MIME={jpg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif"};
 const JSON_H={"Content-Type":"application/json","Cache-Control":"no-store"};
 const arr=x=>Array.isArray(x)?x:[],has=x=>x!==undefined&&x!==null,isObj=x=>!!x&&typeof x==="object"&&!Array.isArray(x);
@@ -318,9 +318,19 @@ function sendText(req,res,hd,str){
   if(str.length<1024||!accepts(req,"gzip")){res.writeHead(200,hd);return res.end(str)}
   zlib.gzip(str,(e,z)=>{if(e){res.writeHead(200,hd);return res.end(str)}hd["Content-Encoding"]="gzip";res.writeHead(200,hd);res.end(z)});
 }
+// The app's script and style files: compressed copies are kept in memory, and the browser re-checks them with an ETag, so an update is picked up straight away.
+const ASSETS=new Map();
+function asset(req,res,u){
+  let a=ASSETS.get(u);
+  if(!a){const raw=fs.readFileSync(path.join(__dirname,"public",u));a={raw,br:zlib.brotliCompressSync(raw),gz:zlib.gzipSync(raw,{level:9}),etag:'"'+crypto.createHash("sha1").update(raw).digest("hex").slice(0,16)+'"'};ASSETS.set(u,a)}
+  const hd={"Content-Type":ST[u]+"; charset=utf-8","Cache-Control":"no-cache",ETag:a.etag,Vary:"Accept-Encoding"};
+  if(req.headers["if-none-match"]===a.etag){res.writeHead(304,hd);return res.end()}
+  let b=a.raw;if(accepts(req,"br")){hd["Content-Encoding"]="br";b=a.br}else if(accepts(req,"gzip")){hd["Content-Encoding"]="gzip";b=a.gz}
+  res.writeHead(200,hd);res.end(b);
+}
 let PAGE=null;
 function page(req,res){
-  if(!PAGE){const html=fs.readFileSync(path.join(__dirname,"index.html"),"utf8").replace("__VERSION__",VERSION).replace("__BUILD__",BUILD);
+  if(!PAGE){const html=fs.readFileSync(path.join(__dirname,"index.html"),"utf8").replaceAll("__VERSION__",VERSION).replaceAll("__BUILD__",BUILD);
     PAGE={raw:Buffer.from(html),br:zlib.brotliCompressSync(html),gz:zlib.gzipSync(html,{level:9}),etag:'"'+crypto.createHash("sha1").update(html).digest("hex").slice(0,16)+'"'}}
   const hd={"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache",ETag:PAGE.etag,Vary:"Accept-Encoding",
     "Content-Security-Policy":"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"};
@@ -524,6 +534,9 @@ function handle(req,res){
         res.writeHead(502,JSON_H);res.end(JSON.stringify(trusted?{ok:false}:{ok:false,msg:"Couldn't send. Accounts other than the admin can only send alerts to public web addresses."}));
       }
     });
+  }
+  if(ST[u]&&/\.(js|css)$/.test(u)&&u!=="/sw.js"){
+    try{return asset(req,res,u)}catch(e){res.writeHead(404).end();return}
   }
   if(ST[u]){
     try{const b=fs.readFileSync(path.join(__dirname,"public",u));res.writeHead(200,{"Content-Type":ST[u],"Cache-Control":u==="/sw.js"?"no-cache":"public, max-age=86400"});return res.end(b)}

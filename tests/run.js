@@ -40,6 +40,12 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   T(r.h["content-encoding"]==="br"&&/<title>/.test(html)&&!/__VERSION__/.test(html),"page is brotli compressed with the version filled in");
   const et=r.h.etag;r=await req(g,"GET","/",{headers:{"If-None-Match":et}});T(r.s===304,"page answers 304 when unchanged");
   r=await req(g,"GET","/");T(/frame-ancestors 'none'/.test(r.h["content-security-policy"]||"")&&r.h["x-frame-options"]==="DENY"&&r.h["x-content-type-options"]==="nosniff"&&r.h["referrer-policy"]==="no-referrer","security headers");
+  for(const[f,ct]of[["app.js","text/javascript"],["lib.js","text/javascript"],["app.css","text/css"]]){
+    r=await req(g,"GET","/"+f+"?v=x",{headers:{"Accept-Encoding":"gzip"}});
+    T(r.s===200&&(r.h["content-type"]||"").startsWith(ct)&&r.h["content-encoding"]==="gzip"&&zlib.gunzipSync(r.b).toString()===fs.readFileSync(path.join(__dirname,"..","public",f),"utf8"),f+" is served, compressed and matches the file");
+    const e2=r.h.etag;r=await req(g,"GET","/"+f,{headers:{"If-None-Match":e2}});T(r.s===304,f+" answers 304 when unchanged");
+  }
+  r=await req(g,"GET","/");const pg=r.b.toString();T(!/__VERSION__|__BUILD__/.test(pg)&&/app\.js\?v=\d+\.\d+\.\d+/.test(pg)&&/APP_V="\d/.test(pg),"every version placeholder in the page is filled in");
   r=await req(g,"GET","/calendar.ics");const ics=r.b.toString("utf8");T(r.s===200&&ics.includes("BEGIN:VCALENDAR"),"calendar served");
   S.stop();
   // calendar folding keeps emoji whole and lines under 76 bytes

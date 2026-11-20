@@ -1,0 +1,1156 @@
+// Garage Log app: screens, forms and syncing. Shared logic is in lib.js, styles in app.css.
+// Inside the Android app the page is bundled with the app. The server is optional there.
+let UPD=null;
+let RO="";try{RO=new URLSearchParams(location.search).get("ro")||""}catch(e){}
+if(RO){const _g=Storage.prototype.getItem,_s=Storage.prototype.setItem;
+  Storage.prototype.getItem=function(k){return/^garagelog(-base)?$/.test(k)?null:_g.call(this,k)};
+  Storage.prototype.setItem=function(k,v){if(/^garagelog(-base)?$/.test(k))return;return _s.call(this,k,v)}}
+if(RO){document.body.classList.add("ro");const _n=()=>{};openForm=vehForm=invForm=addPart=specForm=partEdit=delRec=doneRem=snoozeDlg=qOdo=dataForm=addChooser=renewDlg=searchForm=docsForm=mvVeh=starterDlg=_n;
+  const b=document.createElement("div");b.id="rob";b.textContent="View only";document.body.appendChild(b)}
+const APP=!!(window.Capacitor&&(Capacitor.isNativePlatform?Capacitor.isNativePlatform():true));
+let SRV={};try{SRV=JSON.parse(localStorage.getItem("garagelog-server")||"{}")||{}}catch(e){}
+const BASE=APP&&SRV.u?SRV.u:"",SYNC=!APP||!!BASE;
+// Accounts (optional, turned on by the server admin): a sign-in token is sent instead of the shared password.
+let ME=null,TOK="";try{TOK=localStorage.getItem("garagelog-tok")||""}catch(e){}
+const tok=()=>APP?(SRV.tok||""):TOK;
+const HDR=()=>tok()?{Authorization:"Bearer "+tok()}:SRV.pw?{Authorization:"Basic "+b64("u:"+SRV.pw)}:{};
+const F=(p,o={})=>APP&&!BASE?Promise.reject(new Error("no server")):fetch(BASE+p,Object.assign({},o,{headers:Object.assign({},o.headers,HDR())})).then(r=>{if(r.status===401&&ME&&ME.accounts&&!RO)needLogin();return r});
+// Photo and document addresses carry a link that proves who is asking, because pictures can't send a sign-in header: the view-only link, this person's own media link (accounts), or the server's link.
+const pu=u=>{
+  if(!u||/^(data:|blob:|https?:)/.test(u))return u;
+  const t=RO||(ME&&ME.media)||(BASE&&SRV.t)||"";
+  return (BASE&&!RO?BASE:"")+u+(t?(u.includes("?")?"&":"?")+"t="+t:"");
+};
+const TYPES=[["dash","Dashboard"],["parts","Parts"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"],["timeline","Timeline"],["reminder","Reminders"],["odometer","Odometer"],["note","Notes"]];
+const CATS=["Oil","Lube","Grease","Filter","Part","Other"],PH=["service","repair","upgrade"];
+let S={vehicles:[],records:[],inv:[],cur:null,units:"imperial"},view="garage",tab="dash",ic="All",gk="All",em=false,lk="";
+try{const r=localStorage.getItem("garagelog");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+S.records=S.records.filter(r=>r.type!=="fuel");
+// Phone-only use keeps everything in the app's own storage, which is limited (about 5 MB, roughly 55 photos). When a write fails the change is only in memory, so say so instead of failing quietly.
+let fullWarned=false;
+const writeLocal=()=>{
+  try{localStorage.setItem("garagelog",JSON.stringify(S));return true}
+  catch(e){
+    if(SYNC)return false;
+    const m="This phone's storage for Garage Log is full, so your latest change was NOT saved and will be lost when the app closes. Open Settings & data and tap Download backup now, then delete some photos or old entries. Adding a server in Settings removes this limit.";
+    if(!fullWarned){fullWarned=true;setTimeout(()=>alert(m),0)}else toast("Storage is full. Your latest change was not saved.");
+    return false;
+  }
+};
+const save=()=>{writeLocal();push()};
+const $=id=>document.getElementById(id);
+let ours=false;
+const theme=()=>{try{return localStorage.getItem("garagelog-theme")||"auto"}catch(e){return"auto"}};
+const applyTheme=()=>{const t=theme(),r=document.documentElement;if(t==="auto"){if(ours){r.removeAttribute("data-theme");ours=false}}else{r.setAttribute("data-theme",t);ours=true}
+  const dk=t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme:dark)").matches),m=document.querySelector('meta[name="theme-color"]');if(m)m.content=dk?"#06080c":"#eef1f7"};
+const tsz=()=>{try{return localStorage.getItem("garagelog-ts")||"0"}catch(e){return"0"}};
+const setTsz=t=>{try{localStorage.setItem("garagelog-ts",t)}catch(e){}document.documentElement.dataset.ts=t};
+document.documentElement.dataset.ts=tsz();
+const setTheme=t=>{try{localStorage.setItem("garagelog-theme",t)}catch(e){}applyTheme()};
+applyTheme();
+const KINDS=[["car","Car / Truck","🚗"],["offroad","Off-road","🏞️","Off-road (UTV / ATV / dirt bike)"],["trailer","Trailer","🚚"],["mower","Lawn mower","🌿"],["other","Other","🔧"]];
+const KC={car:"#4da3ff",offroad:"#ff7a3d",trailer:"#b07cff",mower:"#2bf0a0",other:"#9aa7b8"},SC=["var(--okc)","var(--warn)","var(--bad)"],CLRS=["#4da3ff","#ff7a3d","#b07cff","#2bf0a0","#ff5b78","#ffb23d","#18b7ff","#9aa7b8"],vcol=v=>v.color||KC[v.kind]||KC.other;
+const vOf=id=>S.vehicles.find(v=>v.id===id);
+const isH=id=>(vOf(id)||{}).meter==="hrs",isT=id=>(vOf(id)||{}).meter==="time";
+const dU=(id=S.cur)=>isH(id)?"hrs":S.units==="imperial"?"mi":"km";
+const soonAt=id=>+(vOf(id)||{}).soonDist||(isH(id)?10:500),soonD=id=>+(vOf(id)||{}).soonDays||30;
+const IP={car:'<path d="M4 13l2-5.2A2 2 0 0 1 7.9 6.5h8.2a2 2 0 0 1 1.9 1.3L20 13v4.2a.8.8 0 0 1-.8.8h-1.4a.8.8 0 0 1-.8-.8V16H7v1.2a.8.8 0 0 1-.8.8H4.8a.8.8 0 0 1-.8-.8z"/><path d="M4 13h16"/><circle cx="7.6" cy="14.6" r=".6"/><circle cx="16.4" cy="14.6" r=".6"/>',
+mtn:'<path d="M3 19l6.2-11 3.6 6.3 2.2-3.3L21 19z"/>',
+trailer:'<path d="M2 7.5h14.5v8H2z"/><path d="M16.5 13H21"/><circle cx="8" cy="17.5" r="2"/>',
+mower:'<path d="M5 14.5h11.5l1.7-6.5H15"/><path d="M5 14.5V11h4"/><circle cx="7.5" cy="18" r="2"/><circle cx="16.5" cy="18" r="2"/>',
+wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5a1.8 1.8 0 0 0 3 3l5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+hammer:'<path d="M13 7l4 4M4.5 19.5L13 11M9.5 4.5l3-1.5 7.5 7.5-1.5 3-9-9z"/>',
+up:'<path d="M12 19V6M6 11.5l6-6 6 6"/>',
+grid:'<path d="M4 4h7v7H4zM13 4h7v4.5h-7zM13 11.5h7V20h-7zM4 14h7v6H4z"/>',
+timeline:'<path d="M12 3v18"/><circle cx="12" cy="7" r="2" fill="var(--pop)"/><circle cx="12" cy="16" r="2" fill="var(--pop)"/><path d="M14.5 7H19M9.5 16H5"/>',
+cube:'<path d="M20.5 7.5L12 3 3.5 7.5v9L12 21l8.5-4.5zM3.5 7.5L12 12l8.5-4.5M12 12v9"/>',
+bell:'<path d="M18 16.5v-5a6 6 0 0 0-12 0v5L4 18.5h16zM10 21h4"/>',
+gauge:'<path d="M4 17a8.5 8.5 0 1 1 16 0"/><path d="M12 16.5l4-5"/>',
+note:'<path d="M6 3h8.5L19 7.5V21H6zM14 3v5h5M9 13h7M9 17h7"/>',
+dots:'<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+flag:'<path d="M5 21V4M5 4h12l-2.5 4L17 12H5"/>',
+cal:'<path d="M4 6.5h16V20H4zM4 10.5h16M8 3.5v4M16 3.5v4"/>',
+search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5"/>',
+cam:'<path d="M4 8.5h3.7l1.8-2.5h5l1.8 2.5H20V19H4z"/><circle cx="12" cy="13.5" r="3.3"/>',
+help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 1 1 3.6 2.4c-.7.4-1.1.9-1.1 1.7M12 17h.01"/>',
+oil:'<path d="M12 3.5s6 6.2 6 10.3a6 6 0 0 1-12 0c0-4.100 6-10.300 6-10.300z"/>'};
+const EM={car:"🚗",mtn:"🏍️",trailer:"🚚",mower:"🚜",wrench:"🔧",hammer:"🛠️",up:"⬆️",grid:"📊",timeline:"📜",cube:"⚙️",bell:"⏰",gauge:"⏱️",note:"📝",dots:"⋯",flag:"🚩",cal:"📅",search:"🔍",cam:"📷",help:"❓",oil:"🛢️"};
+const EMS={trailer:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="16" height="9.5" rx="1.6" fill="#d5dde8"/><rect x="5" y="6" width="16" height="2.4" rx="1.2" fill="#9fb0c3"/><path d="M5 13.2H2.2L.8 15" stroke="#8a97a8" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="17" r="3.2" fill="#2b3340"/><circle cx="13" cy="17" r="1.2" fill="#d5dde8"/></svg>'};
+const ico=n=>EM[n]?`<span class="ic em" aria-hidden="true">${EMS[n]||EM[n]}</span>`:`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IP[n]||""}</svg>`;
+const TIC={dash:"grid",service:"wrench",repair:"hammer",upgrade:"up",timeline:"timeline",parts:"cube",reminder:"bell",odometer:"gauge",note:"note",more:"dots"};
+
+const veh=()=>S.vehicles.find(v=>v.id===S.cur);
+const lastOdo=id=>Math.max(0,...S.records.filter(r=>r.vid===id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null).map(r=>+r.odo||0));
+
+const REP=[[0,"Doesn't repeat"],[6,"Every 6 months"],[12,"Every year"],[24,"Every 2 years"],[36,"Every 3 years"]];
+const vrep=n=>REP.filter(x=>x[0]).map(([m,l])=>`<option value="${m}" ${m===+n?"selected":""}>${l}</option>`).join("");
+const act=()=>S.vehicles.filter(v=>!v.arch);
+// Equipment in storage keeps its history, but its own reminders pause. Expiration dates (registration etc.) still count.
+const openRem=v=>v.stor?[]:S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done);
+const pseudo=v=>{const g=new Map();for(const x of vDates(v))g.set(x.date,[...(g.get(x.date)||[]),x]);
+  return [...g.values()].map(a=>a.length===1?{desc:a[0].l,date:a[0].date,odo:"",vid:v.id,pk:a[0].k,rep:a[0].rep}:{desc:a.map(x=>x.l.replace(/ expires$/,"")).join(" + ")+" expire",date:a[0].date,odo:"",vid:v.id,pk:a.map(x=>x.k).join(","),rep:a.every(x=>x.rep===a[0].rep)?a[0].rep:0})};
+const rbtn=r=>r.pk?`<div class="rb"><button class="dn" data-renew="${r.pk}">Renew</button></div>`:r.id?`<div class="rb">${r.rep>0?`<button class="dn" data-renew="${r.id}">Renew</button>`:`<button class="dn" data-done="${r.id}">Done</button>`}<button class="sz" data-snz="${r.id}" aria-label="Snooze" title="Snooze">💤</button></div>`:"";
+// Rough date a distance/hours reminder will come due, from how fast the readings have been climbing.
+function estTxt(id,d){
+  const a=S.records.filter(r=>r.vid===id&&r.type!=="reminder"&&r.date&&r.odo!==""&&r.odo!=null).map(r=>[Date.parse(r.date+"T00:00:00Z"),+r.odo]).sort((x,y)=>x[0]-y[0]);
+  if(a.length<2)return"";
+  const e=a[a.length-1],b0=a.filter(x=>x[0]>=e[0]-365*864e5),b=b0.length>1?b0:a,days=(e[0]-b[0][0])/864e5,du=e[1]-b[0][1];
+  if(days<14||du<=0)return"";
+  const t=e[0]+d/(du/days)*864e5,now=Date.parse(today()+"T00:00:00Z");
+  if(t<=now+864e5)return" (est. now)";
+  const o=t-now<90*864e5?{month:"short",day:"numeric"}:{month:"short",year:"numeric"};
+  return" (est. "+new Date(t).toLocaleDateString(undefined,Object.assign({timeZone:"UTC"},o))+")";
+}
+function rinfo(r,lo){
+  if(r.done)return{st:-1,txt:"Done"};let st=0,p=[];
+  if(r.date){const d=Math.round((new Date(r.date)-new Date(today()))/864e5);st=d<0?2:d<=soonD(r.vid)?1:0;p.push(d<0?`${-d}d overdue`:d===0?"due today":`in ${d}d`)}
+  if(r.odo!==""&&r.odo!=null){const d=r.odo-lo;st=Math.max(st,d<=0?2:d<=soonAt(r.vid)?1:0);p.push(d<=0?`${-d} ${dU(r.vid)} over`:`in ${d} ${dU(r.vid)}${estTxt(r.vid,d)}`)}
+  return{st,txt:p.join(" / ")};
+}
+function vstat(v){
+  const lo=lastOdo(v.id),a=openRem(v).map(r=>({r,i:rinfo(r,lo)})).concat(pseudo(v).map(r=>({r,i:rinfo(r,lo)}))).sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
+  if(!a.length)return{st:0,txt:v.stor?"In storage":"No reminders set"};
+  return{st:a[0].i.st,txt:`${a[0].r.desc||"Reminder"} · ${a[0].i.txt}`,bar:progBar(a[0].r,lo,v)};
+}
+// How far along the next reminder is, when it was created from a logged service (so we know where it started).
+function progBar(r,lo,v){
+  if(!r.id)return null;const src=S.records.find(x=>x.nrid===r.id&&x.type!=="reminder");if(!src)return null;
+  const nm=(r.desc||"service").replace(/^Next:\s*/,"").toLowerCase();let a,b,c,u;
+  if(r.odo!==""&&r.odo!=null&&src.odo!==""&&src.odo!=null&&!isT(v.id)){a=+src.odo;b=+r.odo;c=lo;u=" "+dU(v.id)}
+  else if(r.date&&src.date){const t=x=>Date.parse(x+"T00:00:00Z")/864e5;a=t(src.date);b=t(r.date);c=t(today());u=" days"}
+  else return null;
+  if(!(b>a))return null;const p=Math.max(0,Math.min(1,(c-a)/(b-a))),used=Math.max(0,Math.round(c-a)),tot=Math.round(b-a);
+  return{p:Math.round(p*100),lbl:c>=b?`Past due: ${nm}`:`${used.toLocaleString()} of ${tot.toLocaleString()}${u} until ${nm}`}
+}
+const tag=st=>st==2?'<span class="tag bad">Overdue</span>':st==1?'<span class="tag warn">Due soon</span>':'<span class="tag ok">OK</span>';
+
+const PRE0={
+  car:[["Oil & filter",5000,0,6],["Tire rotation",7500,0,6],["Engine air filter",15000,0,12],["Cabin air filter",15000,0,12],["Brake fluid",30000,0,24],["Coolant",30000,0,24],["Transmission fluid",60000,0,36],["Battery test",0,0,12],["Wiper blades",0,0,12]],
+  offroad:[["Engine oil & filter",1500,25,6],["Air filter clean",1000,20,3],["Differential fluid",3000,50,12],["Greasing",500,10,3],["Coolant",5000,100,24],["Drive belt check",2000,50,12]],
+  mower:[["Oil change",0,50,12],["Blade sharpen",0,25,12],["Air filter",0,50,12],["Spark plug",0,100,12],["Grease deck",0,25,6]],
+  trailer:[["Wheel bearings",0,0,12],["Brake check",0,0,6],["Tire check",0,0,6],["Lights check",0,0,6]],
+  other:[["Oil change",0,50,12],["General service",0,0,12]]};
+const PR=k=>(S.presets&&S.presets[k])||(PRE0[k]||PRE0.other).map(([n,d,h,m])=>({n,d,h,m}));
+// The odometer / hours log is opened from the More menu (the dashboard has a quick update for the reading).
+const vTabs=v=>TYPES.filter(t=>t[0]!=="odometer").map(([k,l])=>[k,l]);
+function printView(v,full,only){
+  const L={service:"Service",repair:"Repair",upgrade:"Upgrade"},tm=isT(v.id);
+  const rows=S.records.filter(r=>r.vid===v.id&&L[r.type]&&(!only||r.id===only)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));
+  const meta=[v.model,v.vin&&"VIN "+v.vin,["car","trailer"].includes(v.kind)&&v.plate&&"Plate "+v.plate].filter(Boolean).join(" · ");
+  const row=r=>{const work=[r.desc,...(r.dl||[])].filter(Boolean).join("; ")||L[r.type],pt=partsOf(r).filter(Boolean);
+    return `<tr><td>${esc(r.date||"")}</td>${tm?"":`<td>${r.odo!==""&&r.odo!=null?(+r.odo).toLocaleString()+" "+dU(v.id):""}</td>`}<td>${L[r.type]}</td><td>${esc(work)}${pt.length?`<div class="pvm">Parts: ${pt.map(x=>esc(x)).join(", ")}</div>`:""}${r.notes?`<div class="pvm">${esc(r.notes)}</div>`:""}${full&&(r.ph||[]).concat(r.rc||[]).length?`<div class="pvph">${(r.ph||[]).concat(r.rc||[]).map(p=>`<img src="${esc(pu(p))}" alt="">`).join("")}</div>`:""}</td></tr>`};
+  $("pv").innerHTML=`<div class="bar"><button class="p" id="pv_p">Print / Save as PDF</button><button id="pv_x">Close</button></div><h1>${esc(v.name)}</h1>${meta?`<div class="pvm">${esc(meta)}</div>`:""}<div class="pvm" style="margin-bottom:16px">${only?"Service record":full?"Full history":"Service history"} · ${today()}${tm?"":" · "+lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>${full&&!only?fullExtra(v):""}<table><tr><th>Date</th>${tm?"":`<th>${isH(v.id)?"Hours":"Odometer"}</th>`}<th>Type</th><th>Work done</th></tr>${rows.map(row).join("")||'<tr><td colspan="4">No records yet.</td></tr>'}</table>`;
+  $("pv").hidden=false;$("pv").scrollTop=0;
+  $("pv_p").onclick=()=>{try{window.print()}catch(e){}};
+  if(APP){$("pv_p").textContent="Share as file";$("pv_p").onclick=()=>{const c=$("pv").cloneNode(true),b=c.querySelector(".bar");if(b)b.remove();saveBlob((only?"record-":full?"full-history-":"service-history-")+v.name.replace(/[^\w-]+/g,"-")+".html",new Blob(['<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Service history</title><style>body{font:14px system-ui,sans-serif;padding:18px;color:#111}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:#555}.pvm{color:#555;font-size:13px}</style>'+c.innerHTML],{type:"text/html"}))}}$("pv_x").onclick=()=>{$("pv").hidden=true};
+}
+let tt=null;
+function toast(msg,undo){const t=$("toast");t.innerHTML=`<span>${esc(msg)}</span>${undo?'<button id="tu">Undo</button>':""}`;t.hidden=false;clearTimeout(tt);const hide=()=>{t.hidden=true};tt=setTimeout(hide,undo?8000:3000);if(undo)$("tu").onclick=()=>{clearTimeout(tt);hide();undo()}}
+function addChooser(){
+  const v=veh(),L=[["service","Service"],["repair","Repair"],["upgrade","Upgrade"],["reminder","Reminder"],["note","Note"]];
+  show(`<h3 style="margin:0">Add to ${esc(v.name)}</h3>`+L.map(([k,l])=>`<button class="mrow" data-add="${k}">${l}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.add;if(k){$("dlg").close();openForm(null,{type:k})}};
+}
+function delRec(id){
+  const k=S.records.findIndex(r=>r.id===id);if(k<0)return;const r0=S.records[k];
+  adjInv(r0.iu,[]);S.records.splice(k,1);save();render();
+  toast("Entry deleted",()=>{S.records.splice(Math.min(k,S.records.length),0,r0);adjInv([],r0.iu);save();render()});
+}
+function partEdit(i){
+  const v=veh(),x=v.plist[i];if(!x)return;
+  let vals=String(x.v||"").split("\n");if(!vals.length)vals=[""];
+  show(`<h3 style="margin:0">Edit part</h3><label>Category</label><input id="pe_l" value="${esc(x.l)}"><label>Part numbers / brands</label><div id="pe_v"></div><button type="button" class="p" id="pe_a" style="margin-top:8px;width:100%">+ Add another</button><label>Where to buy (optional)</label><input id="pe_src" value="${esc(x.src||"")}" placeholder="Store name"><input id="pe_url" type="url" inputmode="url" value="${esc(x.url||"")}" placeholder="https://… link to the product" style="margin-top:6px">${btns}<button type="button" id="pe_d" style="margin-top:8px;width:100%;color:var(--bad)">Delete this category</button>`);
+  const sy=()=>{vals=[...$("pe_v").querySelectorAll(".pev")].map(z=>z.value)};
+  const dr=()=>{$("pe_v").innerHTML=vals.map((z,k)=>`<div class="row" style="margin-top:6px"><input class="pev" value="${esc(z)}" placeholder="Part number / brand"><button type="button" data-px="${k}">\u2715</button></div>`).join("")};dr();
+  $("pe_a").onclick=()=>{sy();vals.push("");dr();const a=$("pe_v").querySelectorAll(".pev");a[a.length-1].focus()};
+  $("pe_v").onclick=e=>{const k=e.target.dataset.px;if(k!=null){sy();vals.splice(+k,1);if(!vals.length)vals=[""];dr()}};
+  $("ok").onclick=()=>{const l=$("pe_l").value.trim();if(!l)return;sy();x.l=l;x.v=vals.map(z=>z.trim()).filter(Boolean).join("\n");x.src=$("pe_src").value.trim();x.url=fixUrl($("pe_url").value);save();$("dlg").close();render()};
+  $("pe_d").onclick=()=>{const old=v.plist.slice();v.plist.splice(i,1);save();$("dlg").close();render();toast("Category deleted",()=>{v.plist=old;save();render()})};
+}
+function doneRem(id){const r=S.records.find(x=>x.id===id);if(!r)return;if(r.rep>0)return renewDlg(id);r.done=true;save();render();logFrom(r)}
+function snoozeDlg(id){
+  const r=S.records.find(z=>z.id===id);if(!r)return;
+  const hs=isH(r.vid),du=dU(r.vid),B=(a,l)=>`<button class="mrow" data-sn="${a}">${l}</button>`;
+  let h=`<h3 style="margin:0">Snooze</h3><div class="m" style="margin-top:6px">${esc(r.desc||"Reminder")}</div>`;
+  if(r.date)h+="<label>Push the date back</label>"+B("d:7","1 week")+B("d:14","2 weeks")+B("m:1","1 month")+B("m:3","3 months");
+  if(r.odo!==""&&r.odo!=null)h+=`<label>Push the ${hs?"hours":"reading"} back</label>`+(hs?[5,10,25]:S.units==="imperial"?[100,250,500,1000]:[200,500,1000]).map(n=>B("o:"+n,"+ "+n+" "+du)).join("");
+  show(h+'<div class="m" style="margin-top:10px">Counts from today if it is already overdue.</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');
+  $("dbody").onclick=e=>{const a=e.target.dataset.sn;if(!a)return;
+    const old={date:r.date,odo:r.odo},[k,n]=a.split(":"),b=r.date&&r.date>today()?r.date:today();
+    if(k==="d")r.date=addD(b,+n);else if(k==="m")r.date=addM(b,+n);else r.odo=Math.max(+r.odo,lastOdo(r.vid))+ +n;
+    save();$("dlg").close();render();toast("Snoozed",()=>{r.date=old.date;r.odo=old.odo;save();render()})};
+}
+function qOdo(id){
+  const v=vOf(id);if(!v||isT(id))return;
+  const lo=lastOdo(id),u=dU(id),hs=isH(id);
+  show(`<h3 style="margin:0">${hs?"Hours":"Odometer"} \u00b7 ${esc(v.name)}</h3><div class="m" style="margin-top:6px">Last reading: ${lo?lo.toLocaleString()+" "+u:"none yet"}</div><label>New reading (${u})</label><input type="number" inputmode="decimal" id="qo_v" placeholder="${lo||""}">${btns}`);
+  setTimeout(()=>{const i=$("qo_v");if(i)i.focus()},80);
+  const go=()=>{const n=$("qo_v").value;if(n==="")return;const x=+n;
+    if(x<lo&&!confirm("That's lower than the last reading ("+lo.toLocaleString()+" "+u+"). Save anyway?"))return;
+    const rec={id:uid(),vid:id,type:"odometer",date:today(),odo:x,desc:"",parts:"",pl:[],dl:[],notes:"",ph:[],rc:[],done:false,nrid:"",next:0,iu:[],rep:0};
+    S.records.push(rec);save();$("dlg").close();render();toast((hs?"Hours":"Odometer")+" updated",()=>{S.records=S.records.filter(r=>r!==rec);save();render()})};
+  $("ok").onclick=go;$("qo_v").onkeydown=e=>{if(e.key==="Enter")go()};
+}
+function scanCode(cb,vin){
+  if(!("BarcodeDetector"in window)){alert("This phone's browser can't read barcodes from a photo. Type it in instead.");return}
+  const f=document.createElement("input");f.type="file";f.accept="image/*";f.setAttribute("capture","environment");f.style.display="none";document.body.appendChild(f);
+  f.onchange=async()=>{const file=f.files[0];f.remove();if(!file)return;
+    try{const bm=await createImageBitmap(file),det=new BarcodeDetector(),r=await det.detect(bm);
+      let v=(r[0]&&r[0].rawValue||"").trim();
+      if(vin){v=v.toUpperCase().replace(/\s+/g,"");if(v.length===18&&v[0]==="I")v=v.slice(1)}
+      if(!v)throw 0;cb(v)}catch(e){alert("Couldn't read a barcode in that photo. Get closer with good light and try again, or type it in.")}};
+  f.click()}
+function saveJob(o){
+  const k=vOf(o.vid).kind,rows=PR(k).map(x=>({...x})),i=rows.findIndex(x=>x.n.toLowerCase()===o.desc.toLowerCase()),x=i>=0?rows[i]:{n:o.desc,d:0,h:0,m:0};
+  if(o.next>0){if(isT(o.vid))x.m=o.next;else if(isH(o.vid))x.h=o.next;else x.d=o.next}
+  x.pl=o.pl.slice();x.iu=o.iu.map(z=>({id:z.id,n:z.n,u:z.u,q:z.q}));
+  if(i<0)rows.push(x);S.presets=Object.assign({},S.presets,{[k]:rows});
+}
+function mvVeh(spec){
+  const[id,n]=spec.split(":"),vis=act().filter(v=>gk==="All"||v.kind===gk),i=vis.findIndex(v=>v.id===id),j=i+ +n;
+  if(i<0||j<0||j>=vis.length)return;
+  const a=S.vehicles.indexOf(vis[i]),b=S.vehicles.indexOf(vis[j]);[S.vehicles[a],S.vehicles[b]]=[S.vehicles[b],S.vehicles[a]];save();render();
+}
+function adjInv(a,b){
+  const m=new Map();(a||[]).forEach(x=>m.set(x.id,(m.get(x.id)||0)-x.q));(b||[]).forEach(x=>m.set(x.id,(m.get(x.id)||0)+x.q));
+  for(const[id,d]of m){const it=S.inv.find(i=>i.id===id);if(it&&d)it.qty=Math.max(0,+(it.qty-d).toFixed(2))}
+}
+function saveBlob(name,bl){
+  if(APP&&window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Filesystem&&Capacitor.Plugins.Share){
+    const fr=new FileReader();
+    fr.onload=async()=>{try{const w=await Capacitor.Plugins.Filesystem.writeFile({path:name,data:String(fr.result).split(",")[1],directory:"CACHE"});await Capacitor.Plugins.Share.share({title:name,url:w.uri,dialogTitle:"Save or send "+name})}catch(e){const m=String(e&&e.message||e);if(!/cancel/i.test(m))alert("Couldn't share the file: "+m)}};
+    fr.readAsDataURL(bl);return;
+  }const a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+function csvExport(vid){
+  const t=x=>{let s=String(x??"");if(/^[=+\-@\t\r]/.test(s))s="'"+s;return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},n=x=>x===""||x==null?"":+x;
+  const H=["Equipment","Type","Date","Odometer / hours","Description","Parts","Notes","Status","Repeats"],nm=id=>(vOf(id)||{}).name||"";
+  const L=S.records.filter(r=>!vid||r.vid===vid).sort((a,b)=>nm(a.vid).localeCompare(nm(b.vid))||(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));
+  const rows=L.map(r=>[t(nm(r.vid)),t((TYPES.find(x=>x[0]===r.type)||[0,r.type])[1]),r.date||"",n(r.odo),t([r.desc,...(r.dl||[])].filter(Boolean).join("; ")),t(partsOf(r).filter(Boolean).join("; ")),t(r.notes||""),r.type==="reminder"?(r.done?"Done":"Open"):"",r.rep>0?"Every "+repTxt(r.rep):""].join(","));
+  saveBlob("garage-log-"+(vid?nm(vid).replace(/[^\w-]+/g,"-")+"-":"")+"records-"+today()+".csv",new Blob(["﻿"+[H.join(","),...rows].join("\r\n")],{type:"text/csv"}));
+}
+function renewDlg(key){
+  const v=veh(),L=[],ks=key.split(","),vd=k=>k==="ohv"||k==="reg"||k.startsWith("dt:");
+  if(ks.every(vd)){for(const k of ks){const x=vDates(v).find(z=>z.k===k);if(x)L.push({t:x.l.replace(" expires",""),cur:x.date,rep:x.rep,go:d=>{if(k.startsWith("dt:")){const z=(v.dts||[]).find(y=>"dt:"+y.id===k);if(z)z.date=d}else v[k]=d}})}}
+  else{const r=S.records.find(z=>z.id===key);if(r)L.push({t:r.desc||"Reminder",cur:r.date,rep:r.rep,go:d=>{r.done=true;S.records.push(Object.assign(clone(r),{id:uid(),date:d,odo:"",done:false,nrid:""}))}})}
+  if(!L.length)return;
+  show(`<h3 style="margin:0">Renew</h3>`+L.map((x,i)=>`${L.length===1?`<div class="m" style="margin-top:6px">${esc(x.t)}${x.rep>0?" \u00b7 repeats every "+repTxt(x.rep):""}</div>`:""}<label>${L.length>1?esc(x.t)+" \u2014 new date":"New expiration / due date"}</label><input type="date" class="rnd" id="rn_d${i||""}" value="${nextDate(x.cur,x.rep||12)}">`).join("")+`<div class="m" style="margin-top:6px">Change a date if the new sticker or tag shows a different one.</div>${btns}`);
+  $("ok").onclick=()=>{const ds=[...document.querySelectorAll(".rnd")].map(i=>i.value);if(ds.some(d=>!d))return alert("Pick the new date.");L.forEach((x,i)=>x.go(ds[i]));save();$("dlg").close();render()};
+}
+function searchForm(v){
+  show(`<h3 style="margin:0">When did I last…</h3><input id="sq" placeholder="oil, brake pads, belt…" autocomplete="off" style="margin-top:10px"><div id="sres" class="m" style="margin-top:12px">Searches descriptions, parts and notes for ${esc(v.name)}.</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>`);
+  const lo=lastOdo(v.id),td=Date.parse(today()+"T00:00:00Z"),hint="Searches descriptions, parts and notes for "+v.name+".";
+  const ago=s=>{if(!s)return"";const d=Math.round((td-Date.parse(s+"T00:00:00Z"))/864e5);return d<=0?"today":d<60?d+" days ago":d<730?Math.round(d/30.4)+" months ago":(d/365).toFixed(1)+" years ago"};
+  const go=()=>{
+    const q=$("sq").value.trim().toLowerCase(),bx=$("sres");
+    if(!q){bx.className="m";bx.textContent=hint;return}
+    const L=S.records.filter(r=>r.vid===v.id&&["service","repair","upgrade"].includes(r.type)&&[r.desc,...(r.dl||[]),...partsOf(r),r.notes].join("\n").toLowerCase().includes(q)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));
+    if(!L.length){bx.className="m";bx.textContent="Nothing logged that matches.";return}
+    const f=L[0],hasO=!isT(v.id)&&f.odo!==""&&f.odo!=null,ttl=r=>[r.desc,...(r.dl||[])].filter(Boolean).join(", ");
+    bx.className="";
+    bx.innerHTML=`<div class="c sc st0" style="margin:0 0 10px"><div class="m">Last done</div><h3 class="dt" style="font-size:18px">${esc(f.date||"no date")}${f.date?` <span class="m">· ${ago(f.date)}</span>`:""}</h3>${hasO?`<div class="m">at ${(+f.odo).toLocaleString()} ${dU(v.id)} · ${Math.max(0,lo-f.odo).toLocaleString()} ${dU(v.id)} ago</div>`:""}<div class="m" style="color:var(--tx);margin-top:4px">${esc(ttl(f))}</div></div>`+L.slice(0,15).map(r=>`<div class="sp"><span class="m">${esc(r.date||"")}</span><span style="text-align:right">${esc(ttl(r)||r.type)}</span></div>`).join("");
+  };
+  $("sq").oninput=go;setTimeout(()=>$("sq").focus(),50);
+}
+function copyText(t,msg){
+  const done=()=>toast(msg||"Copied");
+  const fb=()=>{let ok=false;try{const a=document.createElement("textarea");a.value=t;a.setAttribute("readonly","");a.style.cssText="position:fixed;left:0;top:0;opacity:0;font-size:16px";document.body.appendChild(a);a.focus();a.select();a.setSelectionRange(0,t.length);ok=document.execCommand("copy");a.remove()}catch(e){}
+    if(ok)done();else{show(`<h3 style="margin:0">Copy this</h3><input readonly id="cp_t" value="${esc(t)}" style="margin-top:10px"><div class="m" style="margin-top:6px">Press and hold the text, choose Select all, then Copy.</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>`);setTimeout(()=>{const i=$("cp_t");if(i){i.focus();i.select()}},50)}};
+  try{if(window.isSecureContext&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fb);return}}catch(e){}
+  fb();
+}
+function recallCard(v){
+  const vin=(v.vin||"").trim();if(!vin||RO)return"";
+  return`<div class="sec">Recalls</div><div class="c"><div class="m">Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website. Copy the VIN, open the site and paste it in.</div><div class="row" style="margin-top:10px"><a class="abtn" href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener noreferrer">Open nhtsa.gov/recalls</a><button data-rccp="1">Copy VIN</button></div></div>`;
+}
+function docsForm(v){
+  const cur=()=>vOf(v.id)||v;
+  show(`<h3 style="margin:0">Documents</h3><div class="m" style="margin-top:6px">Manuals, title copies, insurance cards. PDFs and photos up to 25 MB, stored on your server.</div><div id="dlist"></div><div class="m" id="dmsg" style="margin-top:10px"></div><input type="file" id="dfi" accept="application/pdf,image/*" multiple hidden><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button><button class="p" id="dadd" style="flex:1">Add document</button></div>`);
+  const draw=()=>{$("dlist").innerHTML=(cur().docs||[]).map(x=>`<div class="sp"><a href="${esc(pu(x.url))}" target="_blank" rel="noopener" style="color:var(--ac);word-break:break-word">${esc(x.n)}</a><button data-ddel="${x.id}" style="flex:none;padding:4px 10px">✕</button></div>`).join("")||'<div class="m" style="margin-top:10px">No documents yet.</div>'};
+  draw();
+  $("dlist").onclick=ev=>{const i=ev.target.dataset.ddel;if(i&&confirm("Remove this document from the list? The file stays in your data folder.")){cur().docs=(cur().docs||[]).filter(x=>x.id!==i);save();draw()}};
+  $("dadd").onclick=()=>$("dfi").click();
+  $("dfi").onchange=async()=>{
+    for(const f of [...$("dfi").files]){
+      $("dmsg").textContent="Uploading "+f.name+"…";
+      try{
+        const r=await F("api/doc",{method:"POST",headers:{"Content-Type":f.type||"application/octet-stream"},body:f});
+        if(r.status===415){$("dmsg").textContent=f.name+": only PDF and image files are supported.";continue}
+        if(!r.ok)throw 0;
+        const j=await r.json(),c=cur();c.docs=[...(c.docs||[]),{id:uid(),n:f.name,url:j.url,t:f.type,at:today()}];save();draw();$("dmsg").textContent="Added "+f.name+"."
+      }catch(e){$("dmsg").textContent="Couldn't upload "+f.name+". Documents need a connection to your server, and files over 25 MB won't fit."}
+    }
+    $("dfi").value="";
+  };
+}
+const buyLn=x=>{if(!x)return"";if(x.url){let h=x.src;if(!h){try{h=new URL(x.url).hostname.replace(/^www\./,"")}catch(e){h="Buy"}}return`<a class="buy" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(h)} ↗</a>`}return x.src?`<span class="m">${esc(x.src)}</span>`:""};
+// A warranty end date becomes a real reminder, so alerts, the calendar and the reminder list all pick it up.
+function syncWty(o,vid,label,date,odo){
+  const old=o.wrid?S.records.find(r=>r.id===o.wrid):null;odo=odo===""||odo==null||isNaN(+odo)?"":+odo;
+  if(!date&&odo===""){if(old&&!old.done)S.records=S.records.filter(r=>r!==old);o.wrid="";return}
+  const f={date:date||"",odo,desc:"Warranty ends: "+label};
+  if(old&&!old.done)Object.assign(old,f);
+  else{const nr=Object.assign({id:uid(),vid,type:"reminder",parts:"",pl:[],dl:[],notes:"",ph:[],rc:[],done:false,rep:0,wr:1},f);S.records.push(nr);o.wrid=nr.id}
+}
+function odoStale(v){
+  if(RO||isT(v.id)||(v.nsnz&&v.nsnz>today()))return null;
+  const ds=S.records.filter(r=>r.vid===v.id&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null&&r.date).map(r=>r.date).sort();
+  if(!ds.length)return null;
+  const days=Math.round((Date.parse(today()+"T00:00:00Z")-Date.parse(ds[ds.length-1]+"T00:00:00Z"))/864e5);
+  return days>=28?{days}:null;
+}
+function attnData(){
+  const o={over:[],soon:[],miles:[]};
+  act().forEach(v=>{const lo=lastOdo(v.id);
+    openRem(v).map(r=>({r,i:rinfo(r,lo)})).concat(pseudo(v).map(r=>({r,i:rinfo(r,lo)}))).forEach(({r,i})=>{if(i.st===2)o.over.push({v,r,i});else if(i.st===1)o.soon.push({v,r,i})});
+    const n=v.stor?null:odoStale(v);if(n)o.miles.push({v,n})});
+  return o;
+}
+function attnBanner(){
+  const a=attnData(),n=a.over.length+a.soon.length+a.miles.length;if(!n)return"";
+  const p=[a.over.length?a.over.length+" overdue":"",a.soon.length?a.soon.length+" due soon":"",a.miles.length?a.miles.length+" need"+(a.miles.length===1?"s":"")+" a mileage update":""].filter(Boolean).join(" · ");
+  return`<button class="attn${a.over.length?" bad":""}" data-attn="1">${ico("flag")}<span>${p}</span><span class="ac">View ›</span></button>`;
+}
+function attnSheet(){
+  const a=attnData(),it=x=>`<div class="at"><button class="mrow" data-av="${x.v.id}"><b>${esc(x.v.name)}</b><span class="m" style="display:block">${esc(x.r.desc||"Reminder")} · ${esc(x.i.txt)}</span></button>${RO?"":`<div class="row ata">${x.r.pk?`<button data-ak="renew" data-av2="${x.v.id}" data-id="${x.r.pk}">Renew</button>`:`<button data-ak="${x.r.rep>0?"renew":"done"}" data-av2="${x.v.id}" data-id="${x.r.id}">${x.r.rep>0?"Renew":"Done"}</button><button data-ak="snz" data-av2="${x.v.id}" data-id="${x.r.id}">Snooze</button>`}</div>`}</div>`;
+  show('<h3 style="margin:0">Needs attention</h3>'+(a.over.length?'<label>Overdue</label>'+a.over.map(it).join(""):"")+(a.soon.length?'<label>Due soon</label>'+a.soon.map(it).join(""):"")+(a.miles.length?'<label>Update mileage</label>'+a.miles.map(x=>`<button class="mrow" data-qm="${x.v.id}"><b>${esc(x.v.name)}</b><span class="m" style="display:block">${ago2(x.n.days)} since the last reading</span></button>`).join(""):"")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.closest("button[data-ak]");if(k){S.cur=k.dataset.av2;const d=k.dataset;if(d.ak==="done")doneRem(d.id);else if(d.ak==="renew")renewDlg(d.id);else snoozeDlg(d.id);return}const b=e.target.closest("button[data-av],button[data-qm]");if(!b)return;if(b.dataset.av){S.cur=b.dataset.av;view="vehicle";tab="reminder";$("dlg").close();render()}else{$("dlg").close();qOdo(b.dataset.qm)}};
+}
+// ---- starter reminders
+const STR={
+ car:[["Engine oil and filter",6,5000,0],["Tire rotation",6,6000,0],["Brake inspection",12,12000,0],["Engine air filter",12,15000,0],["Cabin air filter",12,15000,0],["Wiper blades",12,0,0],["Coolant",36,30000,0]],
+ offroad:[["Engine oil and filter",6,1000,50],["Air filter clean or replace",6,500,25],["Drive belt inspection",12,1500,75],["Differential and gear oil",12,1500,75],["Grease fittings",6,500,25],["Brake fluid",24,0,0],["Coolant",24,0,0]],
+ trailer:[["Wheel bearings repack",12,0,0],["Tire pressure and lug nuts",6,0,0],["Brakes and lights check",6,0,0]],
+ mower:[["Engine oil",12,0,50],["Sharpen or replace blade",12,0,25],["Air filter",12,0,25],["Spark plug",12,0,100]],
+ other:[["Oil change",12,0,50],["General inspection",12,0,0]]};
+function starterDlg(vid){
+  const v=vOf(vid);if(!v)return;const tm=isT(vid),hs=isH(vid),imp=S.units==="imperial",lo=lastOdo(vid),du=dU(vid);
+  const have=S.records.filter(r=>r.vid===vid&&r.type==="reminder"&&!r.done).map(r=>(r.desc||"").toLowerCase());
+  const L=(STR[v.kind]||STR.other).filter(x=>!have.includes(x[0].toLowerCase())),dist=n=>Math.round(n*(imp?1:1.6)/100)*100;
+  const q=x=>hs?x[3]:dist(x[2]),txt=x=>"every "+(x[1]%12===0?(x[1]===12?"year":x[1]/12+" years"):x[1]+" months")+(!tm&&q(x)?" or "+q(x).toLocaleString()+" "+du:"");
+  if(!L.length){toast("You already have all the suggested reminders");return}
+  show(`<h3 style="margin:0">Common reminders for ${esc(v.name)}</h3><div class="m" style="margin-top:6px">Tick the ones you want. They become normal reminders you can edit or delete. Distances count from your latest reading${lo?"":" (once you add one)"}.</div><div id="stl" style="margin-top:6px">${L.map((x,i)=>`<label class="ck"><input type="checkbox" data-i="${i}"><span>${esc(x[0])} <span class="m">${txt(x)}</span></span></label>`).join("")}</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Skip</button><button id="sta" style="flex:1">Select all</button><button class="p" id="ok" style="flex:1">Add</button></div>`);
+  $("sta").onclick=()=>$("stl").querySelectorAll("input").forEach(i=>i.checked=true);
+  $("ok").onclick=()=>{const a=[...$("stl").querySelectorAll("input:checked")].map(i=>L[+i.dataset.i]);if(!a.length){$("dlg").close();return}
+    a.forEach(x=>{const d=q(x);S.records.push({id:uid(),vid,type:"reminder",date:addM(today(),x[1]),odo:!tm&&d&&lo>0?lo+d:"",desc:x[0],parts:"",pl:[],dl:[],notes:"",ph:[],rc:[],done:false,nrid:"",next:0,iu:[],rep:x[1]})});
+    save();$("dlg").close();render();toast(a.length+" reminder"+(a.length===1?"":"s")+" added")};
+}
+// ---- checklists
+const CLS={
+ offroad:[["Spring start-up",["Check tire pressure and condition","Check oil and coolant levels","Inspect brake pads and fluid","Charge or test the battery","Check belt and CVT","Grease fittings and check bolts","Test lights and controls"]],["Winterize",["Change oil","Add fuel stabilizer and run the engine","Clean the vehicle","Disconnect or trickle-charge the battery","Cover and store off the ground"]]],
+ car:[["Seasonal check",["Tire pressure and tread","Oil and coolant levels","Wiper blades and washer fluid","Lights and signals","Battery terminals","Brakes feel normal"]],["Road trip",["Tire pressure and spare","Fluids topped up","Wipers and lights","Emergency kit and jumper cables","Registration and insurance in the car"]]],
+ trailer:[["Before towing",["Hitch and coupler latched","Safety chains and breakaway cable","Lights and brake lights work","Tire pressure and lug nuts","Brakes working","Load tied down"]],["Spring start-up",["Repack or check wheel bearings","Inspect tires for cracks","Check wiring and lights","Check the frame and floor","Lubricate the jack and hitch"]]],
+ mower:[["Spring start-up",["Fresh fuel","Check oil level","Check the air filter","Sharpen or replace the blade","Check tire pressure","Check belts and deck"]],["Winterize",["Add fuel stabilizer and run the engine","Change oil","Clean the deck","Remove or charge the battery","Store dry and covered"]]],
+ other:[["Seasonal check",["Check fluids","Check tires or tracks","Check battery","Inspect belts and hoses","Grease moving parts"]]]};
+function clList(){
+  const v=veh(),L=v.cls||[],td=Date.parse(today()+"T00:00:00Z");
+  show('<h3 style="margin:0">Checklists</h3><div class="m" style="margin-top:6px">Your own checks before a ride or trip. Tick them off, then tap Finish.</div>'+(L.map(c=>`<div class="sp" style="align-items:center;margin-top:10px"><span style="flex:1;min-width:0"><b>${esc(c.name)}</b><span class="m" style="display:block">${(c.items||[]).length} item${(c.items||[]).length===1?"":"s"} · ${c.last?"last done "+ago2(Math.round((td-Date.parse(c.last+"T00:00:00Z"))/864e5))+(Math.round((td-Date.parse(c.last+"T00:00:00Z"))/864e5)<=0?"":" ago"):"not done yet"}</span></span><button class="p" data-clrun="${c.id}" style="flex:none">Start</button><button class="ed2" data-cled="${c.id}" title="Edit">✎</button></div>`).join("")||'<div class="m" style="margin-top:12px">No checklists yet.</div>')+'<button class="mrow" id="cl_new" style="margin-top:12px">+ New checklist</button>'+(()=>{const have=L.map(c=>c.name.toLowerCase()),sg=(CLS[v.kind]||CLS.other).map((x,i)=>[x,i]).filter(([x])=>!have.includes(x[0].toLowerCase()));return sg.length?'<label>Suggested starters (you can edit them)</label>'+sg.map(([x,i])=>`<button class="mrow" data-clsg="${i}">+ ${esc(x[0])} (${x[1].length} items)</button>`).join(""):""})()+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const d=e.target.dataset;if(e.target.id==="cl_new")clEdit(null);else if(d.clsg!=null){const x=(CLS[v.kind]||CLS.other)[+d.clsg];if(x){v.cls=v.cls||[];v.cls.push({id:uid(),name:x[0],items:x[1].slice()});save();clEdit(v.cls[v.cls.length-1].id)}}else if(d.clrun)clRun(d.clrun);else if(d.cled)clEdit(d.cled)};
+}
+function clRun(id){
+  const v=veh(),c=(v.cls||[]).find(x=>x.id===id);if(!c)return;
+  show(`<h3 style="margin:0">${esc(c.name)}</h3><div id="ckl" style="margin-top:6px">${(c.items||[]).map(t=>`<label class="ck"><input type="checkbox"><span>${esc(t)}</span></label>`).join("")||'<div class="m">No items yet. Edit the checklist to add some.</div>'}</div><div class="m" id="ckm" style="margin-top:10px"></div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="ckf" style="flex:1">Finish</button></div>`);
+  const upd=()=>{const a=[...$("ckl").querySelectorAll("input")];$("ckm").textContent=a.length?a.filter(x=>x.checked).length+" of "+a.length+" checked":""};
+  $("ckl").onchange=upd;upd();
+  $("ckf").onclick=()=>{const a=[...$("ckl").querySelectorAll("input")],n=a.filter(x=>!x.checked).length;if(n&&!confirm(n+" not checked. Finish anyway?"))return;c.last=today();save();clList()};
+}
+function clEdit(id){
+  const v=veh();v.cls=v.cls||[];const c=id?v.cls.find(x=>x.id===id):{id:uid(),name:"",items:[]};if(!c)return;let it=(c.items||[]).slice();if(!it.length)it=[""];
+  show(`<h3 style="margin:0">${id?"Edit":"New"} checklist</h3><label>Name</label><input id="cl_n" value="${esc(c.name)}" placeholder="e.g. Before a ride"><label>Items</label><div id="cl_i"></div><button type="button" class="p" id="cl_a" style="margin-top:8px;width:100%">+ Add item</button>${btns}${id?'<button type="button" id="cl_d" style="margin-top:8px;width:100%;color:var(--bad)">Delete this checklist</button>':""}`);
+  const sy=()=>{it=[...$("cl_i").querySelectorAll(".cki")].map(i=>i.value)},dr=()=>{$("cl_i").innerHTML=it.map((x,k)=>`<div class="row" style="margin-top:6px"><input class="cki" value="${esc(x)}" placeholder="e.g. Tire pressure"><button type="button" data-x="${k}">✕</button></div>`).join("")};dr();
+  $("cl_a").onclick=()=>{sy();it.push("");dr();const a=$("cl_i").querySelectorAll(".cki");a[a.length-1].focus()};
+  $("cl_i").onclick=e=>{const k=e.target.dataset.x;if(k!=null){sy();it.splice(+k,1);if(!it.length)it=[""];dr()}};
+  $("ok").onclick=()=>{const n=$("cl_n").value.trim();if(!n)return;sy();c.name=n;c.items=it.map(x=>x.trim()).filter(Boolean);if(!id)v.cls.push(c);save();clList()};
+  $("cancel").onclick=()=>clList();
+  if($("cl_d"))$("cl_d").onclick=()=>{const old=v.cls.slice();v.cls=v.cls.filter(x=>x.id!==id);save();$("dlg").close();toast("Checklist deleted",()=>{v.cls=old;save();render()})};
+}
+// ---- tires
+const tmi=(v,s)=>(+s.mi||0)+(s.st==="on"&&!isT(v.id)?Math.max(0,lastOdo(v.id)-(+s.mo||lastOdo(v.id))):0);
+function tireOn(v,s){(v.tires||[]).forEach(x=>{if(x!==s&&x.st==="on"){x.mi=tmi(v,x);x.st="stored"}});s.st="on";s.mo=lastOdo(v.id)}
+function tireList(){
+  const v=veh(),L=v.tires||[],u=dU(v.id),ST={on:"Mounted",stored:"Stored",retired:"Retired"};
+  const row=s=>{const last=(s.tr||[]).slice().sort((a,b)=>b.d.localeCompare(a.d))[0],mn=last?last.v.filter(x=>x!==""&&x!=null).map(Number):[],min=mn.length?Math.min(...mn):null;
+    return`<div class="c" style="margin:10px 0 0"><div class="row" style="align-items:flex-start"><div style="flex:1;min-width:0"><h3 style="margin:0">${esc(s.name||"Tire set")} <span class="tag${s.st==="on"?" ok":""}">${ST[s.st]||"Stored"}</span></h3><div class="m">${[esc(s.size||""),s.date?"bought "+esc(s.date):"",isT(v.id)?"":tmi(v,s).toLocaleString()+" "+u+" on this set"].filter(Boolean).join(" · ")}</div>${min!=null?`<div class="m">Tread ${min}/32 (${esc(last.d)})</div>`:""}${s.notes?`<div class="m">${esc(s.notes)}</div>`:""}</div><button class="ed2" data-tedit="${s.id}" title="Edit">✎</button></div><div class="row" style="margin-top:8px">${s.st==="stored"?`<button data-tmount="${s.id}">Mount this set</button>`:""}<button data-ttread="${s.id}">Log tread depth</button></div></div>`};
+  show('<h3 style="margin:0">Tires</h3><div class="m" style="margin-top:6px">Each set of tires, which one is on, and tread depth in 32nds of an inch.</div>'+(L.map(row).join("")||'<div class="m" style="margin-top:12px">No tire sets yet.</div>')+'<button class="mrow" id="t_new" style="margin-top:12px">+ Add a tire set</button><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const d=e.target.dataset;if(e.target.id==="t_new")tireEdit(null);else if(d.tedit)tireEdit(d.tedit);else if(d.ttread)tireTread(d.ttread);else if(d.tmount){const s=(v.tires||[]).find(x=>x.id===d.tmount);if(s){tireOn(v,s);save();tireList()}}};
+}
+function tireEdit(id){
+  const v=veh();v.tires=v.tires||[];const s=id?v.tires.find(x=>x.id===id):{id:uid(),name:"",size:"",date:today(),st:v.tires.some(x=>x.st==="on")?"stored":"on",mi:0,notes:"",tr:[]};if(!s)return;
+  show(`<h3 style="margin:0">${id?"Edit":"Add"} tire set</h3><label>Brand / model</label><input id="t_n" value="${esc(s.name)}" placeholder="e.g. Michelin Defender"><label>Size</label><input id="t_s" value="${esc(s.size||"")}" placeholder="e.g. 265/70R17"><label>Bought or installed</label><input type="date" id="t_d" value="${s.date||""}"><label>Status</label><select id="t_st"><option value="on" ${s.st==="on"?"selected":""}>Mounted</option><option value="stored" ${s.st==="stored"?"selected":""}>Stored</option><option value="retired" ${s.st==="retired"?"selected":""}>Retired</option></select>${isT(v.id)?"":`<label>${dU(v.id)} already on it before this (optional)</label><input type="number" inputmode="numeric" id="t_mi" value="${s.mi||""}" placeholder="0">`}<label>Notes</label><textarea id="t_no" rows="2">${esc(s.notes||"")}</textarea>${btns}${id?'<button type="button" id="t_del" style="margin-top:8px;width:100%;color:var(--bad)">Delete this tire set</button>':""}`);
+  $("ok").onclick=()=>{const st=$("t_st").value,mi=$("t_mi")?+$("t_mi").value||0:0,was=s.st;
+    s.name=$("t_n").value.trim();s.size=$("t_s").value.trim();s.date=$("t_d").value;s.notes=$("t_no").value.trim();
+    if(id&&was==="on"&&st!=="on")s.mi=mi+Math.max(0,lastOdo(v.id)-(+s.mo||lastOdo(v.id)));else s.mi=mi;
+    if(st==="on"&&(!id||was!=="on"))tireOn(v,s);else s.st=st;
+    if(!id)v.tires.push(s);save();tireList()};
+  $("cancel").onclick=()=>tireList();
+  if($("t_del"))$("t_del").onclick=()=>{const old=v.tires.slice();v.tires=v.tires.filter(x=>x.id!==id);save();$("dlg").close();toast("Tire set deleted",()=>{v.tires=old;save();render()})};
+}
+function tireTread(id){
+  const v=veh(),s=(v.tires||[]).find(x=>x.id===id);if(!s)return;
+  show(`<h3 style="margin:0">Tread depth</h3><div class="m" style="margin-top:6px">${esc(s.name||"Tire set")} · in 32nds of an inch. Fill in what you measured.</div><label>Date</label><input type="date" id="td_d" value="${today()}"><div class="row" style="margin-top:12px"><input type="number" step="any" inputmode="decimal" class="tdv" placeholder="Front left"><input type="number" step="any" inputmode="decimal" class="tdv" placeholder="Front right"></div><div class="row" style="margin-top:8px"><input type="number" step="any" inputmode="decimal" class="tdv" placeholder="Rear left"><input type="number" step="any" inputmode="decimal" class="tdv" placeholder="Rear right"></div>${btns}`);
+  $("ok").onclick=()=>{const vals=[...document.querySelectorAll(".tdv")].map(i=>i.value);if(vals.every(x=>x===""))return;s.tr=(s.tr||[]).concat([{d:$("td_d").value||today(),o:lastOdo(v.id),v:vals}]);save();tireList()};
+  $("cancel").onclick=()=>tireList();
+}
+function fullExtra(v){
+  const sp=(v.plist||[]).filter(x=>x.v).map(x=>`<div class="pvm"><b>${esc(x.l)}:</b> ${esc(String(x.v).split("\n").join(", "))}</div>`).join("");
+  const dt=[["Registration",v.kind!=="mower"?v.reg:""],["OHV sticker",v.kind==="offroad"?v.ohv:""],...(v.dts||[]).map(x=>[x.l||"Other date",x.date])].filter(x=>x[1]).map(([l,x])=>`<div class="pvm"><b>${esc(l)}:</b> ${esc(x)}</div>`).join("");
+  const tr=(v.tires||[]).map(s=>`<div class="pvm"><b>${esc(s.name||"Tire set")}</b>${s.size?" · "+esc(s.size):""} · ${({on:"mounted",stored:"stored",retired:"retired"})[s.st]||"stored"}</div>`).join("");
+  const dc=(v.docs||[]).map(x=>esc(x.n)).join(", ");
+  return(sp?`<h2>Parts and specs</h2>${sp}`:"")+(dt?`<h2>Dates</h2>${dt}`:"")+(tr?`<h2>Tires</h2>${tr}`:"")+(dc?`<h2>Documents on file</h2><div class="pvm">${dc}</div>`:"")+"<h2>History</h2>";
+}
+function storToggle(){
+  const v=veh();if(!v)return;
+  if(!v.stor){
+    if(!confirm("Put "+v.name+" in storage? Its reminders pause and stay out of the attention list and alerts. Registration and other expiration dates still count."))return;
+    v.stor=today();save();render();toast("In storage",()=>{delete v.stor;save();render()});return;
+  }
+  const was=v.stor,days=Math.max(0,Math.round((Date.parse(today()+"T00:00:00Z")-Date.parse(was+"T00:00:00Z"))/864e5)),pre=JSON.stringify(S.records);let n=0;
+  if(days>0)S.records.forEach(r=>{if(r.vid===v.id&&r.type==="reminder"&&!r.done&&r.date){r.date=addD(r.date,days);n++}});
+  delete v.stor;save();render();
+  toast("Back in use"+(n?". "+n+" dated reminder"+(n===1?"":"s")+" moved "+days+" days later":""),()=>{S.records=JSON.parse(pre);v.stor=was;save();render()});
+}
+// A reminder for another piece of equipment with the same timing: same interval when it came from a logged service, otherwise the time or distance left.
+function copyRem(r,v,t){
+  const src=S.records.find(x=>x.nrid===r.id&&x.type!=="reminder"),T0=Date.parse(today()+"T00:00:00Z"),D=x=>Date.parse(x+"T00:00:00Z");
+  let date="",odo="";
+  if(r.date){
+    if(r.rep>0)date=addM(today(),r.rep);
+    else{const iv=Math.round((D(r.date)-(src&&src.date?D(src.date):T0))/864e5);date=iv>0?addD(today(),iv):""}
+  }
+  if(r.odo!==""&&r.odo!=null&&!isT(t.id)&&isH(v.id)===isH(t.id)){
+    const iv=src&&src.odo!==""&&src.odo!=null?r.odo-src.odo:r.odo-lastOdo(v.id),lt=lastOdo(t.id);
+    if(iv>0&&lt>0)odo=lt+iv;
+  }
+  if(!date&&odo==="")return null;
+  return{id:uid(),vid:t.id,type:"reminder",date,odo,desc:r.desc||"",parts:"",pl:[],dl:[],notes:r.notes||"",ph:[],rc:[],done:false,nrid:"",next:0,iu:[],rep:r.rep||0};
+}
+function copySched(){
+  const v=veh(),T=act().filter(x=>x.id!==v.id),RL=S.records.filter(r=>r.vid===v.id&&r.type==="reminder"&&!r.done),C=v.cls||[];
+  if(!T.length){toast("Add another piece of equipment first");return}
+  if(!RL.length&&!C.length){toast("Nothing to copy yet. Add reminders or checklists first");return}
+  show(`<h3 style="margin:0">Copy to other equipment</h3><div class="m" style="margin-top:6px">Copies ${esc(v.name)}\u2019s reminders and checklists. Reminders keep the same interval but start from today (or from the other one\u2019s latest reading). Anything with the same name that it already has is skipped.</div>
+  <label>Copy to</label><div id="cp_t">${T.map(x=>`<label class="ck"><input type="checkbox" data-t="${x.id}"><span>${esc(x.name)}</span></label>`).join("")}</div>
+  ${RL.length?`<label>Reminders</label><div id="cp_r">${RL.map(r=>`<label class="ck"><input type="checkbox" data-r="${r.id}" checked><span>${esc(r.desc||"Reminder")}</span></label>`).join("")}</div>`:""}
+  ${C.length?`<label>Checklists</label><div id="cp_c">${C.map(c=>`<label class="ck"><input type="checkbox" data-c="${c.id}" checked><span>${esc(c.name)}</span></label>`).join("")}</div>`:""}
+  <div class="m" id="cp_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="cp_go" style="flex:1">Copy</button></div>`);
+  $("cp_go").onclick=()=>{
+    const ts=[...$("cp_t").querySelectorAll("input:checked")].map(i=>vOf(i.dataset.t)).filter(Boolean);
+    if(!ts.length){$("cp_m").textContent="Pick at least one piece of equipment.";return}
+    const rs=RL.filter(r=>($("cp_r")&&$("cp_r").querySelector(`[data-r="${r.id}"]`)||{}).checked),cs=C.filter(c=>($("cp_c")&&$("cp_c").querySelector(`[data-c="${c.id}"]`)||{}).checked);
+    if(!rs.length&&!cs.length){$("cp_m").textContent="Tick something to copy.";return}
+    const pre=JSON.stringify([S.records,S.vehicles]);let nr=0,nc=0,sk=0;
+    ts.forEach(t=>{
+      const have=S.records.filter(x=>x.vid===t.id&&x.type==="reminder"&&!x.done).map(x=>(x.desc||"").toLowerCase());
+      rs.forEach(r=>{if(have.includes((r.desc||"").toLowerCase())){sk++;return}const n=copyRem(r,v,t);if(n){S.records.push(n);nr++}else sk++});
+      cs.forEach(c=>{t.cls=t.cls||[];if(t.cls.some(x=>(x.name||"").toLowerCase()===(c.name||"").toLowerCase())){sk++;return}t.cls.push({id:uid(),name:c.name,items:[...(c.items||[])]});nc++});
+    });
+    save();$("dlg").close();render();
+    toast("Copied "+[nr&&nr+" reminder"+(nr===1?"":"s"),nc&&nc+" checklist"+(nc===1?"":"s")].filter(Boolean).join(" and ")+(nr||nc?"":"nothing")+(sk?" ("+sk+" skipped)":""),()=>{const p=JSON.parse(pre);S.records=p[0];S.vehicles=p[1];save();render()});
+  };
+}
+function moreMenu(){
+  const v=veh();
+  show(`<h3 style="margin:0">More</h3><label>Tools</label>`+(isT(v.id)?"":'<button class="mrow" data-mt="odometer">'+(isH(v.id)?"Hours":"Odometer")+' log</button>')+'<button class="mrow" data-pv="1">Service history ('+(APP?"share as file":"print or PDF")+')</button>'+(SYNC?'<button class="mrow" data-docs="1">Documents'+((v.docs||[]).length?" ("+v.docs.length+")":"")+'</button>':"")+'<button class="mrow" data-pvf="1">Full history report (photos, '+(APP?"share as file":"print or PDF")+')</button><button class="mrow" data-cl="1">Checklists'+((v.cls||[]).length?" ("+v.cls.length+")":"")+'</button><button class="mrow" data-cpy="1">Copy reminders &amp; checklists to\u2026</button><button class="mrow" data-stm="1">'+(v.stor?"\u2744\uFE0F Take out of storage":"\u2744\uFE0F Put in storage for the season")+'</button>'+(v.kind!=="mower"?'<button class="mrow" data-tires="1">Tires'+((v.tires||[]).length?" ("+v.tires.length+")":"")+'</button>':"")+'<button class="mrow" data-csv="1">Export records (CSV)</button>'+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  $("dbody").onclick=e=>{const k=e.target.dataset.mt;if(k){tab=k;$("dlg").close();render()}else if(e.target.dataset.pv){$("dlg").close();printView(v)}else if(e.target.dataset.docs){$("dlg").close();docsForm(v)}else if(e.target.dataset.pvf){$("dlg").close();printView(v,true)}else if(e.target.dataset.cl){$("dlg").close();clList()}else if(e.target.dataset.cpy){$("dlg").close();copySched()}else if(e.target.dataset.stm){$("dlg").close();storToggle()}else if(e.target.dataset.tires){$("dlg").close();tireList()}else if(e.target.dataset.csv){$("dlg").close();csvExport(v.id)}};
+}
+// ---- back gesture: sheets, photo viewer, report and equipment each take one history step
+const HS=[],HQ=[];let hskip=0,LV="garage",hbusy=false,hto=0;
+// History steps run one at a time so a close followed by an open can't race.
+function hnext(){clearTimeout(hto);const f=HQ.shift();if(!f){hbusy=false;return}hbusy=true;f()}
+function hq(f){HQ.push(f);if(!hbusy)hnext()}
+function hpush(t){HS.push(t);hq(()=>{try{history.pushState({gl:1},"")}catch(e){}hnext()})}
+function hdrop(t){const i=HS.lastIndexOf(t);if(i<0)return;const top=i===HS.length-1;HS.splice(i,1);if(top)hq(()=>{hskip++;hto=setTimeout(()=>{if(hskip>0)hskip--;hnext()},600);try{history.back()}catch(e){hskip--;hnext()}})}
+addEventListener("popstate",()=>{
+  if(hskip>0){hskip--;hnext();return}
+  const t=HS.pop();if(!t)return;
+  if(t==="lb"){const x=document.querySelector("#lb .lbx");if(x)x.click()}
+  else if(t==="pv"){const x=$("pv_x");if(x)x.click();else $("pv").hidden=true}
+  else if(t==="dlg"){try{$("dlg").close()}catch(e){}}
+  else if(t==="veh"){view=LV==="inventory"?"inventory":"garage";render()}
+});
+function backNav(){
+  const lb=document.querySelector("#lb .lbx");if(lb){lb.click();return true}
+  if(!$("pv").hidden){const x=$("pv_x");if(x)x.click();else $("pv").hidden=true;return true}
+  if($("dlg").open){$("dlg").close();return true}
+  if(view==="vehicle"&&veh()){view=LV==="inventory"?"inventory":"garage";render();return true}
+  if(view==="inventory"){view="garage";render();return true}
+  return false;
+}
+setTimeout(()=>{try{
+  if(APP){const AP=(window.Capacitor.Plugins&&window.Capacitor.Plugins.App)||(window.Capacitor.registerPlugin&&window.Capacitor.registerPlugin("App"));
+    if(AP&&AP.addListener)AP.addListener("backButton",()=>{if(!backNav()){try{AP.exitApp()}catch(e){}}})}
+}catch(e){}
+try{
+  new MutationObserver(()=>{const o=$("dlg").open;if(o&&!HS.includes("dlg"))hpush("dlg");else if(!o)hdrop("dlg")}).observe($("dlg"),{attributes:true,attributeFilter:["open"]});
+  new MutationObserver(()=>{const o=!$("pv").hidden;if(o&&!HS.includes("pv"))hpush("pv");else if(!o)hdrop("pv")}).observe($("pv"),{attributes:true,attributeFilter:["hidden"]});
+  new MutationObserver(()=>{const o=!!document.getElementById("lb");if(o&&!HS.includes("lb"))hpush("lb");else if(!o)hdrop("lb")}).observe(document.body,{childList:true});
+}catch(e){}},0);
+function render(){
+  {const nv=view==="vehicle"&&veh();if(view!=="vehicle")LV=view;if(nv&&!HS.includes("veh"))hpush("veh");else if(!nv&&HS.includes("veh"))hdrop("veh")}
+  const v0=veh();if(view==="vehicle"&&v0&&isT(v0.id)&&tab==="odometer")tab="service";
+  {const b=document.body.style,c=view==="vehicle"&&v0&&v0.color;if(c){b.setProperty("--ac",c);b.setProperty("--ac2",`color-mix(in srgb,${c} 62%,#18b7ff)`)}else{b.removeProperty("--ac");b.removeProperty("--ac2")}}
+  const key=view+tab+S.cur,ch=key!==lk;if(ch){em=false;lk=key;rq="";rch="all"}
+  const v=veh(),inV=view==="vehicle"&&v;
+  $("hd").innerHTML=inV?`<button id="back">←</button><div class="tw"><b class="t">${esc(v.name)}</b><span class="sub">${esc(v.model||"")}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="ev">✎</button><button id="more"${UPD?' class="upd"':""} aria-label="Settings" title="Settings">⚙️</button>`:`<div class="tw"><b class="t">${view==="inventory"?"Inventory":"My Garage"}</b><span class="sub">${view==="inventory"?S.inv.length+" item"+(S.inv.length===1?"":"s")+" on hand":act().length+" in the garage"}</span></div><i id="sd" title="Sync status. Tap for details"></i><button id="more"${UPD?' class="upd"':""} aria-label="Settings" title="Settings">⚙️</button>`;
+  const pk=KINDS.filter(k=>act().some(x=>x.kind===k[0]));if(gk!=="All"&&!pk.some(k=>k[0]===gk))gk="All";
+  const vt=inV?vTabs(v):[],tl=inV?[...vt,["more","More"]]:view==="inventory"?["All",...CATS].map(x=>[x,x]):pk.length>1?[["All","All"],...pk.map(k=>[k[0],k[1]])]:[];
+  $("tabs").className="tabs";$("tabs").innerHTML=tl.map(([k,l])=>`<button class="${k===(inV?(tab==="odometer"?"more":tab):view==="inventory"?ic:gk)?"on":""}" data-t="${k}">${inV&&TIC[k]?ico(TIC[k]):""}${l}</button>`).join("");
+  {const on=$("tabs").querySelector(".on"),tb=$("tabs");if(on&&tb.scrollWidth>tb.clientWidth)tb.scrollLeft=on.offsetLeft-(tb.clientWidth-on.offsetWidth)/2}
+  $("bn").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(view==="inventory"?"inventory":"garage")));
+  $("fab").style.display="";$("fabE").style.display=view==="garage"&&act().length>1?"":"none";$("fabE").textContent=em?"✓":"⇅";
+  const L=$("list");L.className=ch?"fresh":"";
+  if(inV)L.innerHTML=(tab==="dash"&&v.cover?`<div class="hero" style="--k:${vcol(v)}"><img src="${pu(v.cover)}" alt="" data-cover="1" style="cursor:zoom-in;z-index:1"></div>`:"")+(tab==="dash"?dashView(v):tab==="parts"?partsView(v):recView(v));
+  else if(view==="inventory")L.innerHTML=invView();
+  else L.innerHTML=garageView();
+}
+function dashView(v){
+  const lo=lastOdo(v.id),up=openRem(v).map(r=>({r,i:rinfo(r,lo)}));
+  pseudo(v).forEach(r=>up.push({r,i:rinfo(r,lo)}));
+  up.sort((x,y)=>y.i.st-x.i.st||(x.r.date||"9").localeCompare(y.r.date||"9"));
+  const rec=S.records.filter(r=>r.vid===v.id&&(r.type==="service"||r.type==="repair")).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)).slice(0,6);
+  const upH=up.length?up.map(({r,i})=>`<div class="c ce sc st${i.st}"${r.id?` data-sw="${r.id}"`:""}>${r.id?`<button class="ed" data-edit="${r.id}" title="Edit">\u270e</button>`:r.pk?`<button class="ed" data-vedit="1" title="Edit dates">\u270e</button>`:""}<h3 class="dt">${esc(r.desc||"Reminder")}${tag(i.st)}</h3><div class="rmr"><div class="m">${esc(i.txt)}${r.date?" · due "+r.date:""}${r.rep>0?" · repeats every "+repTxt(r.rep):""}${r.odo!==""&&r.odo!=null?" · at "+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${rbtn(r)}</div></div>`).join(""):'<div class="m" style="padding:4px 2px">No upcoming reminders. <a data-addrem="1" style="color:var(--ac);font-weight:600;cursor:pointer">Add one</a></div>';
+  const rcH=rec.length?rec.map(r=>{const odo=r.odo!==""&&r.odo!=null?" · "+(+r.odo).toLocaleString()+" "+dU(v.id):"",t=[r.desc,...(r.dl||[])].filter(Boolean).join(", ")||(r.type==="repair"?"Repair":"Service");
+    return `<div class="c ce sc st${r.type==="repair"?1:0}"><button class="ed" data-edit="${r.id}" title="Edit">\u270e</button><h3 class="dt">${esc(t)}<span class="tag ${r.type==="repair"?"warn":"ok"}">${r.type==="repair"?"Repair":"Service"}</span></h3><div class="m">${r.date||"no date"}${odo}</div>${r.type==="service"?`<button style="margin-top:8px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`}).join(""):'<div class="m" style="padding:4px 2px">No services or repairs logged yet.</div>';
+  const stH=v.stor?`<div class="c nudge"><b>\u2744\uFE0F In storage since ${esc(v.stor)}</b><div class="m" style="margin:4px 0 10px">Reminders are paused and left out of alerts. Registration and other expiration dates still count. When you take it out, dated reminders move later by the days it was stored.</div><button class="p" data-stor="1" style="width:100%">Take out of storage</button></div>`:"",ns=v.stor?null:odoStale(v),nH=stH+(ns?`<div class="c nudge"><b>Update the ${isH(v.id)?"hours":"odometer"}</b><div class="m" style="margin:4px 0 10px">Last updated ${ago2(ns.days)} ago (${lo.toLocaleString()} ${dU(v.id)}). A fresh reading keeps the due dates accurate.</div><div class="row"><button class="p" data-qodo="1">Update now</button><button data-nsnz="1">Later</button></div></div>`:"");
+  return nH+`<div class="row" style="margin-bottom:6px">${isT(v.id)?"":`<button class="qa" data-qodo="1" style="margin:0">＋ ${isH(v.id)?"Hours":"Odometer"}</button>`}<button class="qa" data-srch="1" style="margin:0">${ico("search")} Last done…</button></div>`+'<div class="sec">Upcoming reminders<a data-go="reminder">See all ›</a></div>'+upH+'<div class="sec">Recent services &amp; repairs<a data-go="service">See all ›</a></div>'+rcH+infoCard(v)+recallCard(v);
+}
+function gSearch(){
+  show(`<h3 style="margin:0">When did I last…</h3><input id="sq" placeholder="oil filter, brake pads, belt…" autocomplete="off" style="margin-top:10px"><div id="sres" class="m" style="margin-top:12px">Searches every piece of equipment: descriptions, parts and notes.</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>`);
+  const td=Date.parse(today()+"T00:00:00Z"),ago=s=>{if(!s)return"";const d=Math.round((td-Date.parse(s+"T00:00:00Z"))/864e5);return d<=0?"today":d<60?d+" days ago":d<730?Math.round(d/30.4)+" months ago":(d/365).toFixed(1)+" years ago"};
+  const go=()=>{const q=$("sq").value.trim().toLowerCase(),bx=$("sres");
+    if(!q){bx.className="m";bx.textContent="Searches every piece of equipment: descriptions, parts and notes.";return}
+    const o=[];act().forEach(v=>{const L=S.records.filter(r=>r.vid===v.id&&PH.includes(r.type)&&[r.desc,...(r.dl||[]),...partsOf(r),r.notes].join("\n").toLowerCase().includes(q)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0));if(L.length)o.push({v,f:L[0],n:L.length})});
+    if(!o.length){bx.className="m";bx.textContent="Nothing logged that matches.";return}
+    o.sort((a,b)=>(b.f.date||"").localeCompare(a.f.date||""));bx.className="";
+    bx.innerHTML=o.map(({v,f,n})=>`<button class="mrow" data-gv="${v.id}"><b>${esc(v.name)}</b><span class="m" style="display:block">${f.date?esc(f.date)+" · "+ago(f.date):"no date"}${!isT(v.id)&&f.odo!==""&&f.odo!=null?" · "+(+f.odo).toLocaleString()+" "+dU(v.id):""}${n>1?" · "+n+" times":""}</span><span class="m" style="display:block;color:var(--tx)">${esc([f.desc,...(f.dl||[])].filter(Boolean).join(", "))}</span></button>`).join("")};
+  $("sq").oninput=go;$("sres").onclick=e=>{const b=e.target.closest("[data-gv]");if(!b)return;S.cur=b.dataset.gv;view="vehicle";tab="timeline";const q=$("sq").value.trim();$("dlg").close();render();rq=q;rch="all";render()};setTimeout(()=>$("sq").focus(),50);
+}
+function updTile(){return APP&&UPD?`<a class="updt" href="${esc(UPD.url)}"><b>Version ${esc(UPD.v)} is available</b><span>You have ${esc(APP_V)}. <u>Download the update</u>, open it, and Android installs it over the app. Your data stays.</span></a>`:""}
+function pickVeh(title,cb){
+  const L=act();if(!L.length)return;if(L.length===1)return cb(L[0].id);
+  show(`<h3 style="margin:0">${esc(title)}</h3><div style="margin-top:8px">${L.map(v=>`<button class="mrow" data-pv="${v.id}" style="--k:${vcol(v)}"><b>${esc(v.name)}</b></button>`).join("")}</div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>`);
+  $("dbody").onclick=e=>{const b=e.target.closest("[data-pv]");if(!b)return;const id=b.dataset.pv;$("dlg").close();cb(id)};
+}
+function quickGo(k){
+  const go=(id,t)=>{S.cur=id;view="vehicle";tab=t;save();render()};
+  if(k==="svc")pickVeh("Add a service to…",id=>{go(id,"service");openForm(null,{type:"service",date:today()})});
+  else if(k==="odo")pickVeh("Update the reading for…",id=>{if(isT(id)){toast("That one has no odometer");return}qOdo(id)});
+  else if(k==="cl")pickVeh("Checklists for…",id=>{go(id,"dash");clList()});
+}
+function garageView(){
+  if(!act().length)return`<div class="empty"><div class="ei">${ico("flag")}</div>Your garage is empty.<br>Add a vehicle, ATV, dirt bike, mower or other equipment.<br><button class="p" data-addv="1">\uff0b Add equipment</button><br><button data-help="1" style="margin-top:10px">How does this work?</button></div>`;
+  const qt=RO||em?"":`<div class="qt"><button data-qk="svc">${ico("wrench")}Add service</button><button data-qk="odo">${ico("gauge")}Odometer</button><button data-qk="cl">${ico("note")}Checklists</button></div>`;
+  return updTile()+(RO?"":attnBanner())+qt+(S.records.some(r=>PH.includes(r.type))&&!em?'<button class="qa" data-gsrch="1" style="margin:0 0 12px;width:100%">'+ico("search")+' When did I last…</button>':"")+(em?'<div class="m" style="margin-bottom:10px;color:var(--ac)">Use the arrows to reorder your garage, then tap ✓.</div>':"")+'<div class="vg">'+act().filter(v=>gk==="All"||v.kind===gk).map(v=>{const s=vstat(v),mt=[esc(v.model||""),isT(v.id)?"":`<span data-qodo2="${v.id}" style="display:inline-block;padding:4px 0;border-bottom:1px dotted var(--mu)">${lastOdo(v.id).toLocaleString()} ${dU(v.id)}</span>`].filter(Boolean).join("<br>");
+    return `<div class="c vt" data-open="${v.id}" style="--k:${vcol(v)};--sc:${SC[s.st]||SC[0]}"><div class="bar"></div>${v.cover?`<div class="cv" style="background-image:url('${pu(v.cover)}')"></div>`:""}<button class="ed" data-vedit2="${v.id}" title="Edit">\u270e</button><h3>${esc(v.name)}</h3>${mt?`<div class="m">${mt}</div>`:""}<div class="vs">${tag(s.st)}<span class="m">${esc(s.txt)}</span></div>${s.bar?`<div class="pb" role="progressbar" aria-valuenow="${s.bar.p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${s.bar.p}%"></i></div>`:""}${em?`<div class="mv"><button data-mv="${v.id}:-1">↑</button><button data-mv="${v.id}:1">↓</button></div>`:""}</div>`}).join("")+'</div>';
+}
+let rq="",rch="all";
+const TLT=["service","repair","upgrade"],TLI={service:ico("wrench"),repair:ico("hammer"),upgrade:ico("up")};
+function tlRows(v){
+  const all=S.records.filter(r=>r.vid===v.id&&TLT.includes(r.type)).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(+b.odo||0)-(+a.odo||0)),q=rq.trim().toLowerCase();
+  const rows=all.filter(r=>(rch==="all"||r.type===rch)&&(!q||q.split(/\s+/).every(w=>[r.desc,...(r.dl||[]),r.notes,r.by,r.date,r.odo,...partsOf(r)].join(" ").toLowerCase().includes(w))));
+  if(!all.length)return`<div class="empty"><div class="ei">${ico("cal")}</div>Nothing on the timeline yet.<br>Services, repairs and upgrades show up here.<br><button class="p" data-addrec="1">\uFF0B Add service</button></div>`;
+  if(!rows.length)return`<div class="empty"><div class="ei">${ico("search")}</div>Nothing matches.<br>Clear the search or pick All.</div>`;
+  let y="",o='<div class="tl">';
+  for(const r of rows){const yr=(r.date||"").slice(0,4)||"Undated";if(yr!==y){y=yr;o+=`<div class="tly">${yr}</div>`}
+    const dt=r.date?new Date(r.date+"T00:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}):"";
+    o+=`<div class="tli"><i class="tld" aria-hidden="true">${TLI[r.type]}</i><div class="tlh">${dt}${r.odo!==""&&r.odo!=null?(dt?" \u00b7 ":"")+(+r.odo).toLocaleString()+" "+dU(v.id):""}</div>${card(r,true)}</div>`}
+  return o+"</div>";
+}
+function recRows(v){
+  if(tab==="timeline")return tlRows(v);
+  const all=S.records.filter(r=>r.vid===v.id&&r.type===tab).sort((a,b)=>tab==="reminder"?(a.date||"9").localeCompare(b.date||"9"):(b.date||"").localeCompare(a.date||"")||b.odo-a.odo),lo=lastOdo(v.id),q=rq.trim().toLowerCase();
+  const rows=all.filter(r=>{
+    if(rch!=="all"){if(tab==="reminder"){const st=r.done?-1:rinfo(r,lo).st;if(rch==="over"&&st!==2)return false;if(rch==="up"&&!(st>=0&&st<2))return false;if(rch==="done"&&!r.done)return false}else if((r.date||"").slice(0,4)!==rch)return false}
+    if(q){const h=[r.desc,...(r.dl||[]),r.notes,r.by,r.date,r.odo,...partsOf(r)].join(" ").toLowerCase();if(!q.split(/\s+/).every(w=>h.includes(w)))return false}
+    return true});
+  if(!all.length)return`<div class="empty"><div class="ei">${ico("wrench")}</div>Nothing here yet.<br>Tap + to add.<br><button class="p" data-addrec="1">＋ Add ${esc((TYPES.find(t=>t[0]===tab)||[0,"record"])[1].toLowerCase())}</button></div>`;
+  if(!rows.length)return`<div class="empty"><div class="ei">${ico("search")}</div>Nothing matches.<br>Clear the search or pick All.</div>`;
+  if(tab==="reminder"){const lo2=lastOdo(v.id),G=[[2,"Overdue"],[1,"Due soon"],[0,"Later"],[-1,"Done"]],st=r=>r.done?-1:rinfo(r,lo2).st;
+    return G.map(([k,l])=>{const x=rows.filter(r=>st(r)===k);return x.length?`<div class="sec">${l}<span class="n">${x.length}</span></div>`+x.map(card).join(""):""}).join("")}
+  return rows.map(card).join("");
+}
+function usageCard(v){
+  if(isT(v.id))return"";
+  const m=new Map();S.records.filter(r=>r.vid===v.id&&r.type!=="reminder"&&r.date&&r.odo!==""&&r.odo!=null&&!isNaN(+r.odo)).forEach(r=>{if(!m.has(r.date)||+r.odo>m.get(r.date))m.set(r.date,+r.odo)});
+  const P=[...m].sort((a,b)=>a[0].localeCompare(b[0]));if(P.length<2)return"";
+  const t=d=>new Date(d+"T00:00:00").getTime(),t0=t(P[0][0]),t1=t(P[P.length-1][0]),o0=Math.min(...P.map(x=>x[1])),o1=Math.max(...P.map(x=>x[1])),W=320,H=96,pd=8;
+  const X=d=>t1===t0?W/2:pd+(t(d)-t0)/(t1-t0)*(W-2*pd),Y=o=>o1===o0?H/2:H-pd-(o-o0)/(o1-o0)*(H-2*pd);
+  const pts=P.map(([d,o])=>X(d).toFixed(1)+","+Y(o).toFixed(1)),ln="M"+pts.join(" L"),area=ln+` L${X(P[P.length-1][0]).toFixed(1)},${H} L${X(P[0][0]).toFixed(1)},${H} Z`,lp=pts[pts.length-1].split(",");
+  const days=(t1-t0)/864e5,tot=P[P.length-1][1]-P[0][1],yr=days>=30&&tot>0?Math.round(tot/days*365):0,u=dU(v.id);
+  return`<div class="c uc"><div class="m">${isH(v.id)?"Hours":"Odometer"} over time</div><div class="big">${(+P[P.length-1][1]).toLocaleString()} ${u}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Line chart of ${isH(v.id)?"hours":"odometer"} readings over time"><defs><linearGradient id="ug" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--ac)" stop-opacity=".35"/><stop offset="1" stop-color="var(--ac)" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#ug)"/><path d="${ln}" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lp[0]}" cy="${lp[1]}" r="4.5" fill="var(--ac)"/></svg><div class="m" style="display:flex;justify-content:space-between"><span>${P[0][0]}</span><span>${P[P.length-1][0]}</span></div>${yr?`<div class="m" style="margin-top:6px">About ${yr.toLocaleString()} ${u} per year</div>`:""}</div>`;
+}
+function recView(v){
+  let out=isT(v.id)?"":`<div class="m" style="margin-bottom:10px">${lastOdo(v.id).toLocaleString()+" "+dU(v.id)}</div>`;
+  if(tab==="odometer")out+=usageCard(v);
+  const all=S.records.filter(r=>r.vid===v.id&&(tab==="timeline"?TLT.includes(r.type):r.type===tab)),yrs=[...new Set(all.map(r=>(r.date||"").slice(0,4)).filter(Boolean))].sort().reverse();
+  const chips=tab==="timeline"?[["all","All"],["service","Service"],["repair","Repairs"],["upgrade","Upgrades"]]:tab==="reminder"?[["all","All"],["over","Overdue"],["up","Upcoming"],["done","Done"]]:yrs.length>1?[["all","All"],...yrs.map(y=>[y,y])]:[];
+  if(all.length>3||rq)out+=`<input id="rs" class="rsb" type="search" placeholder="Search notes, parts, dates…" value="${esc(rq)}" aria-label="Search">`;
+  if(chips.length&&(all.length>3||tab==="timeline"&&all.length>1))out+='<div class="chs">'+chips.map(([k,l])=>`<button class="${k===rch?"on":""}" data-rch="${k}">${l}</button>`).join("")+"</div>";
+  return out+'<div id="rl">'+recRows(v)+"</div>"+(tab==="reminder"&&!RO?'<button class="qa" data-strt="1" style="margin:12px 0 0;width:100%">Add common reminders':"")+(tab==="reminder"&&!RO?"</button>":"");
+}
+function card(r,tl){tl=tl===true;
+  const odo=r.odo!==""&&r.odo!=null?`${(+r.odo).toLocaleString()} ${dU(r.vid)}`:"";
+  let title=esc(r.desc||TYPES.find(t=>t[0]===r.type)[1]),meta=[tl?"":r.date,tl?"":odo,r.by?"by "+esc(r.by):""].filter(Boolean).join(" · "),extra="";
+  if(r.type==="odometer")title=isH(r.vid)?"Hours reading":"Odometer reading";
+  if(r.type==="reminder"){const i=rinfo(r,lastOdo(r.vid)),pz=!r.done&&(vOf(r.vid)||{}).stor;if(pz)i.st=0;extra=r.done?'<span class="tag">Done</span>':pz?'<span class="tag">Paused</span>':tag(i.st);meta=["Due",r.date,odo].filter(Boolean).join(" · ")+(r.done?"":` (${i.txt.replace(/ \(est\. ([^)]*)\)/g,", est. $1")})`)+(r.rep>0?" · repeats every "+repTxt(r.rep):"")}
+  const rc=(r.rc||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}:rc">`).join(""),ph=(r.ph||[]).map((p,i)=>`<img src="${pu(p)}" data-ph="${r.id}:${i}">`).join("");
+  const sk=r.type==="reminder"?"st"+(r.done?"n":rinfo(r,lastOdo(r.vid)).st):({service:"st0",repair:"st1",upgrade:"stu"})[r.type]||"";
+  return `<div class="c ce${sk?" sc "+sk:""}"${r.type==="reminder"&&!r.done?` data-sw="${r.id}"`:""}><button class="ed" data-edit="${r.id}" title="Edit">✎</button><h3>${title}${extra}</h3>${r.type==="reminder"&&!r.done?`<div class="rmr"><div class="m">${meta}</div>${rbtn(r)}</div>`:`<div class="m">${meta}</div>`}${(r.dl||[]).length?`<div class="m" style="margin-top:6px">${r.dl.map(x=>"• "+esc(x)).join("<br>")}</div>`:""}${partsOf(r).length?`<div class="m" style="margin-top:6px">Parts: ${partsOf(r).map(esc).join(" · ")}</div>`:""}${r.notes?`<div class="m" style="margin-top:6px;color:var(--tx)">${esc(r.notes)}</div>`:""}${ph?`<div class="ph">${ph}</div>`:""}${rc?`<div class="m" style="margin-top:8px">Receipts</div><div class="ph">${rc}</div>`:""}${r.type==="service"?`<button style="margin-top:10px" data-again="${r.id}">\u21bb Log again</button>`:""}</div>`;
+}
+let infoOpen=false;
+function infoCard(v){
+  const rows=[["License plate",["car","trailer"].includes(v.kind)?v.plate:""],["OHV sticker expires",v.kind==="offroad"?v.ohv:""],["Registration expires",v.kind!=="mower"?v.reg:""],...(v.dts||[]).map(x=>[x.l||"Other date",x.date]),["VIN / serial #",v.vin]].filter(x=>x[1]).map(([l,x])=>[l,x]);
+  if(!rows.length)return"";
+  const key=rows.filter(r=>/plate|VIN/i.test(r[0])),show=infoOpen?rows:key,pv=r=>`<div class="sp"><span class="m">${esc(r[0])}</span><span>${esc(r[1])}</span></div>`;
+  return`<div class="sec">Details${rows.length>key.length?`<a data-infot="1">${infoOpen?"Show less":"Show all"}</a>`:""}<a data-vedit="1" style="${rows.length>key.length?"margin-left:14px":""}">Edit</a></div><div class="c">${(show.length?show:rows.slice(0,2)).map(pv).join("")}</div>`;
+}
+function partsView(v){
+  return `<div class="sec" style="margin-top:4px">Parts${(v.plist||[]).length>1?'<a data-specs="1">Reorder</a>':""}</div><div class="c">${(v.plist||[]).map((r,i)=>`<div class="sp"><span class="m">${esc(r.l)}</span><span style="white-space:pre-wrap;text-align:right;flex:1">${esc(r.v||"—")}${buyLn(r)?`<span style="display:block">${buyLn(r)}</span>`:""}</span><button class="ed2" data-pedit="${i}" title="Edit">\u270e</button></div>`).join("")||'<div class="m">No parts yet. Tap + to add one as you go.</div>'}</div>`;
+}
+function invView(){
+  let a=S.inv.filter(i=>ic==="All"||i.cat===ic).sort((x,y)=>x.cat.localeCompare(y.cat)||x.name.localeCompare(y.name));
+  if(!a.length)return`<div class="empty"><div class="ei">${ico("oil")}</div>No items yet.<br>Add oil, grease, filters or parts on hand.<br><button class="p" data-addi="1">\uff0b Add an item</button></div>`;
+  return a.map(i=>`<div class="c ce"><button class="ed" data-iedit="${i.id}" title="Edit">\u270e</button><h3 data-iedit="${i.id}">${esc(i.name)}${i.qty<=0?'<span class="tag bad">Out</span>':i.qty<=(i.low!==""&&i.low!=null?+i.low:1)?'<span class="tag warn">Low</span>':""}<span class="tag">${i.cat}</span></h3>${(i.pns||[]).map(x=>`<div class="m">${esc(x)}</div>`).join("")}${i.notes?`<div class="m">${esc(i.notes)}</div>`:""}${buyLn(i)?`<div style="margin-top:4px">${buyLn(i)}</div>`:""}<div class="q"><button data-q="${i.id}:-1">−</button><b>${i.qty}</b> <span class="m">${esc(i.unit||"")}</span><button data-q="${i.id}:1">+</button></div></div>`).join("");
+}
+
+
+const HELP=[
+["Getting started","<p>The quick tiles on My Garage (<b>Add service</b>, <b>Odometer</b>, <b>Checklists</b>) jump straight to those for the equipment you pick.</p><p>Tap <b>＋</b> on My Garage to add a vehicle, ATV, dirt bike, trailer, mower or other equipment. Tap it to open it.</p><p>Inside, the <b>Dashboard</b> shows upcoming reminders and your recent services and repairs. The tabs along the top hold Service, Repairs, Upgrades, Timeline, Parts, Reminders, Odometer / Hours and Notes. The <b>More</b> tab holds tools such as Documents, Checklists, Tires and reports, and the <b>⚙️</b> button at the top opens Settings &amp; data. The green <b>＋</b> adds to whichever tab you are on.</p>"],
+["Log a service or repair","<p>Open the equipment, go to the Service tab and tap ＋. Enter the date and odometer or hours, describe the work, and add parts, notes, photos and receipts.</p><p>Under <b>Parts used</b>, <b>Bought for this job</b> types a part in, and <b>Take from inventory</b> uses what you have on hand and lowers the count. Set <b>Next service due</b> to create a reminder automatically.</p><p>Done a job before? Tap <b>Log again</b> on any tile to copy it with today's date.</p>"],
+["Reminders: done, renew, snooze","<p>Reminders turn orange when due soon and red when overdue. On a reminder tile the green <b>Done</b> button (or <b>Renew</b>) and the 💤 snooze button are right on the row. You can also <b>swipe right</b> to mark it done (or renew it if it repeats) and <b>swipe left</b> to snooze it. The buttons on the tile do the same thing.</p><p>Marking a reminder done offers to log the service. Repeating reminders (every 1 or 2 years, for example) move to the next date when renewed.</p>"],
+["Search and filters","<p>On My Garage, <b>When did I last…</b> searches every piece of equipment at once and shows when each last had that job done.</p><p>Lists with more than a few records show a search box and filter chips. Search looks through descriptions, notes, parts, dates and odometer values. Service, Repair and Upgrade lists can be filtered by year, and Reminders by Overdue, Upcoming or Done.</p><p>On the dashboard, <b>Last done…</b> finds the most recent time you did something, such as an oil change.</p>"],
+["Odometer / Hours and the usage chart","<p>Tap <b>＋ Odometer</b> on the dashboard or garage card to record a reading quickly. The Odometer / Hours tab lists the readings and, once there are two or more, draws a chart of how it changed and the average use per year.</p><p>Time-tracked equipment (such as a trailer) has no odometer and uses dates only.</p>"],
+["Details (plate, VIN, dates)","<p>At the bottom of the equipment's <b>Dashboard</b> a <b>Details</b> card shows the plate and VIN. Tap <b>Show all</b> for registration, sticker and other dates, and <b>Edit</b> to change them.</p>"],
+["Parts and part numbers","<p>The <b>Parts</b> tab holds your own list, such as oil weight and capacity or filter numbers. Tap ＋ to add a category, and use the pencil on a row to edit it. Each category can hold several lines, so you can list different brands.</p>"],
+["Inventory","<p>The Inventory tab lists oil, grease, filters and parts on hand with quantities. Use − and + to adjust. Items show <b>Low</b> or <b>Out</b> when they run short, and each item can have several part numbers.</p>"],
+["Photos and receipts","<p>Add photos and receipt pictures on any record. Tap a photo to view it full screen: swipe for the next one, pinch or double-tap to zoom, and tap ✕ to close. The equipment's cover photo opens the same way.</p><p>Photos are shrunk before they are saved, which keeps the app fast and your storage small.</p>"],
+["Colors and layout","<p>Edit a piece of equipment (the pencil on its card) to give it a color. The color tints that equipment's screen. <b>Settings &amp; data</b> sets light or dark appearance and miles or kilometers.</p><p>Use the ⇅ button on My Garage to reorder equipment. Pull down at the top of a screen to refresh.</p>"],
+["Editing and deleting","<p>Every tile has its own pencil that opens just that item. <b>Delete</b> is inside the edit form, and an <b>Undo</b> appears for a few seconds afterwards. Equipment can also be archived instead of deleted, and restored from Settings &amp; data.</p>"],
+["Photos on tiles","<p>Edit a piece of equipment and add a <b>Cover photo</b>. It shows at the top of its tile in My Garage and at the top of its dashboard. Equipment without a photo has no picture area at all, just its name and status.</p>"],
+["Going back","<p>Swipe from the edge of the screen, or use your phone\u0027s back button, to go back one step: it closes an open sheet or photo first, then goes from a piece of equipment back to My Garage. Back on My Garage leaves the app.</p>"],
+["Accounts","<p>If more than one person uses your server, the admin can turn on <b>accounts</b> in Settings. Everyone then signs in with their own username and password and only sees their own equipment, photos, inventory and settings. The admin adds people under <b>Manage users</b> and gives them the starting password. Turning accounts on moves what is already on the server into the admin account. Everyone, including you, has to sign in afterwards. The Android app has a Username box in its server settings for this.</p><p>Under <b>Manage users</b> you can see when each person last signed in, <b>turn an account off</b> (they can no longer sign in and their links stop working, but their data is kept) and turn it back on later, or <b>sign them out everywhere</b>. Anyone can use <b>Sign out of every device</b> in their own account settings, for example after losing a phone. That signs this device out too.</p>"],
+["In storage","<p>For the winter mower or a trailer that sits all season, open the equipment, tap <b>More</b> and choose <b>Put in storage for the season</b>. Its reminders pause: they stay out of the attention list, the alerts and the calendar. Registration, the OHV sticker and other expiration dates still count, so you won\u0027t miss a renewal. When you take it out, dated reminders move later by the number of days it was stored, so they don\u0027t all show overdue at once. Distance and hours reminders aren\u0027t affected because they count use.</p>"],
+["Copy a schedule","<p>Set up reminders and checklists once, then open <b>More</b> and choose <b>Copy reminders &amp; checklists to\u2026</b>. Pick the equipment and what to copy. Reminders keep the same interval but start from today (or from the other one\u0027s latest reading). Anything the other equipment already has with the same name is skipped, and Undo puts everything back.</p>"],
+["Using it away from home","<p>To reach your server from outside your home network without opening your router, use <b>Tailscale</b>: install the Tailscale app on the NAS and on your phone, sign in to the same account, then use the NAS\u0027s Tailscale address (for example <b>http://truenas:30500</b>) in the browser, or in the Android app under Server in Settings. Never forward the Garage Log port from your router to the internet. If other people will use it, turn on accounts first. The README has the full steps.</p>"],
+["Timeline","<p>Open the <b>Timeline</b> tab inside equipment to see every service, repair and upgrade in one list, newest first. Use the chips to show just one kind, or the search box to find a part, note or person.</p>"],
+["Templates and remembered intervals","<p>When you log a service, tick <b>Save as a template</b>. Next time, tap it under <b>Quick pick</b> and the description, parts and next-service interval fill in. The app also remembers the next-service interval you chose for each job on each piece of equipment and offers it again when you type the same description.</p>"],
+["Done by","<p>Each service, repair or upgrade has an optional <b>Done by</b> box (Me, a family member, a shop). It shows on the tile and is searchable.</p>"],
+["Scan a barcode or VIN","<p>Next to the VIN box and the inventory part numbers is a camera button. Tap it, take a close, well-lit photo of the barcode and the number is filled in. If your phone can't read barcodes this way, you'll be asked to type it.</p>"],
+["Share a view-only link","<p>With a server password set, <b>Settings &amp; data &gt; Share (view only)</b> gives a link that lets family look at your garage and history. They can't change anything. Without a server password the link is only a viewing mode, not protection.</p>"],
+["Text size and appearance","<p>Settings &amp; data has <b>Text size</b> (Normal, Large, Extra large) and <b>Appearance</b> (match your device, dark or light).</p>"],
+["Needs-attention banner and mileage nudge","<p>On My Garage, a banner shows how many things are overdue, due soon, or need a fresh odometer reading. Tap it for the list. Each overdue or due-soon item has <b>Done</b> (or Renew) and <b>Snooze</b> buttons, so you can clear it right there. Inside equipment, the dashboard asks you to update the odometer or hours when the last reading is a month old, so the estimated due dates stay accurate. Tap <b>Later</b> to hide it for a week.</p>"],
+["Warranty dates","<p>Add <b>Warranty ends</b> to equipment (Edit equipment) or to any service, repair or upgrade, as a date, an odometer reading, or both. It becomes a reminder, so it shows in alerts and the calendar like any other.</p>"],
+["Common reminders","<p>After you add equipment, the app offers a list of usual reminders for that kind, such as oil, filters and belts. Tick the ones you want. You can open the same list later from the <b>Reminders</b> tab with <b>Add common reminders</b>. They are ordinary reminders you can edit or delete.</p><p>When you add a reminder yourself, <b>Or pick a month</b> sets it to the 1st of that month and repeats it every year, handy for things like spring mower prep.</p>"],
+["Share one record","<p>Open any service, repair or upgrade with its pencil and tap <b>Share or print this record</b>. It makes a page for just that job, with parts, notes, photos and receipts. On the web use Print / Save as PDF. In the Android app it is shared as a file.</p>"],
+["Checklists","<p>Open <b>More &gt; Checklists</b> to make your own lists, such as <i>Before a ride</i>. Tap <b>Start</b>, tick the items, then <b>Finish</b>. The list remembers when you last did it.</p><p>Under <b>Suggested starters</b> you can add a ready-made list, such as <i>Spring start-up</i> or <i>Winterize</i>, then edit it to suit.</p>"],
+["Tires","<p>Open <b>More &gt; Tires</b> to keep each set (brand, size, bought date), see which set is mounted and how far it has gone, and log tread depth in 32nds. Use <b>Mount this set</b> when you swap.</p>"],
+["Where to buy links","<p>Inventory items and parts-list categories have optional <b>Where to buy</b> fields: a store name and a link. The link shows on the tile so reordering is one tap. No prices are stored.</p>"],
+["Full history report","<p><b>More &gt; Full history report</b> makes a printable page with the equipment's parts, dates, tires, documents and every service, repair and upgrade with its photos and receipts. On the web use Print / Save as PDF. In the Android app it is shared as a file you can open in a browser and print to PDF.</p>"],
+["Recalls","<p>If a vehicle has a VIN, its dashboard has a <b>Recalls</b> card. Open recalls for your exact vehicle can only be checked by VIN on the NHTSA website, so tap <b>Copy VIN</b>, then <b>Open nhtsa.gov/recalls</b> and paste it in.</p>"],
+["Syncing with your server","<p>If syncing stops, open <b>Settings &amp; data &gt; Connection log</b>. It shows the server address, a <b>Test connection</b> button, and the last sync events and errors.</p><p>On the web version the data is stored on your Garage Log server and syncs across your devices. The dot in the header shows the state: green is saved, gray is offline.</p><p>The Android app also works on its own. To sync it, open <b>Settings &amp; data &gt; Server</b> and enter the server address, such as <b>http://192.168.1.50:30500</b>. Check the port number carefully, and that your phone is on the same Wi-Fi or a VPN.</p>"],
+["Backups and moving to a new phone","<p>Settings &amp; data has <b>Download backup</b> and <b>Restore from file</b>. With a server, a copy is also saved there every day and the last 14 are kept. To move the Android app to a new phone, take a backup first and restore it on the new one.</p>"],
+["Reminder alerts and calendar","<p>With a server, <b>Settings &amp; data &gt; Reminder alerts</b> sends a notification when something becomes due. Enter an ntfy address (such as https://ntfy.sh/your-topic) or a JSON webhook for Home Assistant or Gotify, then press <b>Send test message</b>.</p><p><b>Get calendar link</b> gives you an address to subscribe to in a calendar app so due dates show up there.</p>"],
+["Android app: updates","<p>When a newer version of the app is out, an <b>update tile</b> appears at the top of My Garage (and in Settings &amp; data), and the ⚙️ button gets a green dot. Tap the tile to download it, then install it over the old one. Your data is kept. With no update, nothing is shown.</p>"],
+["Something is not working","<p><b>Can't connect to the server:</b> check the address and port, that the phone is on the same network, and open the same address in the phone's browser.</p><p><b>A change did not appear on another device:</b> pull down to refresh, or check the header dot. Changes made on two devices are merged.</p><p><b>An old version is showing on the NAS:</b> set the image tag to the newest version number instead of <b>latest</b>.</p>"]
+];
+function helpForm(){
+  const draw=q=>{q=(q||"").trim().toLowerCase();const L=HELP.filter(([t,b])=>!q||(t+" "+b.replace(/<[^>]+>/g," ")).toLowerCase().includes(q));
+    $("hl").innerHTML=L.length?L.map(([t,b])=>`<details class="hp"${q?" open":""}><summary>${t}</summary><div class="hb">${b}</div></details>`).join(""):'<div class="m" style="padding:14px 4px">No help topics match. Try a different word.</div>'};
+  show('<h3 style="margin:0">Help &amp; tips</h3><input id="hq" type="search" placeholder="Search help…" aria-label="Search help" style="margin-top:12px"><div id="hl" style="margin-top:6px"></div><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Close</button></div>');
+  draw();$("hq").oninput=()=>draw($("hq").value);
+}
+function lightbox(imgs,i){
+  imgs=(imgs||[]).filter(Boolean).map(pu);if(!imgs.length)return;
+  let z=1,tx=0,ty=0;const o=document.createElement("div");o.id="lb";o.setAttribute("role","dialog");o.setAttribute("aria-label","Photo viewer");
+  o.innerHTML='<button class="lbx" aria-label="Close">✕</button><img alt="">'+(imgs.length>1?'<button class="lbn lbp" aria-label="Previous photo">‹</button><button class="lbn lbf" aria-label="Next photo">›</button>':"")+'<div class="lbc"></div>';
+  document.body.appendChild(o);const im=o.querySelector("img"),cnt=o.querySelector(".lbc");
+  const set=()=>{im.style.transform=`translate(${tx}px,${ty}px) scale(${z})`};
+  const go=n=>{i=(i+n+imgs.length)%imgs.length;z=1;tx=ty=0;im.src=imgs[i];cnt.textContent=imgs.length>1?(i+1)+" / "+imgs.length:"";set()};
+  const key=e=>{if(e.key==="Escape")close();else if(imgs.length>1&&e.key==="ArrowLeft")go(-1);else if(imgs.length>1&&e.key==="ArrowRight")go(1)};
+  const close=()=>{o.remove();removeEventListener("keydown",key)};
+  addEventListener("keydown",key);go(0);
+  const P=new Map();let d0=0,z0=1,sx=0,moved=false,lastT=0;
+  im.addEventListener("pointerdown",e=>{try{im.setPointerCapture(e.pointerId)}catch(_){}P.set(e.pointerId,{x:e.clientX,y:e.clientY});sx=e.clientX;moved=false;if(P.size===2){const[a,b]=[...P.values()];d0=Math.hypot(a.x-b.x,a.y-b.y)||1;z0=z}});
+  im.addEventListener("pointermove",e=>{const p=P.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+    if(P.size===2){const[a,b]=[...P.values()];z=Math.max(1,Math.min(6,z0*Math.hypot(a.x-b.x,a.y-b.y)/d0));if(z===1)tx=ty=0;moved=true;set()}
+    else if(z>1){tx+=dx;ty+=dy;moved=true;set()}
+    else{if(Math.abs(e.clientX-sx)>8)moved=true;if(imgs.length>1)im.style.transform=`translateX(${e.clientX-sx}px)`}});
+  const end=e=>{if(!P.has(e.pointerId))return;P.delete(e.pointerId);if(P.size)return;const dx=e.clientX-sx,t=Date.now();
+    if(z===1){set();if(imgs.length>1&&Math.abs(dx)>60)go(dx<0?1:-1);else if(!moved){if(t-lastT<320){z=2.5;set()}lastT=t}}
+    else if(!moved){if(t-lastT<320){z=1;tx=ty=0;set()}lastT=t}};
+  im.addEventListener("pointerup",end);im.addEventListener("pointercancel",end);
+  o.addEventListener("wheel",e=>{e.preventDefault();z=Math.max(1,Math.min(6,z*(e.deltaY<0?1.15:.87)));if(z===1)tx=ty=0;set()},{passive:false});
+  o.addEventListener("click",e=>{const c=e.target.classList;if(e.target===o||c.contains("lbx"))close();else if(c.contains("lbp"))go(-1);else if(c.contains("lbf"))go(1)});
+}
+function shrink(f,mx=800,q=.65){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,mx/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",q))};i.src=r.result};r.readAsDataURL(f)})}
+const up=async d=>{try{const b=await (await fetch(d)).blob(),r=await F("api/photo",{method:"POST",headers:{"Content-Type":b.type||"image/jpeg"},body:b});if(r.ok){const j=await r.json();if(j&&j.url)return j.url}}catch(e){}return d};
+const btns='<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="ok" style="flex:1">Save</button></div>';
+function show(h){$("dbody").onclick=null;$("dbody").innerHTML=h;$("dlg").showModal();if($("cancel"))$("cancel").onclick=()=>$("dlg").close()}
+function logFrom(r){openForm(null,{type:"service",date:today(),desc:(r.desc||"").replace(/^Next:\s*/,""),banner:"Reminder marked done. Log the service now, or cancel to skip."})}
+function openForm(id,pre){
+  const e=id?S.records.find(r=>r.id===id):Object.assign({type:(pre&&pre.type)||tab,date:((pre&&pre.type)||tab)==="reminder"?"":today(),odo:"",desc:"",notes:"",parts:"",ph:[]},pre||{});
+  const t=e.type,rem=t==="reminder",hp=PH.includes(t),sr=["service","repair","upgrade"].includes(t);const nopts=isT(S.cur)?[[1,"1 month"],[3,"3 months"],[6,"6 months"],[12,"1 year"]]:(isH(S.cur)?[10,25,50,100,150,200,250]:[1000,3000,5000,7500,10000,15000]).map(n=>[n,n.toLocaleString()+" "+dU()]);
+  const cs=+e.next>0&&!nopts.some(([n])=>n===+e.next),repC=+e.rep>0&&!REP.some(([n])=>n===+e.rep);
+  const pr=sr&&!id&&vOf(S.cur)?PR(vOf(S.cur).kind):[];
+  let ph=(e.ph||[]).slice(),rc=(e.rc||[]).slice();
+  show(`<h3 style="margin:0">${id?"Edit":"Add"} ${t==="odometer"&&isH(S.cur)?"hours":(({repair:"repair",upgrade:"upgrade",reminder:"reminder",note:"note"})[t]||TYPES.find(x=>x[0]===t)[1].toLowerCase())}</h3>${e.banner?`<div class="m" style="margin-top:6px;color:var(--ac)">${esc(e.banner)}</div>`:""}
+  <label>${rem?"Due date (optional)":"Date"}</label><input type="date" id="f_date" value="${e.date||""}">${rem?`<select id="f_mon" style="margin-top:6px"><option value="">Or pick a month (repeats every year)</option>${["January","February","March","April","May","June","July","August","September","October","November","December"].map((m,i)=>`<option value="${i}">Every ${m}</option>`).join("")}</select><label>Repeats</label><select id="f_rep">${REP.map(([n,l])=>`<option value="${n}" ${+e.rep===n||(!e.rep&&n===0)?"selected":""}>${l}</option>`).join("")}<option value="c" ${repC?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_repc" value="${repC?e.rep:""}" placeholder="Months" style="margin-top:6px;display:${repC?"":"none"}">`:""}
+  ${isT(S.cur)?"":`<label>${rem?"Due at "+dU()+" (optional)":(isH(S.cur)?"Hours":"Odometer ("+(S.units==="imperial"?"mi":"km")+")")}</label><input type="number" inputmode="numeric" id="f_odo" value="${e.odo}" placeholder="${lastOdo(S.cur)||""}">`}
+  ${pr.length?`<label>Quick pick</label><div class="qps" id="qp">${pr.map((x,i)=>`<button data-qp="${i}">${esc(x.n)}${(x.pl||[]).length||(x.iu||[]).length?" \u25cf":""}</button>`).join("")}</div>`:""}${sr?'<label style="display:flex;align-items:center;gap:8px">Description <button class="p" id="adddc" style="width:40px;height:40px;padding:0;border-radius:50%;font-size:22px;line-height:1;flex:none">+</button></label><div id="dls"></div>':""}${t!=="odometer"&&!sr?`<label>${t==="note"?"Title":"Description"}</label><input id="f_desc" value="${esc(e.desc)}" placeholder="${rem?"e.g. Oil change":t==="service"?"e.g. Oil & filter":""}">`:""}
+  ${sr?'<label>Parts used</label><div class="row" style="margin-top:6px"><button type="button" class="p" id="addpt" style="flex:1">+ Bought for this job</button>'+(S.inv.length?'<button type="button" id="addiv" style="flex:1">\u2212 Take from inventory</button>':"")+'</div><div id="pls"></div>'+(S.inv.length?'<select id="ivs" style="display:none"></select><div id="ius"></div>':""):""}
+  ${t==="service"?`<label>Next service due after</label><select id="f_next"><option value="0">Not scheduled</option>${nopts.map(([n,l])=>`<option value="${n}" ${+e.next===n?"selected":""}>${l}</option>`).join("")}<option value="c" ${cs?"selected":""}>Custom…</option></select><input type="number" inputmode="numeric" id="f_nextc" value="${cs?e.next:""}" placeholder="${isT(S.cur)?"Months":dU()}" style="margin-top:6px;display:${cs?"":"none"}">`:""}
+    ${sr?`<label>Warranty ends (optional)</label><div class="row"><input type="date" id="f_wd" value="${e.wd||""}">${isT(S.cur)?"":`<input type="number" inputmode="numeric" id="f_wo" value="${e.wo??""}" placeholder="at ${dU()}">`}</div>`:""}
+    <label>Notes</label><textarea id="f_notes" rows="3">${esc(e.notes)}</textarea>
+  ${sr?`<label>Done by (optional)</label><input id="f_by" list="bys" value="${esc(e.by||"")}" placeholder="Me, a family member, a shop…" autocomplete="off"><datalist id="bys">${[...new Set(S.records.map(r=>r.by).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join("")}</datalist>`:""}
+  ${hp?'<label>Photos</label><div class="ph" id="ph"></div><button type="button" id="pfb" style="width:100%;margin-top:8px">+ Add photos</button><input type="file" id="pf" accept="image/*" multiple hidden>':""}${sr?'<label>Receipts</label><div class="ph" id="rc"></div><button type="button" id="rcb" style="width:100%;margin-top:8px">+ Add receipts</button><input type="file" id="rf" accept="image/*" multiple hidden>':""}${sr&&!id?'<label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--tx)"><input type="checkbox" id="f_job" style="width:auto;margin:0"> Save as a template (remembers parts and interval)</label>':""}${btns}${id&&PH.includes(t)?'<button type="button" id="f_shr" style="margin-top:8px;width:100%">Share or print this record</button>':""}${id?'<button type="button" id="f_del" style="margin-top:8px;width:100%;color:var(--bad)">Delete this entry</button>':""}`);
+  if($("f_mon"))$("f_mon").onchange=()=>{const m=$("f_mon").value;if(m==="")return;const y=new Date().getFullYear(),pad=n=>String(n).padStart(2,"0");let d=y+"-"+pad(+m+1)+"-01";if(d<=today())d=(y+1)+"-"+pad(+m+1)+"-01";$("f_date").value=d;$("f_rep").value="12";$("f_repc").style.display="none"};
+  if($("f_shr"))$("f_shr").onclick=()=>{$("dlg").close();printView(veh(),true,id)};
+  if($("f_del"))$("f_del").onclick=()=>{$("dlg").close();delRec(id)};
+  const grp=(box,inp,arr,mx,q)=>{const d=()=>{if(!$(box))return;$(box).innerHTML=arr.map((p,i)=>`<img src="${pu(p)}" data-rm="${i}">`).join("")+(arr.length?'<div class="m" style="width:100%">Tap an image to remove it</div>':"")};d();if($(inp)){$(inp).onchange=async()=>{for(const f of $(inp).files)arr.push(await up(await shrink(f,mx,q)));$(inp).value="";d()};$(box).onclick=ev=>{const i=ev.target.dataset.rm;if(i!=null){arr.splice(+i,1);d()}}}};
+  grp("ph","pf",ph,800,.65);grp("rc","rf",rc,1600,.7);
+  if($("pfb"))$("pfb").onclick=()=>$("pf").click();if($("rcb"))$("rcb").onclick=()=>$("rf").click();
+  let pl=sr?[...(e.parts?[e.parts]:[]),...(e.pl||[])]:[];if(sr&&!pl.length)pl=[""];
+  const dpl=()=>{if($("pls"))$("pls").innerHTML=pl.map((x,i)=>`<div class="row" style="margin-top:6px"><input class="pt" value="${esc(x)}" placeholder="Part bought for this job"><button data-pd="${i}">✕</button></div>`).join("")};
+  const syncP=()=>{if($("pls"))pl=[...$("pls").querySelectorAll(".pt")].map(i=>i.value)};dpl();
+  let iu=sr?(e.iu||[]).map(x=>({...x})):[];
+  const syncI=()=>{if($("ius"))$("ius").querySelectorAll(".iuq").forEach((i,k)=>{if(iu[k])iu[k].q=+i.value||0})};
+  const dI=()=>{if(!$("ivs"))return;$("ivs").innerHTML='<option value="">Choose an item…</option>'+S.inv.map(i=>`<option value="${i.id}">${esc(i.name)} (${i.qty} ${esc(i.unit||"")} left)</option>`).join("");
+    $("ius").innerHTML=iu.map((x,k)=>`<div class="row" style="margin-top:6px"><span style="flex:1;min-width:0">${esc(x.n)}</span><input type="number" step="any" class="iuq" value="${x.q}" style="flex:none;width:84px"><span class="m" style="flex:none">${esc(x.u||"")}</span><button data-iud="${k}">✕</button></div>`).join("")};
+  dI();
+  if($("ivs")){$("addiv").onclick=()=>{const v=$("ivs");v.style.display=v.style.display==="none"?"":"none";if(v.style.display==="")v.focus()};$("ivs").onchange=()=>{const it=S.inv.find(i=>i.id===$("ivs").value);if(!it)return;syncI();const x=iu.find(z=>z.id===it.id);if(x)x.q+=1;else iu.push({id:it.id,n:it.name,u:it.unit||"",q:1});dI();$("ivs").style.display="none"};$("ius").onclick=ev=>{const k=ev.target.dataset.iud;if(k!=null){syncI();iu.splice(+k,1);dI()}}}
+  if($("f_rep"))$("f_rep").onchange=()=>{$("f_repc").style.display=$("f_rep").value==="c"?"":"none"};
+  const listUI=(box,btn,arr,ph)=>{
+    const d=()=>{$(box).innerHTML=arr.map((x,i)=>`<div class="row" style="margin-top:6px"><input class="${box}i" value="${esc(x)}" placeholder="${ph}"><button data-ld="${i}">✕</button></div>`).join("")};
+    const sy=()=>{arr.splice(0,arr.length,...[...$(box).querySelectorAll("."+box+"i")].map(i=>i.value))};
+    d();$(btn).onclick=()=>{sy();arr.push("");d();const a=$(box).querySelectorAll("."+box+"i");a[a.length-1].focus()};
+    $(box).onclick=ev=>{const i=ev.target.dataset.ld;if(i!=null){sy();arr.splice(+i,1);if(!arr.length)arr.push("");d()}};
+    sy.d=d;return sy};
+  const dl=sr?[e.desc||"",...(e.dl||[])]:[];if(sr&&!dl.length)dl.push("");
+  const syD=sr?listUI("dls","adddc",dl,"Description"):()=>{};
+  if(!id&&sr&&matchMedia("(pointer:fine)").matches){const i=$("dls")&&$("dls").querySelector("input");if(i)i.focus()}
+  let nxT=!!id;
+  if($("f_next"))$("f_next").onchange=()=>{nxT=true;$("f_nextc").style.display=$("f_next").value==="c"?"":"none"};
+  if($("dls")&&$("f_next"))$("dls").addEventListener("change",()=>{if(nxT)return;const i=$("dls").querySelector("input"),m=i&&(S.lastNext||{})[S.cur+"|"+i.value.trim().toLowerCase()],fn=$("f_next");
+    if(m>0){const o=[...fn.options].find(z=>z.value!=="c"&&+z.value===m);if(o)fn.value=o.value;else{fn.value="c";$("f_nextc").value=m}fn.onchange()}});
+  if($("qp"))$("qp").onclick=ev=>{const i=ev.target.dataset.qp;if(i==null)return;const x=pr[+i];syD();if(!dl.some(z=>z.trim().toLowerCase()===x.n.toLowerCase())){const k=dl.findIndex(z=>!z.trim());if(k>=0)dl[k]=x.n;else dl.push(x.n);syD.d()}
+    if((x.pl||[]).length){syncP();const have=pl.map(z=>z.trim().toLowerCase());pl=pl.filter(z=>z.trim());x.pl.forEach(z=>{if(!have.includes(z.toLowerCase()))pl.push(z)});if(!pl.length)pl=[""];dpl()}
+    if((x.iu||[]).length&&$("ivs")){syncI();x.iu.forEach(z=>{const it=S.inv.find(i=>i.id===z.id);if(it&&!iu.some(w=>w.id===z.id))iu.push({id:it.id,n:it.name,u:it.unit||"",q:z.q})});dI()}
+    const m=isT(S.cur)?x.m:isH(S.cur)?x.h:x.d,fn=$("f_next");
+    if(fn&&m>0){const o=[...fn.options].find(z=>z.value!=="c"&&+z.value===m);if(o)fn.value=o.value;else{fn.value="c";$("f_nextc").value=m}fn.onchange()}};
+  if($("addpt")){$("addpt").onclick=()=>{syncP();pl.push("");dpl();const a=$("pls").querySelectorAll(".pt");a[a.length-1].focus()};$("pls").onclick=ev=>{const i=ev.target.dataset.pd;if(i!=null){syncP();pl.splice(+i,1);if(!pl.length)pl=[""];dpl()}}}
+  $("ok").onclick=()=>{
+    const pre=JSON.stringify([S.records,S.inv,S.presets||null,S.lastNext||null]);
+    const g=i=>$(i)?$(i).value:"";
+    const o={id:e.id||uid(),vid:S.cur,type:t,date:g("f_date"),odo:$("f_odo")?(g("f_odo")===""?"":+g("f_odo")):(e.odo??""),desc:sr?(syD(),dl.map(x=>x.trim()).filter(Boolean)[0]||""):g("f_desc").trim(),dl:sr?dl.map(x=>x.trim()).filter(Boolean).slice(1):[],parts:"",pl:(syncP(),pl.map(x=>x.trim()).filter(Boolean)),notes:g("f_notes").trim(),by:g("f_by").trim(),ph,rc,done:e.done||false,nrid:e.nrid||"",next:e.next||0,iu:sr?(syncI(),iu.filter(x=>x.q>0).map(x=>({id:x.id,n:x.n,u:x.u,q:x.q}))):[],rep:rem&&$("f_rep")?($("f_rep").value==="c"?+($("f_repc").value||0):+$("f_rep").value):(e.rep||0)};
+    if(t==="odometer"&&o.odo==="")return alert(isH(S.cur)?"Enter an hours reading.":"Enter an odometer reading.");
+    if(rem&&!o.date&&o.odo==="")return alert("Set a due date or due odometer.");
+    if(rem&&o.rep>0&&!o.date)return alert("A repeating reminder needs a due date.");
+    if(!id&&!rem&&o.odo!==""&&!isT(S.cur)){const lo=lastOdo(S.cur),ld=S.records.filter(r=>r.vid===S.cur&&r.type!=="reminder"&&r.odo!==""&&r.odo!=null&&r.date).map(r=>r.date).sort().pop()||"";
+      if(+o.odo<lo&&(!o.date||o.date>=ld)&&!confirm("That's lower than the last reading ("+lo.toLocaleString()+" "+dU()+"). Save anyway?"))return}
+    if($("f_next")){const sv=$("f_next").value,n=sv==="c"?+($("f_nextc").value||0):+sv;o.next=n;
+      if(o.desc){S.lastNext=S.lastNext||{};S.lastNext[S.cur+"|"+o.desc.toLowerCase()]=n}
+      const old=e.nrid?S.records.find(r=>r.id===e.nrid):null;
+      if(n>0){const tm=isT(S.cur);
+        if(tm&&!o.date)return alert("Set a service date to schedule the next service.");
+        if(!tm&&o.odo==="")return alert("Enter the "+(isH(S.cur)?"hours":"odometer")+" reading to schedule the next service.");
+        const dsc=o.desc?"Next: "+o.desc:"Next service",f=tm?{date:addM(o.date,n),odo:""}:{date:"",odo:o.odo+n};
+        if(old&&!old.done){Object.assign(old,f,{desc:dsc});o.nrid=old.id}
+        else{const nr=Object.assign({id:uid(),vid:S.cur,type:"reminder",desc:dsc,parts:"",pl:[],dl:[],notes:"",ph:[],rc:[],done:false},f);S.records.push(nr);o.nrid=nr.id}}
+      else{if(old&&!old.done)S.records=S.records.filter(r=>r!==old);o.nrid=""}}
+    if(sr)adjInv(id?e.iu:[],o.iu);
+    if(sr){o.wd=g("f_wd");o.wo=$("f_wo")&&g("f_wo")!==""?+g("f_wo"):"";o.wrid=e.wrid||"";syncWty(o,S.cur,o.desc||(TYPES.find(x=>x[0]===t)||[0,"Record"])[1],o.wd,o.wo)}
+    let jobUndo=null;if($("f_job")&&$("f_job").checked&&o.desc){const old=S.presets;saveJob(o);jobUndo=()=>{if(old)S.presets=old;else delete S.presets;save();render()}}
+    if(id)S.records[S.records.findIndex(r=>r.id===id)]=o;else S.records.push(o);
+    save();$("dlg").close();const y0=scrollY;render();requestAnimationFrame(()=>scrollTo(0,y0));
+    toast(jobUndo?"Saved as a template":id?"Changes saved":"Saved",()=>{try{const p=JSON.parse(pre);S.records=p[0];S.inv=p[1];if(p[2])S.presets=p[2];else delete S.presets;if(p[3])S.lastNext=p[3];else delete S.lastNext}catch(e){}save();render()});
+  };
+}
+function specForm(){
+  const v=veh();let rows=v.plist.map(x=>({l:x.l,v:String(x.v||"").split("\n")}));
+  rows.forEach(r=>{if(!r.v.length)r.v=[""]});
+  const sync=()=>{rows=[...$("dbody").querySelectorAll(".pr")].map(d=>({l:d.querySelector(".pl").value.trim(),v:[...d.querySelectorAll(".pv")].map(i=>i.value)}))};
+  const draw=()=>{
+    $("dbody").innerHTML=`<h3 style="margin:0">Parts list</h3><div class="m">Rename, add, reorder or remove your own categories. Tap + Add another to list a second part number or brand under a category.</div>${rows.map((r,i)=>`<div class="pr" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><div class="row"><input class="pl" value="${esc(r.l)}" placeholder="Category"><button data-pup="${i}">\u2191</button><button data-prm="${i}">\u2715</button></div>${r.v.map((x,k)=>`<div class="row" style="margin-top:6px"><input class="pv" value="${esc(x)}" placeholder="Part number / brand"><button data-vx="${i}:${k}">\u2715</button></div>`).join("")}<button class="p" data-vadd="${i}" style="margin-top:8px;width:100%">+ Add another</button></div>`).join("")}<button id="addp" style="margin-top:12px;width:100%">+ Add category</button>${btns}`;
+    $("cancel").onclick=()=>$("dlg").close();
+    $("addp").onclick=()=>{sync();rows.push({l:"",v:[""]});draw();const a=$("dbody").querySelectorAll(".pl");a[a.length-1].focus()};
+    $("ok").onclick=()=>{sync();v.plist=rows.filter(r=>r.l).map(r=>({l:r.l,v:r.v.map(x=>x.trim()).filter(Boolean).join("\n")}));save();$("dlg").close();render()};
+  };
+  $("dbody").onclick=e=>{const d=e.target.dataset;
+    if(d.prm!=null){sync();rows.splice(+d.prm,1);draw()}
+    else if(d.pup!=null&&+d.pup>0){sync();const i=+d.pup;[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}
+    else if(d.vx!=null){sync();const[i,k]=d.vx.split(":").map(Number);rows[i].v.splice(k,1);if(!rows[i].v.length)rows[i].v=[""];draw()}
+    else if(d.vadd!=null){sync();const i=+d.vadd;rows[i].v.push("");draw();const a=$("dbody").querySelectorAll(".pr")[i].querySelectorAll(".pv");a[a.length-1].focus()}};
+  draw();$("dlg").showModal();
+}
+function presetForm(kind){
+  let rows=PR(kind).map(x=>({...x,k:uid()}));
+  const sync=()=>{const old=new Map(rows.map(r=>[r.k,r]));rows=[...$("dbody").querySelectorAll(".qr")].map(d=>{const o=old.get(d.dataset.k)||{};return{k:d.dataset.k,n:d.querySelector(".qn").value.trim(),d:+d.querySelector(".qd").value||0,h:+d.querySelector(".qh").value||0,m:+d.querySelector(".qm").value||0,pl:o.pl,iu:o.iu}})};
+  const draw=()=>{
+    $("dbody").innerHTML=`<h3 style="margin:0">Quick-pick services</h3><div class="m">${esc((KINDS.find(k=>k[0]===kind)||[])[1]||"")}. Name each service, then how often it repeats. Leave a box empty for none.</div>${rows.map((r,i)=>`<div class="qr" data-k="${r.k}" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)"><div class="row"><input class="qn" value="${esc(r.n)}" placeholder="Service"><button data-pup="${i}">↑</button><button data-prm="${i}">✕</button></div><div class="row" style="margin-top:6px"><input class="qd" type="number" inputmode="numeric" value="${r.d||""}" placeholder="${S.units==="imperial"?"miles":"km"}"><input class="qh" type="number" inputmode="numeric" value="${r.h||""}" placeholder="hours"><input class="qm" type="number" inputmode="numeric" value="${r.m||""}" placeholder="months"></div>${(r.pl||[]).length||(r.iu||[]).length?`<div class="m" style="margin-top:6px">Remembers ${(r.pl||[]).length+(r.iu||[]).length} part${(r.pl||[]).length+(r.iu||[]).length===1?"":"s"}</div>`:""}</div>`).join("")}<button id="addq" style="margin-top:12px;width:100%">+ Add service</button><button id="rstq" style="margin-top:8px;width:100%">Reset to the defaults</button>${btns}`;
+    $("cancel").onclick=()=>$("dlg").close();
+    $("addq").onclick=()=>{sync();rows.push({k:uid(),n:"",d:0,h:0,m:0});draw();const a=$("dbody").querySelectorAll(".qn");a[a.length-1].focus()};
+    $("rstq").onclick=()=>{if(S.presets){delete S.presets[kind];save()}$("dlg").close()};
+    $("ok").onclick=()=>{sync();S.presets=Object.assign({},S.presets,{[kind]:rows.filter(r=>r.n).map(({k,...r})=>r)});save();$("dlg").close()};
+  };
+  $("dbody").onclick=e=>{const d=e.target.dataset;if(d.prm!=null){sync();rows.splice(+d.prm,1);draw()}else if(d.pup!=null&&+d.pup>0){sync();const i=+d.pup;[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}};
+  draw();$("dlg").showModal();
+}
+function addPart(){
+  const v=veh(),labs=[...new Set(S.vehicles.flatMap(x=>(x.plist||[]).filter(r=>r.v).map(r=>r.l)))];
+  show(`<h3 style="margin:0">Add part</h3><label>Category</label><input id="ap_l" list="ap_s" placeholder="Category" autocomplete="off"><datalist id="ap_s">${labs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist><div class="m" id="ap_h" style="margin-top:6px;min-height:1.2em"></div><label>Part number / brand</label><input id="ap_v" placeholder="Value">${btns}`);
+  const find=()=>v.plist.find(r=>r.l.toLowerCase()===$("ap_l").value.trim().toLowerCase());
+  $("ap_l").oninput=()=>{const r=find();$("ap_h").textContent=r&&r.v?"Adds another under "+r.l+" (now: "+String(r.v).split("\n").join(", ")+")":""};
+  $("ok").onclick=()=>{const l=$("ap_l").value.trim(),x=$("ap_v").value.trim();if(!l)return;const r=find();
+    if(r){const ls=String(r.v||"").split("\n").filter(Boolean);if(x&&!ls.some(z=>z.toLowerCase()===x.toLowerCase()))ls.push(x);r.v=ls.join("\n")}else v.plist.push({l,v:x});
+    save();$("dlg").close();render()};
+}
+function vehForm(edit){
+  const v=edit?veh():{name:"",model:"",plate:"",kind:"car",meter:"dist"};
+  show(`<h3 style="margin:0">${edit?"Edit":"Add"} equipment</h3><label>Cover photo</label><div class="ph" id="cv"></div><button type="button" id="cfb" style="width:100%;margin-top:8px">Choose photo…</button><input type="file" id="cf" accept="image/*" hidden><label>Type</label><select id="v_k">${KINDS.map(k=>`<option value="${k[0]}" ${k[0]===v.kind?"selected":""}>${k[2]} ${k[3]||k[1]}</option>`).join("")}</select><label>Tracked by</label><select id="v_t"><option value="dist" ${v.meter!=="hrs"&&v.meter!=="time"?"selected":""}>Distance (odometer)</option><option value="hrs" ${v.meter==="hrs"?"selected":""}>Engine hours</option><option value="time" ${v.meter==="time"?"selected":""}>Time (dates only)</option></select><label>Color</label><div class="cs" id="v_cl"><button type="button" data-c="" title="Automatic" aria-label="Automatic color" class="${v.color?"":"on"}" style="background:var(--field);color:var(--mu)">A</button>${CLRS.map(c=>`<button type="button" data-c="${c}" aria-label="Color ${c}" class="${v.color===c?"on":""}" style="background:${c}"></button>`).join("")}</div><label>Nickname</label><input id="v_n" value="${esc(v.name)}" placeholder="e.g. Daily Driver"><label>Year / Make / Model</label><input id="v_m" value="${esc(v.model)}" placeholder="2015 Polaris RZR XP 1000"><div id="v_pr"><label>License plate (optional)</label><input id="v_p" value="${esc(v.plate)}"></div><label>VIN / serial # (optional)</label><div class="row"><input id="v_vin" value="${esc(v.vin||"")}"><button type="button" id="v_scan" aria-label="Scan VIN barcode" style="flex:none">${ico("cam")}</button></div><label>Warranty ends (optional)</label><div class="row"><input type="date" id="v_wd" value="${v.wd||""}"><input type="number" inputmode="numeric" id="v_wo" value="${v.wo??""}" placeholder="at odometer / hours"></div><div id="v_or"><label>OHV sticker expiration</label><div class="row"><input type="date" id="v_oh" value="${v.ohv||""}"><select id="v_ohr">${vrep(v.ohvRep??24)}</select></div></div><div id="v_rg"><label>Registration expiration</label><div class="row"><input type="date" id="v_rgd" value="${v.reg||""}"><select id="v_rgr">${vrep(v.regRep??24)}</select></div></div><div id="v_dts"></div><button type="button" id="v_adt" style="margin-top:10px;width:100%">+ Add another date (inspection, emissions…)</button><label>Show "due soon" when within</label><div class="row"><input type="number" inputmode="numeric" id="v_sd" value="${v.soonDays||""}" placeholder="30 days"><input type="number" inputmode="numeric" id="v_sm" value="${v.soonDist||""}" placeholder="500 mi"></div>${edit?'<button id="av" style="margin-top:12px;width:100%">Archive this equipment</button><button id="dv" style="margin-top:8px;width:100%">Delete this equipment</button>':""}${btns}`);
+  let cover=v.cover||"";const dc=()=>{$("cv").innerHTML=cover?`<img src="${pu(cover)}" data-rm="1" style="width:100%;height:140px"><div class="m" style="width:100%">Tap the photo to remove it</div>`:""};dc();
+  $("cfb").onclick=()=>$("cf").click();$("v_scan").onclick=()=>scanCode(v=>{$("v_vin").value=v},true);$("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
+  const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none";$("v_rg").style.display=k==="mower"?"none":""};tp();
+  let color=v.color||"";
+  $("v_cl").onclick=e=>{const b=e.target.closest("button");if(!b)return;color=b.dataset.c;$("v_cl").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b))};
+  let dts=(v.dts||[]).map(x=>({...x}));
+  const syD2=()=>{dts=[...$("v_dts").querySelectorAll(".dtr0")].map(r=>({id:r.dataset.id,l:r.querySelector(".dtl").value.trim(),date:r.querySelector(".dtd").value,rep:+r.querySelector(".dtr").value||24}))};
+  const ddraw=()=>{$("v_dts").innerHTML=dts.map((x,i)=>`<div class="dtr0" data-id="${x.id}" style="margin-top:12px"><div class="row"><input class="dtl" value="${esc(x.l)}" placeholder="Name, e.g. Inspection / emissions"><button type="button" data-dtx="${i}" style="flex:none">✕</button></div><div class="row" style="margin-top:6px"><input type="date" class="dtd" value="${x.date||""}"><select class="dtr">${vrep(x.rep??24)}</select></div></div>`).join("")};ddraw();
+  $("v_adt").onclick=()=>{syD2();dts.push({id:uid(),l:"",date:"",rep:24});ddraw();const a=$("v_dts").querySelectorAll(".dtl");a[a.length-1].focus()};
+  $("v_dts").onclick=e=>{const i=e.target.dataset.dtx;if(i!=null){syD2();dts.splice(+i,1);ddraw()}};
+  const sp=()=>{const t=$("v_t").value;$("v_sm").style.display=t==="time"?"none":"";$("v_sm").placeholder=t==="hrs"?"10 hrs":"500 "+(S.units==="imperial"?"mi":"km")};sp();$("v_t").addEventListener("change",sp);
+  $("v_k").onchange=()=>{tp();if(!edit)$("v_t").value={mower:"hrs",trailer:"time"}[$("v_k").value]||"dist";sp()};
+  $("ok").onclick=()=>{const n=$("v_n").value.trim()||$("v_m").value.trim();if(!n)return;
+    const f={wd:$("v_wd").value,wo:$("v_wo").value===""?"":+$("v_wo").value,name:n,model:$("v_m").value.trim(),plate:$("v_p").value.trim(),vin:$("v_vin").value.trim(),ohv:$("v_oh").value,ohvRep:+$("v_ohr").value||24,reg:$("v_rgd").value,regRep:+$("v_rgr").value||24,kind:$("v_k").value,meter:$("v_t").value,color,cover,soonDays:+$("v_sd").value||0,soonDist:+$("v_sm").value||0,dts:(syD2(),dts.filter(x=>x.l||x.date))};
+    if(edit)Object.assign(v,f);else{const nv=Object.assign({id:uid(),specs:{}},f);fixV(nv);S.vehicles.push(nv)}
+    {const tv=edit?v:S.vehicles[S.vehicles.length-1];syncWty(tv,tv.id,tv.name,f.wd,f.wo)}
+    save();$("dlg").close();render();if(!edit)starterDlg(S.vehicles[S.vehicles.length-1].id)};
+  if(edit)$("av").onclick=()=>{if(!confirm("Archive "+v.name+"? It leaves your garage but keeps its history. You can restore it from Settings & data."))return;v.arch=true;S.cur=null;view="garage";save();$("dlg").close();render()};
+  if(edit)$("dv").onclick=()=>{if(!confirm("Delete "+v.name+" and all its records?"))return;S.records=S.records.filter(r=>r.vid!==v.id);S.vehicles=S.vehicles.filter(x=>x.id!==v.id);S.cur=null;view="garage";save();$("dlg").close();render()};
+}
+function invForm(id){
+  const e=id?S.inv.find(i=>i.id===id):{name:"",cat:ic==="All"?"Oil":ic,qty:1,unit:"",notes:"",pns:[]};
+  let pn=(e.pns||[]).slice();if(!pn.length)pn=[""];
+  show(`<h3 style="margin:0">${id?"Edit":"Add"} item</h3><label>Name</label><input id="i_n" value="${esc(e.name)}" placeholder="e.g. Mobil 1 5W-30"><label>Category</label><select id="i_c">${CATS.map(c=>`<option ${c===e.cat?"selected":""}>${c}</option>`).join("")}</select><label>Quantity on hand</label><input type="number" step="any" id="i_q" value="${e.qty}"><label>Unit</label><input id="i_u" value="${esc(e.unit)}" placeholder="qt, tube, each"><label>Warn me at or below (optional)</label><input type="number" step="any" id="i_l" value="${e.low??""}" placeholder="1"><label>Part numbers / brands</label><div id="ipn"></div><button type="button" class="p" id="ipa" style="margin-top:8px;width:100%">+ Add another</button><label>Notes</label><textarea id="i_notes" rows="2">${esc(e.notes)}</textarea><label>Where to buy (optional)</label><input id="i_src" value="${esc(e.src||"")}" placeholder="Store name"><input id="i_url" type="url" inputmode="url" value="${esc(e.url||"")}" placeholder="https://… link to the product" style="margin-top:6px">${btns}${id?'<button type="button" id="i_del" style="margin-top:8px;width:100%;color:var(--bad)">Delete this item</button>':""}`);
+  if($("i_del"))$("i_del").onclick=()=>{$("dlg").close();const k=S.inv.findIndex(i=>i.id===id);if(k>=0){const it=S.inv[k];S.inv.splice(k,1);save();render();toast("Item removed",()=>{S.inv.splice(Math.min(k,S.inv.length),0,it);save();render()})}};
+  const ipS=()=>{pn=[...$("ipn").querySelectorAll(".ipni")].map(i=>i.value)};
+  const ipD=()=>{$("ipn").innerHTML=pn.map((x,k)=>`<div class="row" style="margin-top:6px"><input class="ipni" value="${esc(x)}" placeholder="Part number / brand"><button type="button" data-sc="${k}" aria-label="Scan barcode" style="flex:none">${ico("cam")}</button><button type="button" data-px="${k}">\u2715</button></div>`).join("")};ipD();
+  $("ipa").onclick=()=>{ipS();pn.push("");ipD();const a=$("ipn").querySelectorAll(".ipni");a[a.length-1].focus()};
+  $("ipn").onclick=ev=>{const sc=ev.target.dataset.sc;if(sc!=null){ipS();scanCode(v=>{pn[+sc]=v;ipD()});return}const k=ev.target.dataset.px;if(k!=null){ipS();pn.splice(+k,1);if(!pn.length)pn=[""];ipD()}};
+  $("ok").onclick=()=>{const n=$("i_n").value.trim();if(!n)return;const o={id:e.id||uid(),name:n,cat:$("i_c").value,qty:+$("i_q").value||0,unit:$("i_u").value.trim(),notes:$("i_notes").value.trim(),pns:(ipS(),pn.map(x=>x.trim()).filter(Boolean)),low:$("i_l").value===""?"":+$("i_l").value,src:$("i_src").value.trim(),url:fixUrl($("i_url").value)};
+    if(id)S.inv[S.inv.findIndex(i=>i.id===id)]=o;else S.inv.push(o);save();$("dlg").close();render()};
+}
+const restore=t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.vehicles)||!Array.isArray(d.records))throw 0;if(!confirm("Replace all current data?"))return;const rv=S.rev;S=Object.assign({inv:[],units:"imperial"},d);S.rev=rv;S.vehicles.forEach(fixV);save();$("dlg").close();render()}catch(e){alert("That doesn't look like a valid backup.")}};
+const inlined=async()=>{const c=clone(S),g=async u=>{if(!u||u.startsWith("data:"))return u;try{const b=await (await fetch(pu(u))).blob();return await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)})}catch(e){return u}};for(const v of c.vehicles)if(v.cover)v.cover=await g(v.cover);for(const r of c.records){r.ph=await Promise.all((r.ph||[]).map(g));r.rc=await Promise.all((r.rc||[]).map(g))}return c};
+// Android app: ask GitHub whether a newer build has been published. Looks once a day, or when asked.
+async function checkUpd(force){
+  if(!APP||/^__/.test(APP_V))return;
+  const old=s=>String(s||"").replace(/^v/,"").split(".").map(Number),gt=(a,b)=>{a=old(a);b=old(b);for(let i=0;i<3;i++){if((a[i]||0)!==(b[i]||0))return(a[i]||0)>(b[i]||0)}return false};
+  let c=null;try{c=JSON.parse(localStorage.getItem("garagelog-upd")||"null")}catch(e){}
+  if(!force&&c&&Date.now()-c.t<864e5){UPD=c.v&&gt(c.v,APP_V)?c:null;return}
+  try{
+    const r=await fetch("https://api.github.com/repos/Orangitaz/garagelogger-android/releases/latest",{headers:{Accept:"application/vnd.github+json"}});
+    if(!r.ok)throw 0;const j=await r.json(),v=String(j.tag_name||"").replace(/^v/,"");
+    const a=(j.assets||[]).find(x=>/\.apk$/.test(x.name)),url=a?a.browser_download_url:j.html_url;
+    c={t:Date.now(),v,url};try{localStorage.setItem("garagelog-upd",JSON.stringify(c))}catch(e){}
+    UPD=v&&gt(v,APP_V)?c:null;
+  }catch(e){}
+  if(!force&&$("hd"))redraw();
+}
+const wipeLocal=()=>{["garagelog","garagelog-base","garagelog-sl","garagelog-lb","garagelog-upd"].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}})};
+const setTok=(t,u)=>{try{if(APP){SRV.tok=t;if(u)SRV.user=u;localStorage.setItem("garagelog-server",JSON.stringify(SRV))}else{TOK=t;localStorage.setItem("garagelog-tok",t)}if(u)localStorage.setItem("garagelog-user",u)}catch(e){}};
+const jpost=(p,b)=>F(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(async r=>({ok:r.ok,j:await r.json().catch(()=>({}))}));
+function needLogin(){
+  if($("lg"))return;
+  const d=document.createElement("div");d.id="lg";
+  d.style.cssText="position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto";
+  d.innerHTML=`<div style="width:100%;max-width:340px"><div class="t" style="text-align:center">Garage Log</div><div class="m" style="text-align:center;margin:6px 0 18px">Sign in to your account</div><input id="lg_u" placeholder="Username" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" style="width:100%"><input id="lg_p" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;margin-top:8px"><button class="p" id="lg_go" style="width:100%;margin-top:12px">Sign in</button><div class="m" id="lg_m" style="margin-top:10px;text-align:center;color:var(--bad)"></div></div>`;
+  document.body.appendChild(d);
+  const go=async()=>{
+    const user=$("lg_u").value.trim().toLowerCase(),pass=$("lg_p").value,m=$("lg_m");
+    if(!user||!pass){m.textContent="Enter your username and password.";return}
+    m.textContent="";$("lg_go").disabled=true;
+    try{
+      const r=await fetch(BASE+"api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user,pass})}),j=await r.json().catch(()=>({}));
+      if(!r.ok||!j.token){m.textContent=j.msg||"Wrong username or password.";$("lg_go").disabled=false;return}
+      let prev="";try{prev=localStorage.getItem("garagelog-user")||""}catch(e){}
+      // Never let one person's data on this device land in someone else's account.
+      if((prev&&prev!==j.user)||(!prev&&!j.admin))wipeLocal();
+      setTok(j.token,j.user);location.reload();
+    }catch(e){m.textContent="Couldn't reach the server.";$("lg_go").disabled=false}
+  };
+  $("lg_go").onclick=go;d.onkeydown=e=>{if(e.key==="Enter")go()};
+  setTimeout(()=>{const i=$("lg_u");i&&i.focus()},100);
+}
+function acctBlock(){
+  if(RO||!SYNC||!ME)return"";
+  if(ME.accounts&&ME.user)return`<label>Account</label><div class="m" style="margin-top:4px">Signed in as <b>${esc(ME.user)}</b>${ME.admin?" (admin)":""}. Your equipment, photos and settings are saved to your account only.</div><div class="row" style="margin-top:6px"><button id="ac_pw" style="flex:1">Change password</button><button id="ac_out" style="flex:1">Sign out</button></div><button class="mrow" id="ac_all" style="margin-top:8px">Sign out of every device</button>${ME.admin?'<button class="mrow" id="ac_us" style="margin-top:8px">\u{1F465} Manage users</button>':""}`;
+  if(!ME.accounts)return`<label>Accounts</label><div class="m" style="margin-top:4px">Let more than one person use this server, each with their own sign-in and their own data. Your current data becomes the admin account.</div><button id="ac_on" style="margin-top:6px;width:100%">Turn on accounts</button>`;
+  return"";
+}
+function acctWire(){
+  const on=(i,f)=>{const e=$(i);if(e)e.onclick=f};
+  on("ac_out",()=>{if(!confirm("Sign out? This device will forget your data until you sign in again."))return;wipeLocal();try{localStorage.removeItem("garagelog-user");if(APP){delete SRV.tok;localStorage.setItem("garagelog-server",JSON.stringify(SRV))}else localStorage.removeItem("garagelog-tok")}catch(e){}location.reload()});
+  on("ac_all",async()=>{if(!confirm("Sign out of every device, including this one? Everyone using your account has to sign in again."))return;const r=await jpost("api/account/signout-all",{});if(!r.ok){toast("Couldn't do that");return}wipeLocal();try{localStorage.removeItem("garagelog-user");if(APP){delete SRV.tok;localStorage.setItem("garagelog-server",JSON.stringify(SRV))}else localStorage.removeItem("garagelog-tok")}catch(e){}location.reload()});
+  on("ac_pw",()=>{
+    show(`<h3 style="margin:0">Change password</h3><input id="pw_o" type="password" placeholder="Current password" autocomplete="current-password" style="margin-top:10px"><input id="pw_n" type="password" placeholder="New password (8+ characters)" autocomplete="new-password" style="margin-top:6px"><input id="pw_n2" type="password" placeholder="New password again" autocomplete="new-password" style="margin-top:6px"><div class="m" id="pw_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="pw_go" style="flex:1">Save</button></div>`);
+    $("pw_go").onclick=async()=>{const m=$("pw_m");if($("pw_n").value!==$("pw_n2").value){m.textContent="The new passwords don't match.";return}
+      const r=await jpost("api/account/password",{old:$("pw_o").value,new:$("pw_n").value});
+      if(!r.ok){m.textContent=r.j.msg||"Couldn't change it.";return}
+      setTok(r.j.token);if(ME&&r.j.media)ME.media=r.j.media;$("dlg").close();toast("Password changed");render()};
+  });
+  on("ac_us",usersForm);
+  on("ac_on",()=>{
+    show(`<h3 style="margin:0">Turn on accounts</h3><div class="m" style="margin-top:8px">Create the admin account. Everything saved on the server now moves into it. After this everyone, including this device, signs in with a username and password, and the server password setting no longer applies. You can add other people afterwards.</div><input id="ao_u" placeholder="Admin username" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" style="margin-top:10px"><input id="ao_p" type="password" placeholder="Password (8+ characters)" autocomplete="new-password" style="margin-top:6px"><input id="ao_p2" type="password" placeholder="Password again" autocomplete="new-password" style="margin-top:6px"><div class="m" id="ao_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="ao_go" style="flex:1">Turn on</button></div>`);
+    $("ao_go").onclick=async()=>{const m=$("ao_m");if($("ao_p").value!==$("ao_p2").value){m.textContent="The passwords don't match.";return}
+      const r=await jpost("api/accounts/setup",{user:$("ao_u").value,pass:$("ao_p").value});
+      if(!r.ok){m.textContent=r.j.msg||"Couldn't turn on accounts.";return}
+      setTok(r.j.token,r.j.user);location.reload()};
+  });
+}
+async function usersForm(){
+  show(`<h3 style="margin:0">Users</h3><div id="us_l" class="m" style="margin-top:10px">Loading\u2026</div><label>Add a person</label><input id="us_n" placeholder="Username" autocapitalize="none" autocorrect="off" spellcheck="false"><input id="us_p" placeholder="Starting password (8+ characters)" autocapitalize="none" autocorrect="off" spellcheck="false" style="margin-top:6px"><button class="p" id="us_a" style="margin-top:8px;width:100%">Add user</button><div class="m" id="us_m" style="margin-top:6px"></div><div class="m" style="margin-top:6px">Give them the username and password. They can change the password after signing in. Each person only ever sees their own equipment.</div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Close</button></div>`);
+  const load=async()=>{try{const L=await (await F("api/users",{cache:"no-store"})).json();$("us_l").innerHTML=L.map(u=>`<div class="c" style="margin:8px 0;padding:12px"><div style="color:var(--tx);font-weight:700">${esc(u.name)}${u.admin?" (admin)":""}${u.disabled?' <span class="tag bad">Turned off</span>':""}</div><div class="m">${seen(u.last)}</div><div class="row" style="margin-top:8px;flex-wrap:wrap"><button data-rp="${esc(u.name)}">Reset password</button><button data-so="${esc(u.name)}">Sign out everywhere</button>${u.admin?"":`<button data-ds="${esc(u.name)}" data-on="${u.disabled?0:1}">${u.disabled?"Turn on":"Turn off"}</button><button data-rm="${esc(u.name)}">Remove</button>`}</div></div>`).join("")}catch(e){$("us_l").textContent="Couldn't load the users."}};
+  load();
+  $("us_a").onclick=async()=>{const m=$("us_m");m.style.color="var(--bad)";const r=await jpost("api/users",{user:$("us_n").value,pass:$("us_p").value});
+    if(!r.ok){m.textContent=r.j.msg||"Couldn't add that user.";return}
+    m.style.color="var(--mu)";m.textContent="Added "+$("us_n").value.trim().toLowerCase()+". Give them their password.";$("us_n").value="";$("us_p").value="";load()};
+  $("dbody").onclick=async e=>{const d=e.target.dataset;
+    if(d.so){if(!confirm("Sign "+d.so+" out of every device? They have to sign in again."))return;const r=await jpost("api/users/signout",{user:d.so});toast(r.ok?d.so+" signed out everywhere":(r.j.msg||"Couldn't do that"))}
+    else if(d.ds){const off=d.on==="1";if(off&&!confirm("Turn off "+d.ds+"? They are signed out and can't sign in until you turn it back on. Their data is kept."))return;const r=await jpost("api/users/disable",{user:d.ds,disabled:off});if(!r.ok)toast(r.j.msg||"Couldn't do that");load()}
+    else if(d.rm){if(!confirm("Remove "+d.rm+"? They can no longer sign in. Their saved data is kept on the server, set aside."))return;const r=await jpost("api/users/remove",{user:d.rm});if(!r.ok)toast(r.j.msg||"Couldn't remove");load()}
+    else if(d.rp){const n=d.rp;
+      show(`<h3 style="margin:0">Reset password</h3><div class="m" style="margin-top:6px">New password for <b>${esc(n)}</b>. They are signed out everywhere.</div><input id="rp_p" placeholder="New password (8+ characters)" autocapitalize="none" autocorrect="off" spellcheck="false" style="margin-top:10px"><div class="m" id="rp_m" style="margin-top:8px;color:var(--bad)"></div><div class="row" style="margin-top:12px"><button id="cancel" style="flex:1">Cancel</button><button class="p" id="rp_go" style="flex:1">Save</button></div>`);
+      $("rp_go").onclick=async()=>{const r=await jpost("api/users/password",{user:n,pass:$("rp_p").value});if(!r.ok){$("rp_m").textContent=r.j.msg||"Couldn't change it.";return}usersForm();toast("Password changed for "+n)}}};
+}
+async function connectServer(u,pw,usr){
+  const m=$("sv_m");u=(u||"").trim();if(!u){m.textContent="Enter the server address.";return}
+  if(!/^https?:\/\//i.test(u))u="http://"+u;u=u.replace(/\/+$/,"")+"/";
+  m.textContent="Connecting\u2026";
+  let hd=pw?{Authorization:"Basic "+b64("u:"+pw)}:{},d,t="",tk="",uname="";
+  try{
+    // A server with accounts wants a username and password instead of the shared password.
+    const me=await (await fetch(u+"api/me",{cache:"no-store"})).json().catch(()=>null);
+    if(me&&me.accounts){
+      usr=(usr||"").trim().toLowerCase();
+      if(!usr){m.textContent="This server uses accounts. Enter your username and password.";return}
+      if(!pw&&SRV.tok&&SRV.user===usr&&SRV.u===u){tk=SRV.tok;uname=usr}
+      else{
+        const lr=await fetch(u+"api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user:usr,pass:pw||""})}),lj=await lr.json().catch(()=>({}));
+        if(!lr.ok||!lj.token){m.textContent=lj.msg||"Wrong username or password.";return}
+        tk=lj.token;uname=lj.user;
+      }
+      hd={Authorization:"Bearer "+tk};
+    }
+    const v=await fetch(u+"api/version",{headers:hd,cache:"no-store"});
+    if(v.status===401){m.textContent=pw?"The password was not accepted.":"That server needs a password.";return}
+    const j=v.ok?await v.json():null;if(!j||!j.version)throw 0;
+    const r=await fetch(u+"api/state",{headers:hd,cache:"no-store"});if(!r.ok)throw 0;d=await r.json();
+    try{t=(await (await fetch(u+"api/calendar",{headers:hd})).json()).t||""}catch(e){}
+  }catch(e){m.textContent="Couldn't reach that address. Check it, and that your phone is on the same network (or connected by VPN).";return}
+  let prevU="";try{prevU=localStorage.getItem("garagelog-user")||""}catch(e){}
+  if(uname&&prevU&&prevU!==uname)S={vehicles:[],records:[],inv:[],units:"imperial",cur:null}; // another person's data stays out of this account
+  const n=o=>(o.vehicles||[]).length,hasS=d&&Array.isArray(d.vehicles)&&(n(d)||(d.records||[]).length||(d.inv||[]).length),hasL=S.vehicles.length||S.records.length||S.inv.length;
+  const finish=mode=>{
+    const cur=S.cur;
+    if(mode==="server"){S=Object.assign({inv:[],units:"imperial"},d,{cur})}
+    else if(mode==="merge"){const mm=(a,b)=>{const x=new Map((a||[]).map(i=>[i.id,i]));(b||[]).forEach(i=>{if(!x.has(i.id))x.set(i.id,i)});return[...x.values()]};S=Object.assign({},S,d,{vehicles:mm(d.vehicles,S.vehicles),records:mm(d.records,S.records),inv:mm(d.inv,S.inv),cur})}
+    else S.rev=d&&d.rev;
+    try{
+      localStorage.setItem("garagelog",JSON.stringify(S));
+      if(mode==="merge"||mode==="server")localStorage.setItem("garagelog-base",JSON.stringify(d));else localStorage.removeItem("garagelog-base");
+      localStorage.setItem("garagelog-server",JSON.stringify(tk?{u,pw:"",t,tok:tk,user:uname}:{u,pw,t}));if(uname)localStorage.setItem("garagelog-user",uname);
+    }catch(e){m.textContent="Couldn't save the settings on this phone.";return}
+    location.reload();
+  };
+  if(hasS&&hasL){
+    show(`<h3 style="margin:0">The server already has data</h3><div class="m" style="margin-top:6px">This phone has ${S.vehicles.length} equipment and the server has ${n(d)}. What should happen?</div><button class="mrow" data-ch="merge">Combine both (keeps everything)</button><button class="mrow" data-ch="server">Use the server's data (replaces this phone's)</button><div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>`);
+    $("dbody").onclick=e=>{const c=e.target.dataset.ch;if(c)finish(c)};
+  }else finish(hasS?"server":"local");
+}
+const sgOpen=new Set();
+function dataForm(){
+  const al=S.alert||{},arch=S.vehicles.filter(v=>v.arch),O=k=>sgOpen.has(k)?" open":"";
+  show(`<h3 style="margin:0">Settings &amp; data</h3>
+  <button class="mrow" id="hlp" style="margin-top:12px">${ico("help")} Help &amp; tips</button>
+  <div class="m" style="margin-top:12px">${SYNC?"Server sync: ":"Storage: "}<span id="ss">${SYNC?syncMsg:"saved on this phone only"}</span></div>
+  <details class="hp sg" data-g="look"${O("look")}><summary>Look &amp; units</summary><div class="sgb">
+  <label>Text size</label><select id="ts"><option value="0">Normal</option><option value="1">Large</option><option value="2">Extra large</option></select><label>Appearance</label><select id="th"><option value="auto">Match my device</option><option value="dark">Dark</option><option value="light">Light</option></select>
+  <label>Distance units</label><select id="u"><option value="imperial" ${S.units==="imperial"?"selected":""}>Miles</option><option value="metric" ${S.units==="metric"?"selected":""}>Kilometers</option></select>
+  <label>Quick-pick services</label><div class="row"><select id="qk">${KINDS.map(k=>`<option value="${k[0]}">${k[1]}</option>`).join("")}</select><button id="qke" style="flex:none">Edit list</button></div>
+  </div></details>
+  <details class="hp sg" data-g="acct"${O("acct")}><summary>Account &amp; server</summary><div class="sgb">
+  ${acctBlock()}
+  ${APP?`<label>Server (optional)</label><div class="m" style="margin-top:4px">${BASE?"Syncing with "+esc(BASE):"Not connected. Everything is saved on this phone only. Add your Garage Log server to sync, back up photos and documents, and get alerts."}</div><input id="sv_u" type="url" inputmode="url" placeholder="http://192.168.1.50:30080" value="${esc(BASE)}" style="margin-top:6px"><input id="sv_n" placeholder="Username (only if the server has accounts)" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(SRV.user||"")}" style="margin-top:6px"><input id="sv_p" type="password" placeholder="Password (if the server has one)" value="${esc(SRV.pw||"")}" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="p" id="sv_go" style="flex:1">${BASE?"Save":"Connect"}</button>${BASE?'<button id="sv_off" style="flex:1">Disconnect</button>':""}</div><div class="m" id="sv_m" style="margin-top:6px"></div>`:""}
+  ${SYNC?`<details style="margin-top:12px"><summary class="m">Connection log</summary><div class="m" style="margin-top:8px">Server: ${esc(BASE||location.origin)}</div><div class="row" style="margin-top:8px"><button id="tcb" style="flex:1">Test connection</button></div><div class="m" id="tcm" style="margin-top:6px"></div><div class="m" style="margin-top:8px">${SLG.length?SLG.slice().reverse().slice(0,20).map(x=>esc(new Date(x.t).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}))+" \u00b7 "+esc(x.m)+(x.n>1?" (\u00d7"+x.n+")":"")).join("<br>"):"Nothing logged yet."}</div></details>`:""}
+  </div></details>
+  <details class="hp sg" data-g="alerts"${O("alerts")}><summary>Alerts, calendar &amp; sharing</summary><div class="sgb">
+  ${SYNC?`<label>Reminder alerts</label><input id="al_u" type="url" inputmode="url" placeholder="https://ntfy.sh/your-topic" value="${esc(al.url||"")}">
+  <div class="row" style="margin-top:6px"><select id="al_f"><option value="text" ${al.fmt!=="json"?"selected":""}>ntfy / text</option><option value="json" ${al.fmt==="json"?"selected":""}>JSON webhook</option></select><select id="al_h">${[...Array(18).keys()].map(i=>i+5).map(h=>`<option value="${h}" ${(+al.hour||8)===h?"selected":""}>${h%12||12}:00 ${h<12?"AM":"PM"}</option>`).join("")}</select></div>
+  <div class="row" style="margin-top:6px"><button id="al_t" style="flex:1">Send test message</button></div>
+  <div class="m" id="al_m" style="margin-top:6px">The server sends a message when something becomes due soon or overdue, then weekly while it stays overdue. Use "JSON webhook" for Home Assistant or Gotify. Leave the address empty to turn alerts off.</div>`:""}
+  ${SYNC?`<label>Calendar</label><div class="row"><button id="cal_b" style="flex:1">Get calendar link</button></div><div class="m" id="cal_m" style="margin-top:6px">Shows reminders and expiration dates that have a date. Subscribe to the link in Apple Calendar or an Android app like ICSx\u2075. Google Calendar can't reach an address on your home network.</div>`:""}${SYNC?`<label>Share (view only)</label><div class="row"><button id="ro_b" style="flex:1">Get view-only link</button></div><div class="m" id="ro_m" style="margin-top:6px">A link family can open to look at your garage and history. They can't change anything. It needs a password on the server.</div>`:""}
+  </div></details>
+  <details class="hp sg" data-g="backup"${O("backup")}><summary>Backup &amp; restore</summary><div class="sgb">
+  <div class="row"><button id="dlb" style="flex:1">Download backup</button><button id="rfb" style="flex:1">Restore from file</button></div><input type="file" id="rf" accept=".json,application/json" hidden><div class="m" id="lbd" style="margin-top:6px">${(()=>{try{const d=localStorage.getItem("garagelog-lb");return d?"Last backup file: "+d:"No backup file downloaded from this device yet."}catch(e){return""}})()}</div><div class="row" style="margin-top:8px"><button id="csvb" style="flex:1">Export all records (CSV)</button></div>
+  ${SYNC?`<details style="margin-top:12px"><summary class="m">Server backups</summary><div class="m" id="bkl" style="margin-top:8px">Loading…</div></details>`:""}
+  </div></details>
+  ${arch.length?`<details class="hp sg" data-g="arch"${O("arch")}><summary>Archived equipment (${arch.length})</summary><div class="sgb">${arch.map(v=>`<div class="row" style="margin-top:8px"><span style="flex:1;min-width:0">${esc(v.name)}<span class="m" style="display:block">${esc(v.model||"")}</span></span><button data-aprint="${v.id}" style="flex:none">Print</button><button data-unarch="${v.id}" style="flex:none">Restore</button></div>`).join("")}</div></details>`:""}
+  ${APP?`<div id="up_m">${updTile()}</div>`:""}
+  <div class="m" style="margin-top:14px;text-align:center">Garage Log ${/^__/.test(APP_V)?"(preview)":"version "+APP_V}${APP_B&&!/^__/.test(APP_B)?" \u00b7 build "+APP_B:""}${APP?" \u00b7 Android app":""}</div>
+  <div class="row" style="margin-top:10px"><button class="p" id="ok" style="flex:1">Done</button></div>`);
+  $("hlp").onclick=()=>helpForm();acctWire();
+  $("dbody").querySelectorAll("details.sg").forEach(d=>d.ontoggle=()=>{d.open?sgOpen.add(d.dataset.g):sgOpen.delete(d.dataset.g)});
+  $("ts").value=tsz();$("ts").onchange=()=>setTsz($("ts").value);
+  $("th").value=theme();$("th").onchange=()=>setTheme($("th").value);
+  $("u").onchange=()=>{S.units=$("u").value;save();render()};
+  $("qke").onclick=()=>presetForm($("qk").value);
+  const sa=()=>{const u=$("al_u").value.trim();if(u)S.alert={url:u,fmt:$("al_f").value,hour:+$("al_h").value,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};else delete S.alert;save()};
+  if(SYNC)["al_u","al_f","al_h"].forEach(i=>$(i).onchange=sa);
+  if($("al_t"))$("al_t").onclick=async()=>{const u=$("al_u").value.trim(),m=$("al_m");if(!/^https?:\/\//.test(u)){m.textContent="Enter the address first.";return}sa();m.textContent="Sending…";
+    try{const r=await F("api/alert/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u,fmt:$("al_f").value})});m.textContent=r.ok?"Sent. Check your phone.":((await r.json().catch(()=>({}))).msg||"The server could not reach that address.")}catch(e){m.textContent="Could not reach the Garage Log server."}};
+  $("ok").onclick=()=>$("dlg").close();
+  if($("tcb"))$("tcb").onclick=async()=>{const m=$("tcm");m.textContent="Testing\u2026";const t0=Date.now();try{const r=await F("api/state",{cache:"no-store"});const ms=Date.now()-t0;m.textContent=r.ok?"Reached the server in "+ms+" ms. All good.":r.status===401?"The server answered, but it wants a password (or the one saved is wrong).":"The server answered with error "+r.status+".";slog("Test: "+m.textContent,r.ok?"ok":"err")}catch(e){m.textContent="Couldn't reach the server."+(APP?" Check the address and port in Server settings (for example :30500), and that the server is running.":" Check that the server is running.");slog("Test: couldn't reach the server","err")}};
+  $("dlb").onclick=async()=>{const b=$("dlb");b.textContent="Preparing…";const c=await inlined();b.textContent="Download backup";try{localStorage.setItem("garagelog-lb",today())}catch(e){}$("lbd")&&($("lbd").textContent="Last backup file: "+today());saveBlob("garage-log-"+today()+".json",new Blob([JSON.stringify(c)],{type:"application/json"}))};
+  $("rfb").onclick=()=>$("rf").click();
+  $("rf").onchange=async()=>{const f=$("rf").files[0];if(f)restore(await f.text())};
+  $("csvb").onclick=()=>csvExport();
+  if(APP)checkUpd(true).then(()=>{const m=$("up_m");if(m)m.innerHTML=updTile();if(view==="garage"&&!$("dlg").open)render()});
+  if($("sv_go")){$("sv_go").onclick=()=>connectServer($("sv_u").value,$("sv_p").value,$("sv_n").value);
+    if($("sv_off"))$("sv_off").onclick=()=>{if(!confirm("Disconnect from the server? Your data stays on this phone and on the server."))return;try{localStorage.removeItem("garagelog-server");localStorage.removeItem("garagelog-base")}catch(e){}location.reload()}}
+  if(SYNC)F("api/backups",{cache:"no-store"}).then(r=>r.json()).then(L=>{const b=$("bkl");if(!b)return;b.innerHTML=L.length?`A copy is saved before the first change each day, and up to 14 are kept on your server. Tap one to download it, then use Restore from file.`+L.map(x=>`<div class="sp"><a href="backups/${esc(x.name)}" download style="color:var(--ac)">${esc(x.date)}</a><span class="m">${Math.max(1,Math.round(x.size/1024))} KB</span></div>`).join(""):"No copies yet. The first one appears after your next change."}).catch(()=>{if($("bkl"))$("bkl").textContent="Couldn't load the list."});
+  if($("ro_b"))$("ro_b").onclick=async()=>{const m=$("ro_m");m.textContent="Getting the link…";
+    try{const j=await (await F("api/readonly",{cache:"no-store"})).json();
+      if(!j.t){m.textContent="Set a password on the server first (the GARAGE_PASSWORD setting), then come back here.";return}
+      const u=new URL("./?ro="+j.t,BASE||location.href).href;
+      m.innerHTML='Send this link. Anyone with it can view, not edit:<input readonly id="ro_u" style="margin-top:6px;width:100%" value="'+esc(u)+'">';const i=$("ro_u");i.focus();i.select();try{navigator.clipboard&&navigator.clipboard.writeText(u).catch(()=>{})}catch(e){}}
+    catch(e){m.textContent="Couldn't reach the Garage Log server."}};
+  if($("cal_b"))$("cal_b").onclick=async()=>{const m=$("cal_m");m.textContent="Getting the link…";
+    try{const j=await (await F("api/calendar",{cache:"no-store"})).json(),u=new URL(j.path,BASE||location.href).href;
+      m.innerHTML='Copy this link into your calendar app:<input readonly id="cal_u" style="margin-top:6px;width:100%" value="'+esc(u)+'">';const i=$("cal_u");i.focus();i.select();try{navigator.clipboard&&navigator.clipboard.writeText(u).catch(()=>{})}catch(e){}}
+    catch(e){m.textContent="Couldn't reach the Garage Log server."}};
+  $("dbody").onclick=e=>{const d=e.target.dataset;if(d.unarch){const v=vOf(d.unarch);if(v){delete v.arch;save();$("dlg").close();render();dataForm()}}else if(d.aprint){const v=vOf(d.aprint);$("dlg").close();if(v)printView(v)}};
+}
+$("hd").onclick=e=>{const i=e.target.id;if(i==="back"){view="garage";render()}else if(i==="more"||i==="sd")dataForm();else if(i==="ev")vehForm(true)};
+$("tabs").onclick=e=>{const b=e.target.closest("[data-t]"),t=b&&b.dataset.t;if(!t)return;if(t==="more")return moreMenu();if(view==="vehicle")tab=t;else if(view==="inventory")ic=t;else gk=t;render()};
+$("bn").onclick=e=>{const b=e.target.closest("[data-v]"),v=b&&b.dataset.v;if(v){view=v;render()}};
+$("fab").onclick=()=>view==="vehicle"?(tab==="dash"||tab==="timeline"?addChooser():tab==="parts"?addPart():openForm()):view==="inventory"?invForm():vehForm(false);
+$("fabE").onclick=()=>{em=!em;render()};
+$("list").addEventListener("input",e=>{if(e.target.id==="rs"){rq=e.target.value;const r=$("rl");if(r)r.innerHTML=recRows(veh())}});
+$("list").onclick=e=>{const d=e.target.dataset,op=e.target.closest("[data-open]");if(e.target.closest("[data-attn]")){attnSheet();return}if(d.infot){infoOpen=!infoOpen;const y0=scrollY;render();scrollTo(0,y0);return}if(d.nsnz){const v0=veh();v0.nsnz=addD(today(),7);save();render();return}if(RO&&(d.edit||d.vedit||d.pedit!=null||d.specs||d.mv))return;
+  if(d.vedit2){S.cur=d.vedit2;vehForm(true)}
+  else if(d.vedit)vehForm(true);
+  else if(d.pedit!=null)partEdit(+d.pedit);
+  else if(d.qodo2)qOdo(d.qodo2);
+  else if(d.mv)mvVeh(d.mv);
+  else if(op){S.cur=op.dataset.open;view="vehicle";tab="dash";save();render()}
+  else if(d.edit)openForm(d.edit);
+  else if(d.done)doneRem(d.done)
+  else if(d.renew)renewDlg(d.renew);
+  else if(d.rccp)copyText((veh().vin||"").trim(),"VIN copied");
+  else if(e.target.closest("[data-qk]"))quickGo(e.target.closest("[data-qk]").dataset.qk);
+  else if(d.gsrch)gSearch();
+  else if(d.strt)starterDlg(S.cur);
+  else if(d.srch)searchForm(veh());
+  else if(d.qodo)qOdo(S.cur);
+  else if(d.snz)snoozeDlg(d.snz);
+  else if(d.again){const r=S.records.find(x=>x.id===d.again);if(r)openForm(null,{type:r.type,date:today(),desc:r.desc||"",dl:(r.dl||[]).slice(),pl:[...(r.parts?[r.parts]:[]),...(r.pl||[])],iu:(r.iu||[]).filter(x=>S.inv.some(i=>i.id===x.id)).map(x=>({...x})),next:r.next||0,odo:"",notes:"",ph:[],rc:[],banner:"Copied from "+(r.date||"an earlier entry")+". Set the date and "+(isH(S.cur)?"hours":"odometer")+", then save."})}
+  else if(d.specs)specForm();
+  else if(d.go){tab=d.go;render()}
+  else if(d.rch){rch=d.rch;render()}
+  else if(d.help)helpForm()
+  else if(d.addrec)openForm()
+  else if(d.addv)vehForm(false)
+  else if(d.addi)invForm()
+  else if(d.stor)storToggle()
+  else if(d.addrem)openForm(null,{type:"reminder"})
+  else if(d.cover)lightbox([veh().cover],0)
+  else if(d.ph){const[id,i,g]=d.ph.split(":"),r=S.records.find(r=>r.id===id);if(r)lightbox(r[g||"ph"]||[],+i)}
+  else if(d.idel){const k=S.inv.findIndex(i=>i.id===d.idel);if(k>=0){const it=S.inv[k];S.inv.splice(k,1);save();render();toast("Item removed",()=>{S.inv.splice(Math.min(k,S.inv.length),0,it);save();render()})}}
+  else if(d.iedit)invForm(d.iedit);
+  else if(d.q){const[id,n]=d.q.split(":"),it=S.inv.find(i=>i.id===id);it.qty=Math.max(0,+(it.qty+ +n).toFixed(2));save();render()}};
+S.vehicles.forEach(fixV);
+render();
+let syncMsg="not connected yet",pt=null,busy=false,again=false,base=null;
+document.body.dataset.sync=SYNC?"busy":"local";
+const SLG=(()=>{try{const a=JSON.parse(localStorage.getItem("garagelog-sl")||"[]");return Array.isArray(a)?a:[]}catch(e){return[]}})();
+const slog=(m,s)=>{const l=SLG[SLG.length-1],now=Date.now();if(l&&l.m===m){l.t2=now;l.n=(l.n||1)+1}else SLG.push({t:now,s:s||"",m});while(SLG.length>40)SLG.shift();try{localStorage.setItem("garagelog-sl",JSON.stringify(SLG))}catch(e){}};
+const setSync=(st,msg)=>{if(msg!==syncMsg)slog(msg,st);syncMsg=msg;document.body.dataset.sync=st;const e=$("ss");if(e)e.textContent=msg};
+const api=()=>"api/state"+(RO?"?t="+encodeURIComponent(RO):"");
+const stash=()=>{writeLocal()};
+const setBase=o=>{base=norm(clone(o));try{localStorage.setItem("garagelog-base",JSON.stringify(base))}catch(e){}};
+try{const b=localStorage.getItem("garagelog-base");if(b)base=norm(JSON.parse(b))}catch(e){}
+// What changed on this device since the last sync, by item id.
+const adopt=d=>{const cur=S.cur;S=Object.assign({inv:[],units:"imperial"},d,{cur});norm(S);stash()};
+// Put this device's unsynced edits on top of the server's latest state.
+const mergeIn=T=>{const o=base?diff(base,S):{},cur=S.cur;S=apply(norm(clone(T)),o);S.cur=cur;stash();setBase(T)};
+const redraw=()=>{if(view==="vehicle"&&!veh())view="garage";if(!$("dlg").open)render()};
+const push=()=>{if(RO)return;clearTimeout(pt);pt=setTimeout(()=>{pt=null;send()},400)};
+async function send(){
+  if(!SYNC)return;
+  if(busy){again=true;return}
+  busy=true;let more=false,merged=false;setSync("busy","saving…");
+  try{
+    for(let n=0;n<4;n++){
+      const sent=JSON.stringify(S),r=await F(api(),{method:"PUT",headers:{"Content-Type":"application/json"},body:sent});
+      if(r.status===409){
+        const T=await r.json();
+        if(base){mergeIn(T);merged=true;redraw();continue}
+        adopt(T);setBase(T);setSync("ok","loaded changes from another device");redraw();break;
+      }
+      if(!r.ok)throw new Error("the server answered "+r.status+(r.status===401?" (password needed or wrong)":"")+(r.status===422?": "+((await r.json().catch(()=>({}))).msg||"the data was refused"):""));
+      const j=await r.json();S.rev=j.rev;const b=JSON.parse(sent);b.rev=j.rev;setBase(b);stash();
+      setSync("ok",merged?"saved to server (merged with changes from another device)":"saved to server");if(sent.includes('"data:image'))more=true;break;
+    }
+  }catch(e){slog("Save failed: "+((e&&e.message)||"can't reach the server"),"err");setSync("off","offline (saved on this device only)")}
+  if(document.body.dataset.sync==="busy")setSync("off","couldn't save yet, will retry");
+  busy=false;
+  if(again){again=false;send()}else if(more)pull(true);
+}
+const pull=f=>{
+  if(!SYNC)return Promise.resolve();
+  if(!f&&(pt||busy||$("dlg").open))return Promise.resolve();
+  return F(api(),{cache:"no-store"}).then(r=>r.json()).then(d=>{
+    setSync("ok","saved to server");
+    if(d&&Array.isArray(d.vehicles)&&(d.vehicles.length||(d.records||[]).length||(d.inv||[]).length)){
+      const o=base?diff(base,S):null;
+      if(o&&Object.keys(o).length){mergeIn(d);redraw();push()}
+      else{if(cmp(norm(clone(d)))===cmp(S)){if(d.rev!==undefined)S.rev=d.rev}else{adopt(d);redraw()}setBase(d)}
+    }else if(S.vehicles.length)push();
+  }).catch(e=>{slog("Load failed: "+((e&&e.message)||"can't reach the server"),"err");setSync("off","offline (saved on this device only)")});
+};
+addEventListener("online",()=>pull());addEventListener("offline",()=>setSync("off","offline (saved on this device only)"));
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
+async function boot(){
+  if(!RO&&SYNC){try{const r=await F("api/me",{cache:"no-store"});if(r.ok)ME=await r.json()}catch(e){}}
+  if(ME&&ME.accounts&&!ME.user){needLogin();return}
+  pull();
+}
+boot();
+if(APP)checkUpd();
+
+// ---- swipe on reminders
+(function(){let s=null,sw=false;const L=$("list");
+  L.addEventListener("pointerdown",e=>{const c=e.target.closest("[data-sw]");if(!c||e.target.closest("button,a,input,select,textarea"))return;s={c,x:e.clientX,y:e.clientY,dx:0,on:false,id:e.pointerId}});
+  addEventListener("pointermove",e=>{if(!s||e.pointerId!==s.id)return;const dx=e.clientX-s.x,dy=e.clientY-s.y;
+    if(!s.on){if(Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)){s=null;return}if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.5){s.on=true;try{s.c.setPointerCapture(e.pointerId)}catch(_){}}}
+    if(s&&s.on){s.dx=dx;s.c.style.transform="translateX("+Math.max(-140,Math.min(140,dx))*.8+"px)";s.c.classList.toggle("swr",dx>90);s.c.classList.toggle("swl",dx<-90)}});
+  const end=()=>{if(!s)return;const{c,dx,on}=s;s=null;if(!on)return;sw=true;setTimeout(()=>sw=false,60);c.style.transform="";c.classList.remove("swr","swl");const id=c.dataset.sw;if(dx>90)doneRem(id);else if(dx<-90)snoozeDlg(id)};
+  addEventListener("pointerup",end);addEventListener("pointercancel",end);
+  L.addEventListener("click",e=>{if(sw){e.stopPropagation();e.preventDefault()}},true);
+})();
+// ---- pull to refresh
+(function(){let y0=null,x0=0,pd=0;const el=document.createElement("div");el.id="ptr";document.body.appendChild(el);
+  const rst=()=>{el.style.transition="transform .2s,opacity .2s";el.style.opacity=0;el.style.transform="translate(-50%,-60px)";pd=0};
+  addEventListener("touchstart",e=>{y0=(scrollY<=0&&!$("dlg").open&&!$("lb")&&e.touches.length===1)?e.touches[0].clientY:null;x0=e.touches[0].clientX;el.style.transition="none"},{passive:true});
+  addEventListener("touchmove",e=>{if(y0==null)return;const t=e.touches[0],d=t.clientY-y0;if(d<=8||Math.abs(t.clientX-x0)>d){if(d<=0)rst();return}pd=Math.min(d,110);el.style.opacity=Math.min(1,pd/60);el.style.transform=`translate(-50%,${pd-56}px)`;el.textContent=pd>70?"Release to refresh":"Pull to refresh"},{passive:true});
+  addEventListener("touchend",async()=>{if(y0==null)return;const go=pd>70;y0=null;if(!go){rst();return}el.textContent="Refreshing…";el.style.transition="transform .2s";el.style.transform="translate(-50%,16px)";
+    try{if(SYNC)await pull(true);else render()}catch(e){}el.textContent=SYNC?"Up to date":"Refreshed";setTimeout(rst,700)});
+})();
+(function(){let a="";try{a=new URLSearchParams(location.search).get("a")||""}catch(e){}
+  if(!a)return;try{history.replaceState(null,"",location.pathname)}catch(e){}
+  if(a==="inventory"){view="inventory";render()}
+  else if(a==="service"){const L=act();if(!L.length)return;
+    const go=id=>{S.cur=id;view="vehicle";tab="service";render();openForm(null,{type:"service"})};
+    if(L.length===1)go(L[0].id);
+    else{show('<h3 style="margin:0">Log a service</h3><label>Which one?</label>'+L.map(v=>`<button class="mrow" data-pk="${v.id}">${esc(v.name)}</button>`).join("")+'<div class="row" style="margin-top:14px"><button id="cancel" style="flex:1">Cancel</button></div>');$("dbody").onclick=e=>{const i=e.target.dataset.pk;if(i){$("dlg").close();go(i)}}}}
+})();
+try{if(!APP&&!RO&&"serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
