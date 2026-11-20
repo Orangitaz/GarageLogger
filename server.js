@@ -104,30 +104,66 @@ try{
   }
 }catch(e){console.error("Checking photos in db.json was skipped:",e&&e.message)}
 
-// Before 1.23.0 every account shared the top-level photos/ and docs/ folders. Copy each person's files (the ones their data and backups point to) into their own folders once.
-// The old folders are left alone and are no longer served, so nothing is lost if a file is wanted back.
+// Before 1.23.0 every account shared the top-level photos/ and docs/ folders. Copy each person's files (the ones their data and backups point to) into their own folders.
+// The old folders are left alone and are never deleted by the server, so nothing is lost if a file is wanted back.
+// The "done" marker is only written once every file that is listed has been copied and checked, or no longer exists in the old folder. Anything else (a read
+// error, a full disk, a copy cut short) leaves the marker out, so the copy is tried again: a few minutes later while the server runs, and on every start. Until
+// then a person's own files are still served from the old folder (see legacyFile), so no photo or receipt disappears part way through an upgrade.
+const MEDIA_MARK=path.join(DIR,"media-per-user.done");
+let mediaTries=0;
+const sameSize=(a,b)=>{try{return fs.statSync(a).size===fs.statSync(b).size}catch(e){return false}};
+function copyMedia(src,dst){
+  if(!fs.existsSync(src))return fs.existsSync(dst)?"ok":"gone";
+  if(fs.existsSync(dst)&&sameSize(src,dst))return"ok";      // a file with the wrong size is a copy that was cut short: copy it again
+  fs.mkdirSync(path.dirname(dst),{recursive:true});
+  const tmp=dst+".tmp";
+  try{fs.copyFileSync(src,tmp);if(!sameSize(src,tmp))throw new Error("the copy was cut short");fs.renameSync(tmp,dst)}
+  catch(e){try{fs.rmSync(tmp,{force:true})}catch(_){}throw e}
+  return"copied";
+}
+const MEDIA_REF=/\b(photos|docs)\/([a-f0-9]{16}\.(?:jpg|png|webp|gif|pdf))/g;
+function readIfThere(f){try{return fs.readFileSync(f,"utf8")}catch(e){if(e.code==="ENOENT")return"";throw e}}
 function migrateMedia(force){
   if(!ACC)return;
-  const mark=path.join(DIR,"media-per-user.done");
-  if(!force&&fs.existsSync(mark))return;
-  let copied=0,missing=0;
+  if(!force&&fs.existsSync(MEDIA_MARK))return;
+  let copied=0,gone=0,failed=0,why="";
+  const bad=e=>{failed++;why=why||(e&&e.message)||"unknown error"};
   for(const name of Object.keys(ACC.users)){
     const c=uctx(name),txt=[];
-    try{txt.push(fs.readFileSync(c.FILE,"utf8"))}catch(e){}
-    try{for(const f of fs.readdirSync(c.BACKUPS))txt.push(fs.readFileSync(path.join(c.BACKUPS,f),"utf8"))}catch(e){}
+    try{txt.push(readIfThere(c.FILE))}catch(e){bad(e)}
+    try{for(const f of fs.readdirSync(c.BACKUPS))txt.push(readIfThere(path.join(c.BACKUPS,f)))}catch(e){if(e.code!=="ENOENT")bad(e)}
     const seen=new Set();
-    for(const m of txt.join("\n").matchAll(/\b(photos|docs)\/([a-f0-9]{16}\.(?:jpg|png|webp|gif|pdf))/g)){
+    for(const m of txt.join("\n").matchAll(MEDIA_REF)){
       if(seen.has(m[0]))continue;seen.add(m[0]);
-      const dst=path.join(m[1]==="photos"?c.PHOTOS:c.DOCS,m[2]);
       try{
-        if(fs.existsSync(dst))continue;
-        fs.mkdirSync(path.dirname(dst),{recursive:true});
-        fs.copyFileSync(path.join(m[1]==="photos"?PHOTOS:DOCS,m[2]),dst);copied++;
-      }catch(e){missing++}
+        const r=copyMedia(path.join(m[1]==="photos"?PHOTOS:DOCS,m[2]),path.join(m[1]==="photos"?c.PHOTOS:c.DOCS,m[2]));
+        if(r==="copied")copied++;else if(r==="gone")gone++;
+      }catch(e){bad(e)}
     }
   }
-  try{fs.writeFileSync(path.join(DIR,"media-per-user.done"),String(Date.now()))}catch(e){}
-  console.log("Photos and documents are now stored per person: "+copied+" copied"+(missing?", "+missing+" listed but not found":""));
+  if(!failed){try{fs.writeFileSync(MEDIA_MARK,String(Date.now()))}catch(e){bad(e)}}
+  if(!failed){console.log("Photos and documents are now stored per person: "+copied+" copied"+(gone?", "+gone+" listed but no longer in the old folder":""));return}
+  const wait=[+process.env.MEDIA_RETRY_MS||60e3,5*60e3,15*60e3,3600e3][Math.min(mediaTries++,3)];
+  console.error("Moving photos and documents to each person's folder is not finished ("+failed+" problem"+(failed===1?"":"s")+": "+why+"). It will be tried again in "+Math.round(wait/1000)+" seconds and on the next start; files are still served from the old folder meanwhile.");
+  setTimeout(()=>migrateMedia(),wait).unref();
+}
+// While that copy is unfinished, a person's own file can still be opened from the old shared folder, but only if their data (or a backup of it) points to it.
+function legacyFile(c,kind,n){
+  if(!ACC||fs.existsSync(MEDIA_MARK))return null;
+  const src=path.join(kind==="photos"?PHOTOS:DOCS,n),ref=kind+"/"+n;
+  try{
+    if(!fs.existsSync(src))return null;
+    let own=readIfThere(c.FILE).includes(ref);
+    if(!own)try{own=fs.readdirSync(c.BACKUPS).some(f=>readIfThere(path.join(c.BACKUPS,f)).includes(ref))}catch(e){}
+    return own?src:null;
+  }catch(e){return null}
+}
+function readMedia(c,kind,n){
+  const own=path.join(kind==="photos"?c.PHOTOS:c.DOCS,n);
+  try{return fs.readFileSync(own)}catch(e){}
+  const old=legacyFile(c,kind,n);if(!old)return null;
+  try{copyMedia(old,own)}catch(e){}
+  try{return fs.readFileSync(old)}catch(e){return null}
 }
 migrateMedia();
 
@@ -487,7 +523,7 @@ function handle(req,res){
   if(u.startsWith("/docs/")){
     const n=u.slice(6);
     if(!/^[a-f0-9]{16}\.(pdf|jpg|png|webp|gif)$/.test(n)){res.writeHead(404).end();return}
-    try{const b=fs.readFileSync(path.join(c.DOCS,n));res.writeHead(200,{"Content-Type":n.endsWith(".pdf")?"application/pdf":MIME[n.split(".")[1]],"Content-Disposition":"inline","X-Content-Type-Options":"nosniff","Cache-Control":"private, max-age=31536000, immutable"});return res.end(b)}
+    try{const b=readMedia(c,"docs",n);if(!b)throw 0;res.writeHead(200,{"Content-Type":n.endsWith(".pdf")?"application/pdf":MIME[n.split(".")[1]],"Content-Disposition":"inline","X-Content-Type-Options":"nosniff","Cache-Control":"private, max-age=31536000, immutable"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
   // Read-only status for dashboards (Home Assistant etc.): what is overdue or due soon, per equipment.
@@ -516,7 +552,7 @@ function handle(req,res){
   if(u.startsWith("/photos/")){
     const n=u.slice(8);
     if(!/^[a-f0-9]{16}\.(jpg|png|webp|gif)$/.test(n)){res.writeHead(404).end();return}
-    try{const b=fs.readFileSync(path.join(c.PHOTOS,n));res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"X-Content-Type-Options":"nosniff","Cache-Control":(ACC?"private":"public")+", max-age=31536000, immutable"});return res.end(b)}
+    try{const b=readMedia(c,"photos",n);if(!b)throw 0;res.writeHead(200,{"Content-Type":MIME[n.split(".")[1]],"X-Content-Type-Options":"nosniff","Cache-Control":(ACC?"private":"public")+", max-age=31536000, immutable"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
   if(u==="/api/version"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify({version:VERSION,build:BUILD}))}

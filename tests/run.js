@@ -191,6 +191,48 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   r=await req(g,"GET","/api/summary");T(r.s===200,"summary still works with broken data on disk");
   r=await req(g,"GET","/healthz");T(r.s===200,"server is still running afterwards");
   S.stop();
+  // ----- the copy into per-person folders is only marked finished when every file made it -----
+  {
+    const up=async(S,tok,buf)=>(await req(S.port,"POST","/api/photo",{body:buf,ct:"image/png",tok})).j.url;
+    S=await start({});g=S.port;
+    const old1=await up(S,null,Buffer.from("year-one-photo-"+Math.random()));       // no accounts yet: lands in the shared folder
+    const old2=await up(S,null,Buffer.from("year-two-receipt-"+Math.random()+"x".repeat(5000)));
+    await req(g,"PUT","/api/state",{body:{vehicles:[{id:"a",name:"Truck",cover:old1}],records:[{id:"r",vid:"a",type:"service",ph:[],rc:[old2]}],rev:0}});
+    r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});
+    const mark=path.join(S.dir,"media-per-user.done"),mp=path.join(S.dir,"users","mike","photos");
+    T(fs.existsSync(mark)&&fs.existsSync(path.join(mp,old1.slice(7)))&&fs.existsSync(path.join(mp,old2.slice(7))),"all files copied: marked finished");
+    S.stop(true);
+    const MIKE=async S=>{const lg=await req(S.port,"POST","/api/login",{body:{user:"mike",pass:"password1"}});return{tok:lg.j.token,media:(await req(S.port,"GET","/api/me",{tok:lg.j.token})).j.media}};
+    const until=async(f,ms)=>{for(let i=0;i<ms/100;i++){if(f())return true;await wait(100)}return f()};
+    // 1. the new folder can't be written (here: a file is in the way) -> not finished, still served, finished by itself once fixed
+    fs.rmSync(mark);fs.rmSync(mp,{recursive:true});fs.writeFileSync(mp,"in the way");
+    let S2=await start({MEDIA_RETRY_MS:"300"},S.dir);let m=await MIKE(S2);
+    T(!fs.existsSync(mark),"a copy that failed is not marked finished");
+    r=await req(S2.port,"GET","/"+old1+"?t="+m.media);T(r.s===200&&r.b.toString().startsWith("year-one-photo-"),"the file is still served from the old folder meanwhile");
+    r=await req(S2.port,"GET","/"+old2+"?t="+m.media);T(r.s===200,"...documents and receipts too");
+    await req(S2.port,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:m.tok});const kim=await req(S2.port,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}});const kimMedia=(await req(S2.port,"GET","/api/me",{tok:kim.j.token})).j.media;
+    T((await req(S2.port,"GET","/"+old1+"?t="+kimMedia)).s===404,"...but only for the person whose data points to it");
+    fs.rmSync(mp);
+    T(await until(()=>fs.existsSync(mark),4000)&&fs.existsSync(path.join(mp,old1.slice(7)))&&fs.existsSync(path.join(mp,old2.slice(7))),"once the problem is fixed the copy is retried and finishes without a restart");
+    S2.stop(true);
+    // 2. a copy that was cut short is not trusted
+    fs.rmSync(mark);fs.writeFileSync(path.join(mp,old2.slice(7)),"cut");
+    S2=await start({},S.dir);
+    T(fs.existsSync(mark)&&fs.statSync(path.join(mp,old2.slice(7))).size>1000,"a cut-short copy is replaced by a full one");
+    S2.stop(true);
+    // 3. data that can't be read right now must not be treated as "no files"
+    fs.rmSync(mark);const dbp=path.join(S.dir,"users","mike","db.json"),dbs=fs.readFileSync(dbp);fs.rmSync(dbp);fs.mkdirSync(dbp);
+    S2=await start({MEDIA_RETRY_MS:"300"},S.dir);
+    T(!fs.existsSync(mark),"if a person's data can't be read the copy is not marked finished");
+    fs.rmSync(dbp,{recursive:true});fs.writeFileSync(dbp,dbs);
+    T(await until(()=>fs.existsSync(mark),4000),"...and it finishes when the data can be read again");
+    S2.stop(true);
+    // 4. a file the data lists but the old folder never had can't be copied, and must not hold things up for ever
+    fs.rmSync(mark);const d2=JSON.parse(dbs);d2.records.push({id:"q",vid:"a",type:"service",ph:["photos/aaaaaaaaaaaaaaaa.jpg"],rc:[]});fs.writeFileSync(dbp,JSON.stringify(d2));
+    S2=await start({},S.dir);
+    T(fs.existsSync(mark),"a file that no longer exists anywhere doesn't stop the copy being marked finished");
+    S2.stop();
+  }
   // ----- behind a proxy -----
   S=await start({TRUST_PROXY:"1"});g=S.port;
   r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});

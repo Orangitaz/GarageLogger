@@ -2,6 +2,13 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.24.1 - 2026-11-19
+- Upgrading to per-person photo and document folders (first introduced in 1.23.0) is now only marked finished when every photo, receipt and document your data points to has been copied. Before, one failed copy (disk busy, out of space) could still mark it finished and it would never be retried.
+- If anything fails, the server says so in its log, keeps serving the files from the old shared folders to the person they belong to, and retries by itself (after 1 minute, then 5, 15 and every hour) without a restart. A restart also retries.
+- Copies are written to a temporary name, checked for size and then moved into place, so a half-copied file is never mistaken for a good one and is replaced on the next try.
+- A person's data that can't be read at that moment is no longer treated as "no files"; it counts as a failure and is tried again.
+- A file your data lists that no longer exists anywhere does not hold up the finish.
+
 ## 1.24.0 - 2026-11-19
 - The app's single page file is split up. `index.html` is now a small page that loads `app.css` (styles), `lib.js` (shared logic) and `app.js` (screens, forms and syncing). Nothing looks or behaves differently.
 - The shared logic (dates, text helpers and the merge used when two devices edit the same data) is now in `lib.js` and has its own checks, `tests/lib.test.js`, which run before every image build. The checks also make sure the files load together without clashing and that no version placeholder is left behind.
