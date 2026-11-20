@@ -208,12 +208,14 @@ function req(port,method,p,{body,tok,ct,headers}={}){
     fs.rmSync(mark);fs.rmSync(mp,{recursive:true});fs.writeFileSync(mp,"in the way");
     let S2=await start({MEDIA_RETRY_MS:"300"},S.dir);let m=await MIKE(S2);
     T(!fs.existsSync(mark),"a copy that failed is not marked finished");
+    T((await req(S2.port,"GET","/api/me",{tok:m.tok})).j.mediaPending===true,"the admin is told the copy is still pending");
     r=await req(S2.port,"GET","/"+old1+"?t="+m.media);T(r.s===200&&r.b.toString().startsWith("year-one-photo-"),"the file is still served from the old folder meanwhile");
     r=await req(S2.port,"GET","/"+old2+"?t="+m.media);T(r.s===200,"...documents and receipts too");
     await req(S2.port,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:m.tok});const kim=await req(S2.port,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}});const kimMedia=(await req(S2.port,"GET","/api/me",{tok:kim.j.token})).j.media;
     T((await req(S2.port,"GET","/"+old1+"?t="+kimMedia)).s===404,"...but only for the person whose data points to it");
     fs.rmSync(mp);
     T(await until(()=>fs.existsSync(mark),4000)&&fs.existsSync(path.join(mp,old1.slice(7)))&&fs.existsSync(path.join(mp,old2.slice(7))),"once the problem is fixed the copy is retried and finishes without a restart");
+    T((await req(S2.port,"GET","/api/me",{tok:m.tok})).j.mediaPending===undefined,"...and the notice goes away once it has finished");
     S2.stop(true);
     // 2. a copy that was cut short is not trusted
     fs.rmSync(mark);fs.writeFileSync(path.join(mp,old2.slice(7)),"cut");
@@ -232,6 +234,61 @@ function req(port,method,p,{body,tok,ct,headers}={}){
     S2=await start({},S.dir);
     T(fs.existsSync(mark),"a file that no longer exists anywhere doesn't stop the copy being marked finished");
     S2.stop();
+  }
+  // ----- backup and restore: database, photos, documents and sign-ins come back together -----
+  {
+    S=await start({});g=S.port;
+    r=await req(g,"POST","/api/accounts/setup",{body:{user:"mike",pass:"password1"}});const mt=r.j.token;
+    await req(g,"POST","/api/users",{body:{user:"kim",pass:"kimspass1"},tok:mt});
+    const kl=await req(g,"POST","/api/login",{body:{user:"kim",pass:"kimspass1"}}),kt=kl.j.token;
+    const media=async tok=>(await req(g,"GET","/api/me",{tok})).j.media;
+    const files={};
+    for(const [who,tok] of [["mike",mt],["kim",kt]]){
+      const ph=(await req(g,"POST","/api/photo",{body:Buffer.from(who+"-photo-"+"p".repeat(3000)),ct:"image/png",tok})).j.url;
+      const rc=(await req(g,"POST","/api/photo",{body:Buffer.from(who+"-receipt-"+"r".repeat(2000)),ct:"image/jpeg",tok})).j.url;
+      const dc=(await req(g,"POST","/api/doc",{body:Buffer.from("%PDF-1.4 "+who+" manual "+"d".repeat(4000)),ct:"application/pdf",tok})).j.url;
+      files[who]={ph,rc,dc};
+      const w=await req(g,"PUT","/api/state",{tok,body:{vehicles:[{id:"v"+who,name:who+"'s truck",cover:ph,docs:[{id:"d1",name:"Manual",url:dc}]}],records:[{id:"r"+who,vid:"v"+who,type:"service",date:"2026-10-01",title:"Oil change by "+who,ph:[ph],rc:[rc]}],rev:0}});
+      T(w.s===200,who+": data saved");
+    }
+    const sizes=Object.fromEntries(Object.entries(files).map(([w,f])=>[w,[f.ph,f.rc,f.dc].map(u=>fs.statSync(path.join(S.dir,"users",w,u)).size)]));
+    S.stop(true);
+    // "restore": the whole data folder is copied to a fresh place, as a dataset snapshot or a copy of the folder would be
+    const dir2=fs.mkdtempSync(path.join(os.tmpdir(),"gl-restore-"));fs.cpSync(S.dir,dir2,{recursive:true});fs.rmSync(S.dir,{recursive:true,force:true});
+    const R=await start({},dir2);const p=R.port;
+    const lg=async(u,pw)=>(await req(p,"POST","/api/login",{body:{user:u,pass:pw}}));
+    const lm=await lg("mike","password1"),lk=await lg("kim","kimspass1");
+    T(lm.s===200&&lk.s===200,"restored: both people sign in with their old passwords");
+    T((await lg("mike","wrongpass1")).s!==200,"restored: a wrong password still fails");
+    T((await req(p,"GET","/api/state",{tok:mt})).s===200,"restored: sessions that were open before keep working (the signing key came back too)");
+    for(const [who,tok] of [["mike",lm.j.token],["kim",lk.j.token]]){
+      const st=(await req(p,"GET","/api/state",{tok})).j,other=who==="mike"?"kim":"mike";
+      T(st.vehicles.length===1&&st.vehicles[0].name===who+"'s truck"&&st.records[0].title==="Oil change by "+who,who+": equipment and records came back");
+      const mm=(await req(p,"GET","/api/me",{tok})).j.media,f=files[who],z=sizes[who];
+      const got=await Promise.all([f.ph,f.rc,f.dc].map(u=>req(p,"GET","/"+u+"?t="+mm)));
+      T(got.every((x,i)=>x.s===200&&x.b.length===z[i]),who+": photo, receipt and document came back byte for byte");
+      T(got[0].b.toString().startsWith(who+"-photo-")&&got[2].b.toString().startsWith("%PDF-1.4 "+who),who+": and they are the right person's files");
+      const x=await req(p,"GET","/"+files[other].ph+"?t="+mm);T(x.s===404,who+": still can't open "+other+"'s files");
+    }
+    // the daily copy of the data is a downloadable backup; putting it back as a save restores the records and the photos still open
+    const list=(await req(p,"GET","/api/backups",{tok:lm.j.token})).j;
+    T(Array.isArray(list),"restored: the list of daily backups is there");
+    const cur=(await req(p,"GET","/api/state",{tok:lm.j.token})).j;
+    const keep=JSON.parse(JSON.stringify(cur));
+    await req(p,"PUT","/api/state",{tok:lm.j.token,body:Object.assign({},cur,{records:[],vehicles:[]})});          // an accident: everything deleted
+    const mid=(await req(p,"GET","/api/state",{tok:lm.j.token})).j;
+    T(mid.records.length===0,"accident: the records are gone");
+    const snaps=fs.readdirSync(path.join(dir2,"users","mike","backups")).filter(n=>/^db-/.test(n));
+    T(snaps.length>0,"a daily copy exists in the person's folder");
+    if(snaps.length){
+      const dl=await req(p,"GET","/backups/"+snaps.sort().pop(),{tok:lm.j.token});
+      const old=JSON.parse(dl.b.toString());
+      const put=await req(p,"PUT","/api/state",{tok:lm.j.token,body:Object.assign({},old,{rev:mid.rev})});
+      const back=(await req(p,"GET","/api/state",{tok:lm.j.token})).j;
+      T(put.s===200&&back.records.length===1&&back.records[0].title===keep.records[0].title,"restoring the daily copy brings the records back");
+      T((await req(p,"GET","/"+files.mike.ph+"?t="+(await req(p,"GET","/api/me",{tok:lm.j.token})).j.media)).s===200,"...and the photos are still there, since deleting records never removes files");
+    }
+    R.stop();
   }
   // ----- behind a proxy -----
   S=await start({TRUST_PROXY:"1"});g=S.port;

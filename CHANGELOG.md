@@ -2,6 +2,11 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.24.2 - 2026-11-19
+- The photo and document copy retry (1.24.1) can no longer end up with several retries running at once, and starts its waiting times over after it succeeds.
+- While that copy is unfinished, the admin sees a note in Settings so it doesn't go unnoticed.
+- New checks: a backup-and-restore check (whole data folder copied to a new place: sign-ins, data, photos and documents all come back, nobody can open anyone else's files, and a daily backup put back after an accidental delete restores the records), and browser checks for adding equipment, recording maintenance with a receipt, and two devices syncing and merging changes. The browser checks run as their own GitHub check.
+
 ## 1.24.1 - 2026-11-19
 - Upgrading to per-person photo and document folders (first introduced in 1.23.0) is now only marked finished when every photo, receipt and document your data points to has been copied. Before, one failed copy (disk busy, out of space) could still mark it finished and it would never be retried.
 - If anything fails, the server says so in its log, keeps serving the files from the old shared folders to the person they belong to, and retries by itself (after 1 minute, then 5, 15 and every hour) without a restart. A restart also retries.

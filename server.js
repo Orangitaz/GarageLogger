@@ -110,7 +110,8 @@ try{
 // error, a full disk, a copy cut short) leaves the marker out, so the copy is tried again: a few minutes later while the server runs, and on every start. Until
 // then a person's own files are still served from the old folder (see legacyFile), so no photo or receipt disappears part way through an upgrade.
 const MEDIA_MARK=path.join(DIR,"media-per-user.done");
-let mediaTries=0;
+let mediaTries=0,mediaTimer=null;
+const mediaPending=()=>!!ACC&&!fs.existsSync(MEDIA_MARK);
 const sameSize=(a,b)=>{try{return fs.statSync(a).size===fs.statSync(b).size}catch(e){return false}};
 function copyMedia(src,dst){
   if(!fs.existsSync(src))return fs.existsSync(dst)?"ok":"gone";
@@ -125,6 +126,7 @@ const MEDIA_REF=/\b(photos|docs)\/([a-f0-9]{16}\.(?:jpg|png|webp|gif|pdf))/g;
 function readIfThere(f){try{return fs.readFileSync(f,"utf8")}catch(e){if(e.code==="ENOENT")return"";throw e}}
 function migrateMedia(force){
   if(!ACC)return;
+  if(mediaTimer){clearTimeout(mediaTimer);mediaTimer=null}      // only ever one retry waiting, however this was started
   if(!force&&fs.existsSync(MEDIA_MARK))return;
   let copied=0,gone=0,failed=0,why="";
   const bad=e=>{failed++;why=why||(e&&e.message)||"unknown error"};
@@ -142,10 +144,10 @@ function migrateMedia(force){
     }
   }
   if(!failed){try{fs.writeFileSync(MEDIA_MARK,String(Date.now()))}catch(e){bad(e)}}
-  if(!failed){console.log("Photos and documents are now stored per person: "+copied+" copied"+(gone?", "+gone+" listed but no longer in the old folder":""));return}
+  if(!failed){mediaTries=0;console.log("Photos and documents are now stored per person: "+copied+" copied"+(gone?", "+gone+" listed but no longer in the old folder":""));return}
   const wait=[+process.env.MEDIA_RETRY_MS||60e3,5*60e3,15*60e3,3600e3][Math.min(mediaTries++,3)];
   console.error("Moving photos and documents to each person's folder is not finished ("+failed+" problem"+(failed===1?"":"s")+": "+why+"). It will be tried again in "+Math.round(wait/1000)+" seconds and on the next start; files are still served from the old folder meanwhile.");
-  setTimeout(()=>migrateMedia(),wait).unref();
+  mediaTimer=setTimeout(()=>{mediaTimer=null;migrateMedia()},wait);mediaTimer.unref();
 }
 // While that copy is unfinished, a person's own file can still be opened from the old shared folder, but only if their data (or a backup of it) points to it.
 function legacyFile(c,kind,n){
@@ -396,7 +398,7 @@ function handle(req,res){
     }
     if(U)c=uctx(U);
   }
-  if(u==="/api/me"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(ACC?{accounts:true,user:U,admin:!!(U&&ACC.users[U].admin),media:U?linkTok(U,"media"):undefined}:{accounts:false}))}
+  if(u==="/api/me"&&req.method==="GET"){res.writeHead(200,JSON_H);return res.end(JSON.stringify(ACC?{accounts:true,user:U,admin:!!(U&&ACC.users[U].admin),mediaPending:U&&ACC.users[U].admin&&mediaPending()?true:undefined,media:U?linkTok(U,"media"):undefined}:{accounts:false}))}
   // Only real JSON requests are accepted. A web page on another site can't send those without the browser asking the server first, which keeps other sites from posting to this one.
   const isJson=()=>/^application\/json/i.test(req.headers["content-type"]||"");
   const jb=(limit,cb)=>{if(!isJson()){req.resume();res.writeHead(415,JSON_H);return res.end('{"ok":false}')}return body(req,limit,async buf=>{let j;try{j=JSON.parse(buf.toString())}catch(e){res.writeHead(400,JSON_H);return res.end('{"ok":false}')}
