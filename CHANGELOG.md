@@ -2,6 +2,10 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.24.3 - 2026-11-20
+- `PORT=0` now really means "pick a free port" (before, it fell back to 3000). Normal setups that leave `PORT` unset or set a number are unaffected.
+- More browser checks: signing in with accounts on (wrong password, separate garages, a private receipt photo that shows for its owner and is refused for another person or someone signed out, and "sign out of every device"), barcode and VIN scanning (with a stand-in for the browser's reader: capitals and trimming, a leading "I" on an 18-character VIN, a photo with no barcode, and a browser with no reader), and backup and restore through the app's own buttons onto an empty server (the receipt photo inside the backup comes back as a real file, and a file that isn't a backup changes nothing).
+
 ## 1.24.2 - 2026-11-19
 - The photo and document copy retry (1.24.1) can no longer end up with several retries running at once, and starts its waiting times over after it succeeds.
 - While that copy is unfinished, the admin sees a note in Settings so it doesn't go unnoticed.

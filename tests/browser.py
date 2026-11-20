@@ -17,22 +17,32 @@ def png(w=40, h=30):
 
 data = tempfile.mkdtemp(prefix="gl-browser-")
 img = os.path.join(data, "receipt.png"); open(img, "wb").write(png())
-srv = subprocess.Popen(["node", os.path.join(ROOT, "server.js")], env=dict(os.environ, DATA_DIR=os.path.join(data, "d"), PORT="0"), stdout=subprocess.PIPE, text=True)
-port = int(re.search(r"listening on (\d+)", srv.stdout.readline()).group(1))
-URL = f"http://127.0.0.1:{port}/"
+servers = []
+def start_server(name):
+    p = subprocess.Popen(["node", os.path.join(ROOT, "server.js")], env=dict(os.environ, DATA_DIR=os.path.join(data, name), PORT="0"), stdout=subprocess.PIPE, text=True)
+    servers.append(p)
+    return f"http://127.0.0.1:{int(re.search(r'listening on (\d+)', p.stdout.readline()).group(1))}/"
+def call(url, path, body=None, tok=None, method=None):
+    h = {"Content-Type": "application/json"}
+    if tok: h["Authorization"] = "Bearer " + tok
+    r = urllib.request.Request(url + path, data=json.dumps(body).encode() if body is not None else None, headers=h, method=method)
+    try: return json.loads(urllib.request.urlopen(r).read() or b"{}")
+    except urllib.error.HTTPError as e: return {"status": e.code}
+URL = start_server("main")
 state = lambda: json.loads(urllib.request.urlopen(URL + "api/state").read())
+PUMP = []
 def until(f, ms=8000):
     end = time.time() + ms / 1000
     while time.time() < end:
         try:
             if f(): return True
         except Exception: pass
-        time.sleep(0.15)
+        (PUMP[0].wait_for_timeout(150) if PUMP else time.sleep(0.15))   # waiting through the browser keeps its dialogs and events handled
     return False
 
 try:
     with sync_playwright() as pw:
-        b = pw.chromium.launch()
+        b = pw.chromium.launch(); PUMP.append(b.new_page())
         def device():
             ctx = b.new_context(viewport={"width": 400, "height": 820}); pg = ctx.new_page()
             pg.errors = []; pg.on("pageerror", lambda e: pg.errors.append(str(e)))
@@ -86,7 +96,93 @@ try:
         A.reload(); A.wait_for_selector("#fab")
         T(A.locator("text=Tacoma").count() > 0, "after a reload the equipment is still there")
         T(A.errors == [] and B.errors == [], "no script errors on either device" + (" " + str(A.errors + B.errors) if A.errors or B.errors else ""))
+
+        # 6. backup file -> restore through the app's own buttons, on an empty server (photos travel inside the backup)
+        A.evaluate("dataForm()")
+        A.click("details[data-g=backup] > summary")
+        with A.expect_download() as dl: A.click("#dlb")
+        bk = os.path.join(data, "backup.json"); dl.value.save_as(bk)
+        saved = json.load(open(bk))
+        T(len(saved["records"]) == 3 and len(saved["vehicles"]) == 1, "the downloaded backup holds the equipment and all three records")
+        T(any(str(x).startswith("data:image") for r in saved["records"] for x in r.get("rc", [])), "...with the receipt photo inside it")
+        URL2 = start_server("fresh")
+        C = b.new_context(viewport={"width": 400, "height": 820}).new_page(); C.errors = []; C.on("pageerror", lambda e: C.errors.append(str(e)))
+        msgs = []; C.on("dialog", lambda d: (msgs.append(d.message), d.accept()))
+        C.goto(URL2); C.wait_for_selector("#fab"); C.evaluate("dataForm()")
+        C.click("details[data-g=backup] > summary"); C.set_input_files("#rf", bk)
+        T(until(lambda: len(json.loads(urllib.request.urlopen(URL2 + "api/state").read())["records"]) == 3, 12000), "restoring the backup file puts all records on the empty server")
+        st2 = json.loads(urllib.request.urlopen(URL2 + "api/state").read()); 
+        rc = [x for r in st2["records"] for x in r.get("rc", [])]
+        T(len(rc) == 1 and rc[0].startswith("photos/"), "the receipt photo inside the backup became a real file again")
+        if rc: T(urllib.request.urlopen(URL2 + rc[0]).status == 200, "...and it can be opened")
+        bad_file = os.path.join(data, "bad.json"); open(bad_file, "w").write('{"hello": 1}')
+        before = len(json.loads(urllib.request.urlopen(URL2 + "api/state").read())["records"])
+        C.evaluate("dataForm()"); C.click("details[data-g=backup] > summary"); C.set_input_files("#rf", bad_file); C.wait_for_timeout(600)
+        T(len(json.loads(urllib.request.urlopen(URL2 + "api/state").read())["records"]) == before, "a file that isn't a backup changes nothing")
+        T(C.errors == [], "no script errors while restoring")
+
+        # 7. barcode / VIN scan (the browser's detector is replaced by a stand-in, since a headless browser has none)
+        def scan_page(stub):
+            ctx = b.new_context(viewport={"width": 400, "height": 820})
+            if stub: ctx.add_init_script(stub)
+            pg = ctx.new_page(); pg.errors = []; pg.on("pageerror", lambda e: pg.errors.append(str(e))); pg.alerts = []
+            pg.on("dialog", lambda d: (pg.alerts.append(d.message), d.accept()))
+            pg.goto(URL2); pg.wait_for_selector("#fab"); pg.click("#fab"); pg.wait_for_selector("#v_scan"); return pg
+        D = scan_page("window.BarcodeDetector=class{async detect(){return[{rawValue:' 1ftfw1et5dfc10312 '}]}}")
+        with D.expect_file_chooser() as fc: D.click("#v_scan")
+        fc.value.set_files(img)
+        T(until(lambda: D.input_value("#v_vin") == "1FTFW1ET5DFC10312"), "scanning fills the VIN box, trimmed and in capitals")
+        D2 = scan_page("window.BarcodeDetector=class{async detect(){return[{rawValue:'I1FTFW1ET5DFC10312'}]}}")
+        with D2.expect_file_chooser() as fc: D2.click("#v_scan")
+        fc.value.set_files(img)
+        T(until(lambda: D2.input_value("#v_vin") == "1FTFW1ET5DFC10312"), "a VIN printed with a leading I (18 characters) is corrected to 17")
+        D3 = scan_page("window.BarcodeDetector=class{async detect(){return[]}}")
+        with D3.expect_file_chooser() as fc: D3.click("#v_scan")
+        fc.value.set_files(img)
+        T(until(lambda: any("Couldn't read" in m for m in D3.alerts)) and D3.input_value("#v_vin") == "", "a photo with no barcode gives a clear message and leaves the box empty")
+        D4 = scan_page("delete window.BarcodeDetector")
+        D4.click("#v_scan")
+        T(until(lambda: any("Type it in" in m for m in D4.alerts)), "a browser without a barcode reader (like Safari) is told to type it in")
+        T(all(p.errors == [] for p in (D, D2, D3, D4)), "no script errors while scanning")
+
+        # 8. accounts: sign-in, separate garages, private photos, signing out everywhere
+        URL3 = start_server("accounts")
+        tok = call(URL3, "api/accounts/setup", {"user": "mike", "pass": "password1"})["token"]
+        call(URL3, "api/users", {"user": "kim", "pass": "kimspass1"}, tok)
+        def signin(user, pw, expect=True):
+            pg = b.new_context(viewport={"width": 400, "height": 820}).new_page(); pg.errors = []; pg.on("pageerror", lambda e: pg.errors.append(str(e)))
+            pg.goto(URL3); pg.wait_for_selector("#lg_u"); pg.fill("#lg_u", user); pg.fill("#lg_p", pw); pg.click("#lg_go")
+            if expect: pg.wait_for_selector("#lg_u", state="detached"); pg.wait_for_selector("#fab")
+            return pg
+        M0 = b.new_context().new_page(); M0.goto(URL3); M0.wait_for_selector("#lg_u")
+        T(M0.locator("#lg_u").is_visible() and "Mike" not in M0.inner_text("body"), "with accounts on, the app asks for a sign-in first")
+        W = signin("mike", "wrongpass1", False); W.wait_for_selector("#lg_m:not(:empty)")
+        T("Wrong" in W.inner_text("#lg_m") or "wrong" in W.inner_text("#lg_m"), "a wrong password is refused with a message")
+        M = signin("mike", "password1")
+        M.click("#fab"); M.fill("#v_n", "Mike's Truck"); M.click("#ok"); M.wait_for_selector("#cancel"); M.click("#cancel")
+        M.locator("text=Mike's Truck").first.click(); M.wait_for_selector("#fab"); M.evaluate("tab='service';render()")
+        M.click("#fab"); M.wait_for_selector("#f_odo"); M.fill("#f_odo", "1000"); M.fill("#f_notes", "Mike's private receipt"); M.set_input_files("#rf", img)
+        T(until(lambda: M.locator("#rc img").count() == 1), "mike attaches a receipt to his record")
+        M.click("#ok")
+        tm = call(URL3, "api/login", {"user": "mike", "pass": "password1"})["token"]
+        T(until(lambda: len(call(URL3, "api/state", tok=tm).get("records", [])) == 1), "mike's record is saved to his account")
+        M.reload(); M.wait_for_selector("#fab"); M.locator("text=Mike's Truck").first.click(); M.wait_for_selector("#fab"); M.evaluate("tab='service';render()")
+        T(until(lambda: M.evaluate("[...document.images].some(i=>i.naturalWidth>0)")), "his receipt photo still shows after a reload (the private link works)")
+        K = signin("kim", "kimspass1")
+        T(K.locator("text=Mike's Truck").count() == 0, "kim's garage is empty: she can't see mike's equipment")
+        rcfile = call(URL3, "api/state", tok=tm)["records"][0]["rc"][0]
+        code = K.evaluate("async u=>{const r=await fetch(u,{headers:{Authorization:'Bearer '+localStorage.getItem('garagelog-tok')}});return r.status}", URL3 + rcfile)
+        T(code == 404, f"(got {code}) kim's signed-in browser can't open mike's receipt")
+        anon = b.new_context().new_page(); T(anon.goto(URL3 + rcfile).status in (401, 403, 404), "and neither can someone who isn't signed in")
+        # sign out of every device from mike's phone: the other device is signed out too
+        M2 = signin("mike", "password1")
+        M.evaluate("settings()") if False else None
+        call(URL3, "api/account/signout-all", {}, tm, "POST")
+        M2.evaluate("document.dispatchEvent(new Event('visibilitychange'))"); M2.reload()
+        T(until(lambda: M2.locator("#lg_u").count() > 0), "after \"sign out of every device\" other devices are asked to sign in again")
+        T(all(p.errors == [] for p in (M, K)), "no script errors in accounts mode")
         b.close()
 finally:
-    srv.terminate(); shutil.rmtree(data, ignore_errors=True)
+    for p in servers: p.terminate()
+    shutil.rmtree(data, ignore_errors=True)
 print("ALL OK" if not bad else f"FAILURES: {bad}"); sys.exit(1 if bad else 0)
