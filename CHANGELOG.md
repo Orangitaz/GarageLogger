@@ -2,6 +2,12 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.25.0 - 2026-11-21
+- Equipment now has a 3D picture. Cars and trucks, off-road, trailers and lawn mowers each get a default picture (car, UTV, utility trailer, riding mower) on the garage cards and at the top of the equipment's dashboard. "Other" keeps its small icon. A cover photo you added yourself still comes first.
+- **Edit equipment > Picture** lets you pick any of 20 pictures (car, pickup, SUV, motorcycle, RV, ATV, UTV, off-road UTV, snowmobile, golf cart, utility, flatbed, dump and enclosed trailers, horse trailer, travel trailer, boat, riding and zero-turn mowers, tractor) or leave it on Automatic. The choice is stored as a new optional `pic` field only when you pick one; equipment types, existing equipment and saved records are unchanged.
+- Pictures are small WebP files in two sizes (the phone downloads the right one), have fixed dimensions so the page doesn't jump while they load, load lazily below the first screen, and are kept on the device after the first time. They sit on a light tile so they look right in dark mode too. The Android app bundles them.
+- Known issue in the supplied artwork: a few windows (golf cart canopy, UTV and boat windscreens) show a faint checkerboard pattern that was baked into the images.
+
 ## 1.24.3 - 2026-11-20
 - `PORT=0` now really means "pick a free port" (before, it fell back to 3000). Normal setups that leave `PORT` unset or set a number are unaffected.
 - More browser checks: signing in with accounts on (wrong password, separate garages, a private receipt photo that shows for its owner and is refused for another person or someone signed out, and "sign out of every device"), barcode and VIN scanning (with a stand-in for the browser's reader: capitals and trimming, a leading "I" on an 18-character VIN, a photo with no barcode, and a browser with no reader), and backup and restore through the app's own buttons onto an empty server (the receipt photo inside the backup comes back as a real file, and a file that isn't a backup changes nothing).

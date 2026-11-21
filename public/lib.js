@@ -19,6 +19,11 @@ const norm=o=>{o.records=(o.records||[]).filter(r=>r.type!=="fuel");o.vehicles=o
 const cmp=o=>JSON.stringify(Object.assign({},o,{cur:null,rev:0}));
 const SPECS=[["oilW","Oil weight","5W-30"],["oilC","Oil capacity","4.5 qt"],["oilF","Oil filter #",""],["airF","Air filter #",""],["blade","Blade / belt #",""],["fuelF","Fuel filter #",""],["plug","Spark plugs",""],["tire","Tire size",""]];
 const fixV=v=>{v.specs=v.specs||{};if(!v.plist){const sp=v.specs;v.plist=SPECS.filter(([k])=>sp[k]).map(([k,l])=>({l,v:sp[k]}));if(sp.other)v.plist.push({l:"Other",v:sp.other})}if(!v.pclean){v.plist=v.plist.filter(r=>r.v||!SPECS.some(x=>x[1]===r.l));v.pclean=1}v.kind=v.kind==="atv"||v.kind==="bike"?"offroad":v.kind||"car";v.meter=v.meter||"dist"};
+// Equipment pictures (public/images/equipment/<key>-200.webp and -400.webp). [key, label, height/width]. The stored equipment type never changes: a type only picks the
+// default picture, and an optional "pic" on the equipment picks another one. Types without a default (Other) get no picture.
+const PICS=[["car","Car",0.556],["pickup-truck","Pickup truck",0.745],["suv","SUV",0.775],["motorcycle","Motorcycle",0.812],["rv-motorhome","RV / motorhome",0.727],["atv","ATV",0.757],["utv","UTV",0.768],["off-road-utv","Off-road UTV",0.704],["snowmobile","Snowmobile",0.684],["golf-cart","Golf cart",0.904],["utility-trailer","Utility trailer",0.566],["flatbed-trailer","Flatbed trailer",0.671],["dump-trailer","Dump trailer",0.72],["enclosed-cargo-trailer","Enclosed trailer",0.761],["horse-trailer","Horse trailer",0.748],["travel-trailer","Travel trailer",0.763],["boat","Boat on trailer",0.665],["riding-mower","Riding mower",0.795],["zero-turn-mower","Zero-turn mower",0.836],["tractor","Tractor",0.758]];
+const PIC_DEF={car:"car",offroad:"utv",trailer:"utility-trailer",mower:"riding-mower"};
+const picOf=v=>{const k=v&&v.pic;return PICS.some(p=>p[0]===k)?k:(v&&PIC_DEF[v.kind])||""};
 const AK=["vehicles","records","inv"],SK=["units","presets","alert","lastNext"];
 function diff(a,b){
   const o={};
@@ -37,4 +42,4 @@ function apply(T,o){
   return T;
 }
 
-if(typeof module!=="undefined")module.exports={b64,esc,uid,today,addM,repTxt,nextDate,vDates,partsOf,fmtD,addD,ago2,fixUrl,seen,clone,norm,cmp,SPECS,fixV,AK,SK,diff,apply};
+if(typeof module!=="undefined")module.exports={b64,esc,uid,today,addM,repTxt,nextDate,vDates,partsOf,fmtD,addD,ago2,fixUrl,seen,clone,norm,cmp,SPECS,fixV,AK,SK,diff,apply,PICS,PIC_DEF,picOf};

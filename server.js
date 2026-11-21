@@ -5,6 +5,8 @@ const PASS=process.env.GARAGE_PASSWORD||"",sha=x=>crypto.createHash("sha256").up
 const DOCS=path.join(DIR,"docs");
 fs.mkdirSync(PHOTOS,{recursive:true});fs.mkdirSync(DOCS,{recursive:true});
 const ST={"/manifest.webmanifest":"application/manifest+json","/sw.js":"text/javascript","/app.js":"text/javascript","/lib.js":"text/javascript","/app.css":"text/css","/icon.svg":"image/svg+xml","/icon-192.png":"image/png","/icon-512.png":"image/png","/apple-touch-icon.png":"image/png"};
+// The equipment pictures are public static files (no personal data), served like the other files here.
+try{for(const f of fs.readdirSync(path.join(__dirname,"public","images","equipment")))if(/^[a-z-]+-\d+\.webp$/.test(f))ST["/images/equipment/"+f]="image/webp"}catch(e){}
 const EXT={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"},DEXT=Object.assign({"application/pdf":"pdf"},{"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"}),MIME={jpg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif"};
 const JSON_H={"Content-Type":"application/json","Cache-Control":"no-store"};
 const arr=x=>Array.isArray(x)?x:[],has=x=>x!==undefined&&x!==null,isObj=x=>!!x&&typeof x==="object"&&!Array.isArray(x);
@@ -183,7 +185,7 @@ const KIND={
   objs:x=>Array.isArray(x)&&x.every(isObj),
 };
 const SHAPE={
-  vehicle:{name:"str",model:"str",plate:"str",vin:"str",kind:"str",meter:"str",color:"str",cover:"str",ohv:"date",reg:"date",stor:"date",wd:"date",ohvRep:"num",regRep:"num",soonDays:"num",soonDist:"num",wo:"num",arch:"bool",specs:"obj",plist:"objs",dts:"objs",docs:"objs",tires:"objs",cls:"objs"},
+  vehicle:{name:"str",model:"str",plate:"str",vin:"str",kind:"str",meter:"str",color:"str",cover:"str",ohv:"date",reg:"date",stor:"date",wd:"date",ohvRep:"num",regRep:"num",soonDays:"num",soonDist:"num",wo:"num",arch:"bool",pic:"str",specs:"obj",plist:"objs",dts:"objs",docs:"objs",tires:"objs",cls:"objs"},
   dt:{l:"str",date:"date"},doc:{n:"str",url:"str",t:"str",at:"date"},part:{l:"str",v:"str"},
   check:{name:"str",items:"strs"},tire:{name:"str",size:"str",date:"date",st:"str",mi:"num",notes:"str",tr:"objs"},
   record:{type:"str",date:"date",odo:"num",desc:"str",dl:"strs",pl:"strs",parts:"str",notes:"str",by:"str",ph:"strs",rc:"strs",done:"bool",nrid:"str",wrid:"str",next:"num",iu:"objs",rep:"num",wd:"date",wo:"num"},
@@ -577,7 +579,7 @@ function handle(req,res){
     try{return asset(req,res,u)}catch(e){res.writeHead(404).end();return}
   }
   if(ST[u]){
-    try{const b=fs.readFileSync(path.join(__dirname,"public",u));res.writeHead(200,{"Content-Type":ST[u],"Cache-Control":u==="/sw.js"?"no-cache":"public, max-age=86400"});return res.end(b)}
+    try{const b=fs.readFileSync(path.join(__dirname,"public",u));res.writeHead(200,{"Content-Type":ST[u],"Cache-Control":u==="/sw.js"?"no-cache":u.startsWith("/images/")?"public, max-age=604800":"public, max-age=86400"});return res.end(b)}
     catch(e){res.writeHead(404).end();return}
   }
   if(u==="/healthz"){res.writeHead(200,{"Content-Type":"text/plain"});return res.end("ok")}

@@ -97,6 +97,18 @@ try:
         T(A.locator("text=Tacoma").count() > 0, "after a reload the equipment is still there")
         T(A.errors == [] and B.errors == [], "no script errors on either device" + (" " + str(A.errors + B.errors) if A.errors or B.errors else ""))
 
+        # 5b. equipment pictures: the type gives a default, and one can be picked in the form
+        T(A.locator(".vt .cv.ill img[src*='images/equipment/car-']").count() == 1, "a car with no picture chosen shows the default car picture")
+        T(A.evaluate("[...document.querySelectorAll('.vt .cv.ill img')].every(i=>i.getAttribute('width')&&i.getAttribute('height'))"), "pictures have fixed dimensions (no layout jump)")
+        A.click(".vt .ed"); A.wait_for_selector("#v_pic")
+        T(A.locator("#v_pic button").count() == 21, "the form offers Automatic plus the 20 pictures")
+        A.click("#v_pic button[data-p=boat]"); A.click("#ok")
+        T(until(lambda: state()["vehicles"][0].get("pic") == "boat" and state()["vehicles"][0]["kind"] == "car"), "choosing a picture stores it and leaves the equipment type alone")
+        T(until(lambda: A.locator(".vt .cv.ill img[src*='boat-']").count() == 1), "the card now shows the chosen picture")
+        A.locator(".vt").first.click(); A.wait_for_selector(".hero.ill img")
+        T(A.locator(".hero.ill img[src*='boat-']").count() == 1, "the equipment's dashboard shows the same picture")
+        A.evaluate("view='garage';S.cur=null;render()"); A.wait_for_selector(".vt")
+
         # 6. backup file -> restore through the app's own buttons, on an empty server (photos travel inside the backup)
         A.evaluate("dataForm()")
         A.click("details[data-g=backup] > summary")

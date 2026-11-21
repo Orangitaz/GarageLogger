@@ -152,6 +152,14 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   r=await req(g,"PUT","/api/state",{body:okState()});T(r.s===200,"a full save like the app makes is accepted (empty current equipment, spare fields and all)");
   const refuse=(name,edit)=>{const d=okState();edit(d);return req(g,"PUT","/api/state",{body:d}).then(x=>T(x.s===422&&!!(x.j&&x.j.msg),"refused: "+name+(x.j&&x.j.msg?" ("+x.j.msg+")":"")))};
   const cur=(await req(g,"GET","/api/state")).j;
+  // ----- equipment pictures -----
+  {
+    r=await req(g,"GET","/images/equipment/car-400.webp");T(r.s===200&&r.h["content-type"]==="image/webp"&&r.b.slice(0,4).toString()==="RIFF"&&/max-age/.test(r.h["cache-control"]||""),"equipment pictures are served as WebP and can be cached");
+    r=await req(g,"GET","/images/equipment/../../server.js");T(r.s!==200||!/require\(/.test(r.b.toString()),"the pictures folder doesn't give out other files");
+    r=await req(g,"GET","/images/equipment/nothing-400.webp");T(r.s===404,"a picture that doesn't exist is a 404");
+    await refuse("a picture that isn't text",d=>d.vehicles[0].pic=5);
+  }
+
   await refuse("records is not a list",d=>d.records={a:1});
   await refuse("records is empty (null)",d=>d.records=null);
   await refuse("records is text",d=>d.records="abc");
@@ -183,6 +191,7 @@ function req(port,method,p,{body,tok,ct,headers}={}){
   r=await req(g,"PUT","/api/state",{body:[1,2]});T(r.s===422,"refused: the data itself is a list");
   r=await req(g,"PUT","/api/state",{body:"{not json",ct:"application/json"});T(r.s===400,"refused: not JSON at all");
   const after=(await req(g,"GET","/api/state")).j;T(JSON.stringify(after)===JSON.stringify(cur),"none of the refused saves changed what is stored");
+  {const d=okState();d.rev=after.rev;d.vehicles[0].pic="boat";r=await req(g,"PUT","/api/state",{body:d});T(r.s===200&&(await req(g,"GET","/api/state")).j.vehicles[0].pic==="boat","equipment with a chosen picture is saved and comes back")}
   S.stop();
   // data that is already broken on disk (saved by an older version, or edited by hand) must not take the server down
   const bd=fs.mkdtempSync(path.join(os.tmpdir(),"gl-"));fs.writeFileSync(path.join(bd,"db.json"),JSON.stringify({vehicles:[null,{id:"a",name:"X",dts:{},reg:"2027-13-45",ohv:5},{id:"b",name:"Y",kind:"offroad",ohv:"2027-02-01",dts:[null,{id:"q",l:5,date:"2027-04-01"},{id:"r",l:"Smog",date:"2027-04-01"}]}],records:{x:1}}));

@@ -52,6 +52,14 @@ let ok=true,why="";try{new vm.Script(lib+"\n"+app)}catch(e){ok=false;why=e.messa
 T(ok,"lib.js and app.js load together without clashing names"+(ok?"":" ("+why+")"));
 T(html.indexOf("lib.js")>0&&html.indexOf("lib.js")<html.indexOf("app.js")&&html.indexOf("APP_V")<html.indexOf("lib.js"),"index.html loads the version, then lib.js, then app.js");
 T((html.match(/__VERSION__/g)||[]).length>=4&&!/__VERSION__|__BUILD__/.test(lib+app),"the version placeholders are only in index.html (the Android build fills them in there)");
+// ----- equipment pictures -----
+T(L.PICS.length===20&&new Set(L.PICS.map(p=>p[0])).size===20,"there are 20 distinct equipment pictures");
+T(L.PICS.every(p=>fs.existsSync(pub("images/equipment/"+p[0]+"-200.webp"))&&fs.existsSync(pub("images/equipment/"+p[0]+"-400.webp"))&&p[2]>0.3&&p[2]<1.3),"every picture has both sizes on disk and a sensible shape");
+T(!fs.readdirSync(pub("images/equipment")).some(f=>!L.PICS.some(p=>f.startsWith(p[0]+"-"))),"no stray files in the pictures folder");
+T(["car","offroad","trailer","mower"].every(k=>L.PICS.some(p=>p[0]===L.picOf({kind:k}))),"each existing equipment type has a default picture that exists");
+T(L.picOf({kind:"other"})===""&&L.picOf({kind:"something-new"})===""&&L.picOf(null)==="","types without a picture (and odd data) give none, so the app falls back to an icon");
+T(L.picOf({kind:"car",pic:"boat"})==="boat"&&L.picOf({kind:"car",pic:"gone.png"})==="car","a chosen picture wins; an unknown one is ignored");
+const old={kind:"atv",specs:{}};L.fixV(old);T(old.kind==="offroad"&&old.pic===undefined,"old equipment keeps its type and gets no new stored field");
 T(!/\b(S|view|tab|document|window|localStorage)\b/.test(lib.replace(/\/\/.*$/gm,"").replace(/typeof module/,"")),"lib.js doesn't touch the page or the app's state");
 global.Date=RealDate;
 console.log(bad?"FAILURES: "+bad:"ALL OK");process.exit(bad?1:0);
