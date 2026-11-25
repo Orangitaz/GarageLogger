@@ -101,7 +101,7 @@ try:
         T(A.locator(".vt .cv.ill img[src*='images/equipment/car-']").count() == 1, "a car with no picture chosen shows the default car picture")
         T(A.evaluate("[...document.querySelectorAll('.vt .cv.ill img')].every(i=>i.getAttribute('width')&&i.getAttribute('height'))"), "pictures have fixed dimensions (no layout jump)")
         A.click(".vt .ed"); A.wait_for_selector("#v_pic")
-        T(A.locator("#v_pic button").count() == 21, "the form offers Automatic plus the 20 pictures")
+        T(A.locator("#v_pic button").count() == 34 and A.locator("#v_pic .pkh").count() == 5, "the form offers Automatic plus the 33 pictures in 5 groups")
         A.click("#v_pic button[data-p=boat]"); A.click("#ok")
         T(until(lambda: state()["vehicles"][0].get("pic") == "boat" and state()["vehicles"][0]["kind"] == "car"), "choosing a picture stores it and leaves the equipment type alone")
         T(until(lambda: A.locator(".vt .cv.ill img[src*='boat-']").count() == 1), "the card now shows the chosen picture")

@@ -2,6 +2,11 @@
 
 Each release has a number: **major.minor.patch**. A new feature raises the minor number (1.1.0), a fix raises the patch number (1.0.1), and a big change that needs your attention raises the major number (2.0.0). The number is in the `VERSION` file, shows at the bottom of **Settings & data** in the app, and is a tag on the Docker image (for example `ghcr.io/orangitaz/garagelogger:1.0.0`), so you can always tell which version is running.
 
+## 1.26.0 - 2026-11-25
+- 13 more equipment pictures: boat trailer, stand-up and sit-down jet ski, dirt bike, push mower, snow blower, leaf blower, string trimmer, chainsaw, pressure washer, garden tiller, hedge trimmer and lawn edger. There are now 33 to choose from in **Edit equipment > Picture**.
+- The picture list is grouped (Cars & trucks, Off-road & snow, Trailers, Water, Mowers & yard tools) so it is quicker to scan.
+- Nothing else changes: equipment types, default pictures per type and saved data are the same, and a picture is only stored when you pick one.
+
 ## 1.25.0 - 2026-11-21
 - Equipment now has a 3D picture. Cars and trucks, off-road, trailers and lawn mowers each get a default picture (car, UTV, utility trailer, riding mower) on the garage cards and at the top of the equipment's dashboard. "Other" keeps its small icon. A cover photo you added yourself still comes first.
 - **Edit equipment > Picture** lets you pick any of 20 pictures (car, pickup, SUV, motorcycle, RV, ATV, UTV, off-road UTV, snowmobile, golf cart, utility, flatbed, dump and enclosed trailers, horse trailer, travel trailer, boat, riding and zero-turn mowers, tractor) or leave it on Automatic. The choice is stored as a new optional `pic` field only when you pick one; equipment types, existing equipment and saved records are unchanged.

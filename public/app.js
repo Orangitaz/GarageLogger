@@ -814,7 +814,7 @@ function vehForm(edit){
   $("cfb").onclick=()=>$("cf").click();$("v_scan").onclick=()=>scanCode(v=>{$("v_vin").value=v},true);$("cf").onchange=async()=>{const f=$("cf").files[0];if(f){cover=await up(await shrink(f,700,.7));$("cf").value="";dc()}};$("cv").onclick=e=>{if(e.target.dataset.rm){cover="";dc()}};
   let pic=PICS.some(p=>p[0]===v.pic)?v.pic:"";
   const pd=()=>{const k=$("v_k").value,dk=PIC_DEF[k],b=(key,label,art)=>`<button type="button" role="radio" aria-checked="${pic===key}" class="${pic===key?"on":""}" data-p="${key}" aria-label="${esc(label)}"><span class="art">${art}</span><small>${esc(label)}</small></button>`;
-    $("v_pic").innerHTML=b("","Automatic",dk?picImg(dk,"90px"):`<span class="em" aria-hidden="true">${kEmoji(k)}</span>`)+PICS.map(p=>b(p[0],p[1],picImg(p[0],"90px"))).join("")};pd();
+    $("v_pic").innerHTML=b("","Automatic",dk?picImg(dk,"90px"):`<span class="em" aria-hidden="true">${kEmoji(k)}</span>`)+PGROUPS.map(([gl,ks])=>`<div class="pkh">${esc(gl)}</div>`+ks.map(key=>{const p=PICS.find(x=>x[0]===key);return p?b(p[0],p[1],picImg(p[0],"90px")):""}).join("")).join("")};pd();
   $("v_pic").onclick=e=>{const b=e.target.closest("button");if(!b)return;pic=b.dataset.p;pd()};
   const tp=()=>{const k=$("v_k").value;$("v_pr").style.display=["car","trailer"].includes(k)?"":"none";$("v_or").style.display=k==="offroad"?"":"none";$("v_rg").style.display=k==="mower"?"none":""};tp();
   let color=v.color||"";
